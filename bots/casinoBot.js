@@ -43,7 +43,7 @@ module.exports = (token) => {
       await ctx.reply(`Welcome to Greenlight Casino, ${first_name}! 🎰✨\n\nTap the button below to start playing.`, {
         reply_markup: {
           inline_keyboard: [
-            [{ text: '🎮 Play Greenlight Casino', web_app: { url: process.env.WEBAPP_URL || 'https://your-webapp-url.com' } }]
+            [{ text: '🎮 Play Greenlight Casino', web_app: { url: process.env.WEBAPP_URL || 'https://grnlight-casino.onrender.com' } }]
           ]
         }
       });
