@@ -4,10 +4,15 @@
 const tgApp = window.Telegram.WebApp;
 tgApp.expand();
 
-// API base URL
-const API_URL = window.location.hostname === 'localhost' 
-  ? 'http://localhost:3000/api' 
-  : 'https://your-production-domain.com/api';
+// API base URL - динамически определяем на основе текущего хоста
+const API_URL = `${window.location.origin}/api`;
+
+// Отладочная информация
+console.log('WebApp Info:', {
+  API_URL,
+  location: window.location.href,
+  origin: window.location.origin
+});
 
 // Current user data
 let currentUser = {
@@ -18,60 +23,122 @@ let currentUser = {
   balance: 0
 };
 
-// Elements
-const screens = document.querySelectorAll('.screen');
-const backButtons = document.querySelectorAll('.back-btn');
-const gameCards = document.querySelectorAll('.game-card');
-const balanceDisplay = document.getElementById('balance-amount');
-const homeBtn = document.getElementById('home-btn');
-const historyBtn = document.getElementById('history-btn');
-const profileBtn = document.getElementById('profile-btn');
-const historyModal = document.getElementById('history-modal');
-const profileModal = document.getElementById('profile-modal');
-const closeModalButtons = document.querySelectorAll('.close-modal');
-const userName = document.getElementById('user-name');
-const profileBalance = document.getElementById('profile-balance');
-const historyList = document.getElementById('history-list');
-const transactionList = document.getElementById('transaction-list');
-
 // ===== Initialization =====
 document.addEventListener('DOMContentLoaded', initApp);
 
 async function initApp() {
-  // Initialize user from Telegram WebApp
-  if (tgApp.initDataUnsafe && tgApp.initDataUnsafe.user) {
-    const user = tgApp.initDataUnsafe.user;
+  try {
+    console.log('App initialization started');
+
+    // Initialize user from Telegram WebApp
+    if (tgApp.initDataUnsafe && tgApp.initDataUnsafe.user) {
+      const user = tgApp.initDataUnsafe.user;
+      console.log('User data from Telegram:', user);
+      
+      // Set current user data
+      currentUser.telegramId = user.id;
+      currentUser.firstName = user.first_name;
+      currentUser.lastName = user.last_name || '';
+      currentUser.username = user.username || '';
+      
+      // Register/update user in our system
+      await registerUser();
+      
+      // Update user interface
+      updateUserInterface();
+      
+      // Load user balance and info
+      await getUserProfile();
+    } else {
+      // For testing locally without Telegram
+      console.log('Running in development mode without Telegram WebApp');
+      
+      // Use test user for development
+      currentUser.telegramId = 123456789;
+      currentUser.firstName = 'Test';
+      currentUser.lastName = 'User';
+      currentUser.username = 'testuser';
+      currentUser.balance = 500;
+      
+      updateUserInterface();
+    }
     
-    // Set current user data
-    currentUser.telegramId = user.id;
-    currentUser.firstName = user.first_name;
-    currentUser.lastName = user.last_name || '';
-    currentUser.username = user.username || '';
+    // Re-select DOM elements to ensure they're available
+    const screens = document.querySelectorAll('.screen');
+    const gameCards = document.querySelectorAll('.game-card');
+    const backButtons = document.querySelectorAll('.back-btn');
     
-    // Register/update user in our system
-    await registerUser();
+    console.log('DOM elements found:', {
+      screens: screens.length,
+      gameCards: gameCards.length,
+      backButtons: backButtons.length
+    });
     
-    // Update user interface
-    updateUserInterface();
+    // Setup direct click handlers for game cards
+    setupGameCardHandlers();
     
-    // Load user balance and info
-    await getUserProfile();
-  } else {
-    // For testing locally without Telegram
-    console.log('Running in development mode without Telegram WebApp');
+    // Add event listeners for other elements
+    addEventListeners();
     
-    // Use test user for development
-    currentUser.telegramId = 123456789;
-    currentUser.firstName = 'Test';
-    currentUser.lastName = 'User';
-    currentUser.username = 'testuser';
-    currentUser.balance = 500;
+    console.log('App initialization completed');
+  } catch (error) {
+    console.error('Error during app initialization:', error);
+    showNotification('Error initializing app. Please try again later.');
+  }
+}
+
+// Setup direct handlers for game cards
+function setupGameCardHandlers() {
+  const gameCards = document.querySelectorAll('.game-card');
+  console.log('Setting up handlers for', gameCards.length, 'game cards');
+  
+  gameCards.forEach(card => {
+    const game = card.getAttribute('data-game');
+    console.log('Setting up handler for game:', game);
     
-    updateUserInterface();
+    // Make card visibly clickable
+    card.style.cursor = 'pointer';
+    
+    // Remove any existing handlers
+    const newCard = card.cloneNode(true);
+    card.parentNode.replaceChild(newCard, card);
+    
+    // Add onclick handler directly
+    newCard.onclick = function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('Game card clicked:', game);
+      showGameScreen(game);
+    };
+  });
+}
+
+// Function to show game screen
+function showGameScreen(gameName) {
+  const screenId = `${gameName}-screen`;
+  console.log('Attempting to show game screen:', screenId);
+  
+  // Get the screen element
+  const screenElement = document.getElementById(screenId);
+  
+  if (!screenElement) {
+    console.error('Game screen not found:', screenId);
+    return;
   }
   
-  // Add event listeners
-  addEventListeners();
+  // Hide all screens
+  const screens = document.querySelectorAll('.screen');
+  screens.forEach(screen => {
+    screen.classList.remove('active');
+    console.log('Removed active class from:', screen.id);
+  });
+  
+  // Show selected screen
+  screenElement.classList.add('active');
+  console.log('Added active class to:', screenId);
+  
+  // Update nav button
+  updateActiveNavButton(document.getElementById('home-btn'));
 }
 
 // ===== API Functions =====
@@ -217,19 +284,36 @@ async function processGameResult(gameType, betAmount, outcome, winAmount, gameDa
 
 // ===== UI Functions =====
 function updateUserInterface() {
+  // Get up-to-date elements
+  const userName = document.getElementById('user-name');
+  
   // Update user name display
-  userName.textContent = currentUser.firstName;
+  if (userName) {
+    userName.textContent = currentUser.firstName;
+  }
   
   // Update balance displays
   updateBalance();
 }
 
 function updateBalance() {
-  balanceDisplay.textContent = currentUser.balance;
-  profileBalance.textContent = currentUser.balance;
+  const balanceDisplay = document.getElementById('balance-amount');
+  const profileBalance = document.getElementById('profile-balance');
+  
+  if (balanceDisplay) {
+    balanceDisplay.textContent = currentUser.balance;
+  }
+  
+  if (profileBalance) {
+    profileBalance.textContent = currentUser.balance;
+  }
 }
 
 function updateHistoryList(historyData) {
+  // Get fresh reference to element
+  const historyList = document.getElementById('history-list');
+  if (!historyList) return;
+  
   // Clear the current list
   historyList.innerHTML = '';
   
@@ -276,6 +360,10 @@ function updateHistoryList(historyData) {
 }
 
 function updateTransactionList(transactionData) {
+  // Get fresh reference to element
+  const transactionList = document.getElementById('transaction-list');
+  if (!transactionList) return;
+  
   // Clear the current list
   transactionList.innerHTML = '';
   
@@ -350,29 +438,55 @@ function showNotification(message) {
 
 // ===== Navigation Functions =====
 function showScreen(screenId) {
+  console.log('Showing screen:', screenId);
+  
+  // Get fresh references to screens
+  const screens = document.querySelectorAll('.screen');
+  
   // Hide all screens
   screens.forEach(screen => {
     screen.classList.remove('active');
   });
   
   // Show the selected screen
-  document.getElementById(screenId).classList.add('active');
+  const targetScreen = document.getElementById(screenId);
+  if (targetScreen) {
+    targetScreen.classList.add('active');
+  } else {
+    console.error('Screen not found:', screenId);
+  }
 }
 
 function showModal(modal) {
+  if (!modal) {
+    console.error('Modal not found');
+    return;
+  }
+  
   modal.style.display = 'flex';
   
   // Add fade-in animation
   setTimeout(() => {
-    modal.querySelector('.modal-content').style.opacity = '1';
-    modal.querySelector('.modal-content').style.transform = 'scale(1)';
+    const content = modal.querySelector('.modal-content');
+    if (content) {
+      content.style.opacity = '1';
+      content.style.transform = 'scale(1)';
+    }
   }, 10);
 }
 
 function hideModal(modal) {
+  if (!modal) {
+    console.error('Modal not found');
+    return;
+  }
+  
   // Add fade-out animation
-  modal.querySelector('.modal-content').style.opacity = '0';
-  modal.querySelector('.modal-content').style.transform = 'scale(0.9)';
+  const content = modal.querySelector('.modal-content');
+  if (content) {
+    content.style.opacity = '0';
+    content.style.transform = 'scale(0.9)';
+  }
   
   // Hide modal after animation
   setTimeout(() => {
@@ -382,45 +496,56 @@ function hideModal(modal) {
 
 // ===== Event Listeners =====
 function addEventListeners() {
-  // Game card click event
-  gameCards.forEach(card => {
-    card.addEventListener('click', () => {
-      const game = card.getAttribute('data-game');
-      showScreen(`${game}-screen`);
-      
-      // Update active nav button
-      updateActiveNavButton(homeBtn);
-    });
-  });
+  console.log('Adding event listeners');
+  
+  // Elements
+  const backButtons = document.querySelectorAll('.back-btn');
+  const homeBtn = document.getElementById('home-btn');
+  const historyBtn = document.getElementById('history-btn');
+  const profileBtn = document.getElementById('profile-btn');
+  const historyModal = document.getElementById('history-modal');
+  const profileModal = document.getElementById('profile-modal');
+  const closeModalButtons = document.querySelectorAll('.close-modal');
   
   // Back button click events
   backButtons.forEach(button => {
     button.addEventListener('click', () => {
+      console.log('Back button clicked');
       showScreen('welcome-screen');
     });
   });
   
   // Bottom navigation click events
-  homeBtn.addEventListener('click', () => {
-    showScreen('welcome-screen');
-    updateActiveNavButton(homeBtn);
-  });
+  if (homeBtn) {
+    homeBtn.addEventListener('click', () => {
+      console.log('Home button clicked');
+      showScreen('welcome-screen');
+      updateActiveNavButton(homeBtn);
+    });
+  }
   
-  historyBtn.addEventListener('click', () => {
-    getGameHistory();
-    showModal(historyModal);
-    updateActiveNavButton(historyBtn);
-  });
+  if (historyBtn) {
+    historyBtn.addEventListener('click', () => {
+      console.log('History button clicked');
+      getGameHistory();
+      showModal(historyModal);
+      updateActiveNavButton(historyBtn);
+    });
+  }
   
-  profileBtn.addEventListener('click', () => {
-    getTransactionHistory();
-    showModal(profileModal);
-    updateActiveNavButton(profileBtn);
-  });
+  if (profileBtn) {
+    profileBtn.addEventListener('click', () => {
+      console.log('Profile button clicked');
+      getTransactionHistory();
+      showModal(profileModal);
+      updateActiveNavButton(profileBtn);
+    });
+  }
   
   // Close modal buttons
   closeModalButtons.forEach(button => {
     button.addEventListener('click', () => {
+      console.log('Close modal button clicked');
       const modal = button.closest('.modal');
       hideModal(modal);
       updateActiveNavButton(homeBtn);
@@ -428,19 +553,30 @@ function addEventListeners() {
   });
   
   // Close modal when clicking outside content
-  window.addEventListener('click', (event) => {
-    if (event.target === historyModal) {
-      hideModal(historyModal);
-      updateActiveNavButton(homeBtn);
-    }
-    if (event.target === profileModal) {
-      hideModal(profileModal);
-      updateActiveNavButton(homeBtn);
-    }
-  });
+  if (historyModal) {
+    historyModal.addEventListener('click', (event) => {
+      if (event.target === historyModal) {
+        hideModal(historyModal);
+        updateActiveNavButton(homeBtn);
+      }
+    });
+  }
+  
+  if (profileModal) {
+    profileModal.addEventListener('click', (event) => {
+      if (event.target === profileModal) {
+        hideModal(profileModal);
+        updateActiveNavButton(homeBtn);
+      }
+    });
+  }
+  
+  console.log('Event listeners added successfully');
 }
 
 function updateActiveNavButton(activeButton) {
+  if (!activeButton) return;
+  
   // Remove active class from all nav buttons
   document.querySelectorAll('.nav-btn').forEach(btn => {
     btn.classList.remove('active');
@@ -454,5 +590,6 @@ function updateActiveNavButton(activeButton) {
 window.casinoApp = {
   processGameResult,
   showNotification,
-  currentUser
+  currentUser,
+  showScreen
 };
