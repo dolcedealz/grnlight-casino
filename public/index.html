@@ -1,28 +1,128 @@
-<!-- public/index.html -->
+<!-- public/index.html - Simplified version -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Greenlight Casino</title>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Poiret+One&display=swap">
-    <link rel="stylesheet" href="css/style.css">
-    <!-- Load Telegram Web App JS first -->
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <!-- Load improved loader script -->
-    <script src="js/loader.js"></script>
+    <style>
+        /* Basic styles to make the app look decent */
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #121212;
+            color: white;
+            margin: 0;
+            padding: 0;
+        }
+        
+        .app-container {
+            max-width: 100%;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #333;
+            margin-bottom: 20px;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+        }
+        
+        .logo h1 {
+            margin: 0;
+            color: #00A86B;
+        }
+        
+        .balance {
+            background: #222;
+            padding: 5px 15px;
+            border-radius: 20px;
+            border: 1px solid #444;
+        }
+        
+        .game-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .game-card {
+            background: #1E1E1E;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        
+        .game-card:hover {
+            transform: translateY(-5px);
+            border-color: #00A86B;
+        }
+        
+        .game-icon {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+        
+        .screen {
+            display: none;
+        }
+        
+        .screen.active {
+            display: block;
+        }
+        
+        .bottom-nav {
+            display: flex;
+            justify-content: space-around;
+            padding: 10px 0;
+            background: #1A1A1A;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            border-top: 1px solid #333;
+        }
+        
+        .nav-btn {
+            background: none;
+            border: none;
+            color: #888;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+        }
+        
+        .nav-btn.active {
+            color: #00A86B;
+        }
+        
+        .nav-icon {
+            font-size: 1.5em;
+        }
+    </style>
 </head>
 <body>
     <div class="app-container">
         <!-- Header -->
         <header class="header">
             <div class="logo">
-                <div class="green-light"></div>
                 <h1>Greenlight</h1>
             </div>
             <div class="balance">
                 <span id="balance-amount">0</span>
-                <span class="star">⭐</span>
+                <span>⭐</span>
             </div>
         </header>
 
@@ -30,196 +130,60 @@
         <main class="main-content">
             <!-- Welcome Screen -->
             <div id="welcome-screen" class="screen active">
-                <div class="gatsby-quote">
-                    <p>"Gatsby believed in the green light, the orgastic future that year by year recedes before us..."</p>
-                </div>
-                <div class="game-selection">
-                    <h2>Select a Game</h2>
-                    <div class="game-grid">
-                        <div class="game-card" data-game="slots">
-                            <div class="game-icon">🎰</div>
-                            <div class="game-name">Slots</div>
-                        </div>
-                        <div class="game-card" data-game="roulette">
-                            <div class="game-icon">🎲</div>
-                            <div class="game-name">Roulette</div>
-                        </div>
-                        <div class="game-card" data-game="guessnumber">
-                            <div class="game-icon">🔢</div>
-                            <div class="game-name">Guess Number</div>
-                        </div>
-                        <div class="game-card" data-game="miner">
-                            <div class="game-icon">💣</div>
-                            <div class="game-name">Miner</div>
-                        </div>
-                        <div class="game-card" data-game="crush">
-                            <div class="game-icon">📈</div>
-                            <div class="game-name">Crush</div>
-                        </div>
+                <h2>Select a Game</h2>
+                <div class="game-grid">
+                    <div class="game-card" data-game="slots">
+                        <div class="game-icon">🎰</div>
+                        <div>Slots</div>
+                    </div>
+                    <div class="game-card" data-game="roulette">
+                        <div class="game-icon">🎲</div>
+                        <div>Roulette</div>
+                    </div>
+                    <div class="game-card" data-game="guessnumber">
+                        <div class="game-icon">🔢</div>
+                        <div>Guess Number</div>
+                    </div>
+                    <div class="game-card" data-game="miner">
+                        <div class="game-icon">💣</div>
+                        <div>Miner</div>
+                    </div>
+                    <div class="game-card" data-game="crush">
+                        <div class="game-icon">📈</div>
+                        <div>Crush</div>
                     </div>
                 </div>
             </div>
 
-            <!-- Slots Game Screen -->
+            <!-- Placeholder for game screens -->
             <div id="slots-screen" class="screen">
-                <div class="game-header">
-                    <button class="back-btn">&larr; Back</button>
-                    <h2>Slots</h2>
-                </div>
-                <div class="slots-container">
-                    <div class="slot-reels">
-                        <div class="reel" id="reel1">
-                            <div class="symbol">🍒</div>
-                        </div>
-                        <div class="reel" id="reel2">
-                            <div class="symbol">🍋</div>
-                        </div>
-                        <div class="reel" id="reel3">
-                            <div class="symbol">7️⃣</div>
-                        </div>
-                    </div>
-                    <div class="result" id="slots-result"></div>
-                    <div class="bet-controls">
-                        <div class="bet-amount">
-                            <label for="slots-bet">Bet Amount:</label>
-                            <input type="number" id="slots-bet" min="1" value="10">
-                        </div>
-                        <button id="spin-btn" class="action-btn">SPIN</button>
-                    </div>
-                </div>
+                <h2>Slots Game</h2>
+                <p>Game coming soon</p>
+                <button class="back-btn">Back</button>
             </div>
-
-            <!-- Roulette Game Screen -->
+            
             <div id="roulette-screen" class="screen">
-                <div class="game-header">
-                    <button class="back-btn">&larr; Back</button>
-                    <h2>Roulette</h2>
-                </div>
-                <div class="roulette-container">
-                    <div class="roulette-wheel">
-                        <div class="wheel-outer">
-                            <div class="wheel-inner" id="wheel-inner">
-                                <div class="ball" id="roulette-ball"></div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="result" id="roulette-result"></div>
-                    <div class="bet-options">
-                        <div class="bet-type">
-                            <label for="roulette-bet-type">Bet Type:</label>
-                            <select id="roulette-bet-type">
-                                <option value="color">Color (Red/Black)</option>
-                                <option value="number">Number (0-36)</option>
-                                <option value="odd-even">Odd/Even</option>
-                            </select>
-                        </div>
-                        <div id="bet-color-container" class="bet-color-container">
-                            <button class="color-btn red" data-color="red">Red</button>
-                            <button class="color-btn black" data-color="black">Black</button>
-                        </div>
-                        <div id="bet-number-container" class="bet-number-container hidden">
-                            <input type="number" id="roulette-number" min="0" max="36" value="0">
-                        </div>
-                        <div id="bet-odd-even-container" class="bet-odd-even-container hidden">
-                            <button class="odd-even-btn" data-type="odd">Odd</button>
-                            <button class="odd-even-btn" data-type="even">Even</button>
-                        </div>
-                        <div class="bet-amount">
-                            <label for="roulette-bet">Bet Amount:</label>
-                            <input type="number" id="roulette-bet" min="1" value="10">
-                        </div>
-                        <button id="spin-wheel-btn" class="action-btn">SPIN</button>
-                    </div>
-                </div>
+                <h2>Roulette Game</h2>
+                <p>Game coming soon</p>
+                <button class="back-btn">Back</button>
             </div>
-
-            <!-- Guess Number Game Screen -->
+            
             <div id="guessnumber-screen" class="screen">
-                <div class="game-header">
-                    <button class="back-btn">&larr; Back</button>
-                    <h2>Guess the Number</h2>
-                </div>
-                <div class="guessnumber-container">
-                    <div class="number-range">
-                        <p>Guess a number between <span id="min-range">1</span> and <span id="max-range">100</span></p>
-                    </div>
-                    <div class="guess-input">
-                        <input type="number" id="guess-input" min="1" max="100" value="50">
-                    </div>
-                    <div class="result" id="guess-result"></div>
-                    <div class="bet-controls">
-                        <div class="bet-amount">
-                            <label for="guess-bet">Bet Amount:</label>
-                            <input type="number" id="guess-bet" min="1" value="10">
-                        </div>
-                        <button id="guess-btn" class="action-btn">GUESS</button>
-                    </div>
-                </div>
+                <h2>Guess Number Game</h2>
+                <p>Game coming soon</p>
+                <button class="back-btn">Back</button>
             </div>
-
-            <!-- Miner Game Screen -->
+            
             <div id="miner-screen" class="screen">
-                <div class="game-header">
-                    <button class="back-btn">&larr; Back</button>
-                    <h2>Miner</h2>
-                </div>
-                <div class="miner-container">
-                    <div class="miner-info">
-                        <div class="mines-count">
-                            <span>Mines: </span>
-                            <select id="mines-count">
-                                <option value="3">3</option>
-                                <option value="5">5</option>
-                                <option value="7">7</option>
-                                <option value="10">10</option>
-                            </select>
-                        </div>
-                        <div class="potential-win">
-                            <span>Potential Win: </span>
-                            <span id="potential-win">0</span>
-                            <span class="star">⭐</span>
-                        </div>
-                    </div>
-                    <div class="miner-grid" id="miner-grid"></div>
-                    <div class="result" id="miner-result"></div>
-                    <div class="miner-controls">
-                        <div class="bet-amount">
-                            <label for="miner-bet">Bet Amount:</label>
-                            <input type="number" id="miner-bet" min="1" value="10">
-                        </div>
-                        <div class="control-buttons">
-                            <button id="new-game-btn" class="action-btn">NEW GAME</button>
-                            <button id="cashout-btn" class="action-btn" disabled>CASH OUT</button>
-                        </div>
-                    </div>
-                </div>
+                <h2>Miner Game</h2>
+                <p>Game coming soon</p>
+                <button class="back-btn">Back</button>
             </div>
-
-            <!-- Crush Game Screen -->
+            
             <div id="crush-screen" class="screen">
-                <div class="game-header">
-                    <button class="back-btn">&larr; Back</button>
-                    <h2>Crush</h2>
-                </div>
-                <div class="crush-container">
-                    <div class="multiplier-display">
-                        <span id="multiplier">1.00</span>x
-                    </div>
-                    <div class="crush-graph" id="crush-graph">
-                        <div class="graph-line" id="graph-line"></div>
-                    </div>
-                    <div class="result" id="crush-result"></div>
-                    <div class="crush-controls">
-                        <div class="bet-amount">
-                            <label for="crush-bet">Bet Amount:</label>
-                            <input type="number" id="crush-bet" min="1" value="10">
-                        </div>
-                        <div class="control-buttons">
-                            <button id="start-crush-btn" class="action-btn">START</button>
-                            <button id="cash-crush-btn" class="action-btn" disabled>CASH OUT</button>
-                        </div>
-                    </div>
-                </div>
+                <h2>Crush Game</h2>
+                <p>Game coming soon</p>
+                <button class="back-btn">Back</button>
             </div>
         </main>
 
@@ -227,65 +191,96 @@
         <nav class="bottom-nav">
             <button id="history-btn" class="nav-btn">
                 <span class="nav-icon">📜</span>
-                <span class="nav-label">History</span>
+                <span>History</span>
             </button>
             <button id="home-btn" class="nav-btn active">
                 <span class="nav-icon">🏠</span>
-                <span class="nav-label">Home</span>
+                <span>Home</span>
             </button>
             <button id="profile-btn" class="nav-btn">
                 <span class="nav-icon">👤</span>
-                <span class="nav-label">Profile</span>
+                <span>Profile</span>
             </button>
         </nav>
-
-        <!-- History Screen (Modal) -->
-        <div id="history-modal" class="modal">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h2>Game History</h2>
-                    <span class="close-modal">&times;</span>
-                </div>
-                <div class="modal-body">
-                    <div id="history-list" class="history-list">
-                        <!-- History items will be added dynamically -->
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Profile Screen (Modal) -->
-        <div id="profile-modal" class="modal">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h2>Profile</h2>
-                    <span class="close-modal">&times;</span>
-                </div>
-                <div class="modal-body">
-                    <div class="profile-info">
-                        <div class="user-avatar">👤</div>
-                        <div class="user-details">
-                            <h3 id="user-name">Player</h3>
-                            <p>Balance: <span id="profile-balance">0</span> ⭐</p>
-                        </div>
-                    </div>
-                    <div class="transaction-history">
-                        <h3>Transaction History</h3>
-                        <div id="transaction-list" class="transaction-list">
-                            <!-- Transaction items will be added dynamically -->
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
     </div>
 
-    <!-- Main JavaScript -->
-    <script src="js/main.js"></script>
-    <script src="js/games/slots.js"></script>
-    <script src="js/games/roulette.js"></script>
-    <script src="js/games/guessnumber.js"></script>
-    <script src="js/games/miner.js"></script>
-    <script src="js/games/crush.js"></script>
+    <!-- Telegram WebApp API -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    
+    <!-- Simple App Script -->
+    <script>
+    // Initialize Telegram WebApp
+    const tgApp = window.Telegram?.WebApp;
+    if (tgApp) {
+        try {
+            tgApp.expand();
+            console.log('Telegram WebApp expanded successfully');
+        } catch (error) {
+            console.error('Error expanding Telegram WebApp:', error);
+        }
+    }
+    
+    // Basic navigation
+    document.addEventListener('DOMContentLoaded', function() {
+        // Game card click handlers
+        const gameCards = document.querySelectorAll('.game-card');
+        gameCards.forEach(card => {
+            card.addEventListener('click', function() {
+                const game = this.getAttribute('data-game');
+                if (!game) return;
+                
+                document.querySelectorAll('.screen').forEach(screen => {
+                    screen.classList.remove('active');
+                });
+                
+                const targetScreen = document.getElementById(`${game}-screen`);
+                if (targetScreen) {
+                    targetScreen.classList.add('active');
+                }
+            });
+        });
+        
+        // Back button handlers
+        const backButtons = document.querySelectorAll('.back-btn');
+        backButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                document.querySelectorAll('.screen').forEach(screen => {
+                    screen.classList.remove('active');
+                });
+                
+                const welcomeScreen = document.getElementById('welcome-screen');
+                if (welcomeScreen) {
+                    welcomeScreen.classList.add('active');
+                }
+            });
+        });
+        
+        // Navigation button handlers
+        const homeBtn = document.getElementById('home-btn');
+        if (homeBtn) {
+            homeBtn.addEventListener('click', function() {
+                document.querySelectorAll('.screen').forEach(screen => {
+                    screen.classList.remove('active');
+                });
+                
+                const welcomeScreen = document.getElementById('welcome-screen');
+                if (welcomeScreen) {
+                    welcomeScreen.classList.add('active');
+                }
+                
+                updateActiveNavButton(this);
+            });
+        }
+        
+        // Helper for nav buttons
+        function updateActiveNavButton(activeButton) {
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            activeButton.classList.add('active');
+        }
+    });
+    </script>
 </body>
 </html>
