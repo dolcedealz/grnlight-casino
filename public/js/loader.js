@@ -1,270 +1,336 @@
-// Улучшенный loader.js со стабильным поведением и подробным логированием
-
-console.log('[Loader] Инициализация улучшенного загрузчика');
+// Усовершенствованный loader.js с гарантированной загрузкой для Greenlight Casino
+console.log('[Loader] Начало загрузки приложения');
 
 (function() {
-  // Переменная для отслеживания состояния загрузчика
-  let loaderRemoved = false;
+  // Отслеживание состояния загрузки
+  let isLoaderRemoved = false;
+  let jsScriptsLoaded = false;
+  let domInitialized = false;
   
-  // Создание загрузочного экрана (если его еще нет)
-  const createLoadingOverlay = () => {
-    console.log('[Loader] Создание оверлея загрузки');
+  // Базовые проверки проблем загрузки
+  let checkInterval;
+  let loadingTimeoutId;
+  
+  // Создание экрана загрузки (или использование существующего)
+  const setupLoadingScreen = () => {
+    console.log('[Loader] Настройка экрана загрузки');
     
-    // Проверяем, существует ли уже оверлей
-    let overlay = document.getElementById('loadingOverlay');
+    // Проверяем, существует ли уже экран загрузки
+    let loadingOverlay = document.getElementById('loadingOverlay');
     
-    if (!overlay) {
-      overlay = document.createElement('div');
-      overlay.className = 'loading-overlay';
-      overlay.id = 'loadingOverlay';
+    if (!loadingOverlay) {
+      console.log('[Loader] Создание экрана загрузки');
       
-      // Создаем спиннер
+      // Создаем структуру загрузочного экрана
+      loadingOverlay = document.createElement('div');
+      loadingOverlay.className = 'loading-overlay';
+      loadingOverlay.id = 'loadingOverlay';
+      
       const spinner = document.createElement('div');
       spinner.className = 'loading-spinner';
       
-      // Создаем текст загрузки
       const loadingText = document.createElement('div');
       loadingText.className = 'loading-text';
       loadingText.textContent = 'Loading Greenlight Casino...';
       
-      // Добавляем элементы
-      overlay.appendChild(spinner);
-      overlay.appendChild(loadingText);
+      loadingOverlay.appendChild(spinner);
+      loadingOverlay.appendChild(loadingText);
       
-      // Убедимся, что body существует
+      // Добавляем в DOM, если body уже доступен
       if (document.body) {
-        document.body.appendChild(overlay);
-        console.log('[Loader] Оверлей загрузки добавлен в DOM');
+        document.body.appendChild(loadingOverlay);
       } else {
-        console.error('[Loader] Не могу найти body для добавления оверлея');
-        // Попробуем добавить позже, когда DOM будет готов
+        // Добавляем обработчик, если body еще не создан
         document.addEventListener('DOMContentLoaded', () => {
-          document.body.appendChild(overlay);
-          console.log('[Loader] Оверлей загрузки добавлен в DOM после DOMContentLoaded');
+          if (document.body && !document.getElementById('loadingOverlay')) {
+            document.body.appendChild(loadingOverlay);
+          }
         });
       }
     } else {
-      console.log('[Loader] Оверлей загрузки уже существует');
+      console.log('[Loader] Экран загрузки уже существует');
     }
     
-    return overlay;
+    return loadingOverlay;
   };
   
-  // Удаление загрузочного экрана с доп. проверками
-  const removeLoadingOverlay = (reason) => {
-    if (loaderRemoved) {
-      console.log(`[Loader] Попытка повторного удаления оверлея (причина: ${reason}), игнорирую`);
+  // Удаление экрана загрузки
+  const removeLoadingScreen = (reason) => {
+    if (isLoaderRemoved) {
+      console.log(`[Loader] Повторный вызов удаления (причина: ${reason}), игнорируем`);
       return;
     }
     
-    console.log(`[Loader] Удаление оверлея загрузки (причина: ${reason})`);
-    
-    // Помечаем, что мы уже запустили процесс удаления
-    loaderRemoved = true;
+    console.log(`[Loader] Удаление экрана загрузки (причина: ${reason})`);
+    isLoaderRemoved = true;
     
     try {
-      const overlay = document.getElementById('loadingOverlay');
+      // Очищаем все таймеры
+      clearTimeout(loadingTimeoutId);
+      clearInterval(checkInterval);
       
-      if (overlay) {
-        // Скрываем сначала через opacity для плавного исчезновения
-        overlay.style.opacity = '0';
+      const loadingOverlay = document.getElementById('loadingOverlay');
+      if (loadingOverlay) {
+        // Плавное скрытие
+        loadingOverlay.style.opacity = '0';
         
         setTimeout(() => {
           try {
-            if (overlay.parentNode) {
-              overlay.parentNode.removeChild(overlay);
-              console.log('[Loader] Оверлей успешно удален');
-            } else {
-              console.warn('[Loader] У оверлея нет родителя, возможно он уже удален');
+            if (loadingOverlay.parentNode) {
+              loadingOverlay.parentNode.removeChild(loadingOverlay);
+              console.log('[Loader] Экран загрузки успешно удален');
             }
           } catch (e) {
-            console.error('[Loader] Ошибка при удалении оверлея:', e);
-            
-            // Крайний случай - просто скрываем его
-            if (overlay) overlay.style.display = 'none';
+            console.error('[Loader] Ошибка при удалении экрана загрузки:', e);
+            // Просто скрываем, если не можем удалить
+            loadingOverlay.style.display = 'none';
           }
         }, 500);
       } else {
-        console.warn('[Loader] Оверлей не найден при попытке удаления');
+        console.warn('[Loader] Экран загрузки не найден при попытке удаления');
       }
       
-      // Проверяем видимость главного экрана
-      checkMainScreenVisibility();
-    } catch (e) {
-      console.error('[Loader] Критическая ошибка при удалении оверлея:', e);
+      // Проверка видимости главного экрана и активация при необходимости
+      activateMainScreen();
+    } catch (error) {
+      console.error('[Loader] Критическая ошибка при удалении экрана загрузки:', error);
       
-      // Пытаемся в любом случае скрыть все элементы loading-overlay
+      // Экстренное скрытие всех элементов с классом loading-overlay
       try {
         document.querySelectorAll('.loading-overlay').forEach(el => {
           el.style.display = 'none';
         });
-      } catch (err) {
-        // Ничего не делаем, это последняя попытка
+      } catch (e) {
+        // Ничего не делаем - последний рубеж защиты
       }
     }
   };
   
-  // Проверка видимости главного экрана
-  const checkMainScreenVisibility = () => {
-    console.log('[Loader] Проверка видимости главного экрана');
+  // Проверка и активация основного экрана
+  const activateMainScreen = () => {
+    console.log('[Loader] Проверка основного экрана');
     
-    // Ищем активный экран
-    const activeScreen = document.querySelector('.screen.active');
-    
-    if (!activeScreen) {
-      console.warn('[Loader] Активный экран не найден, пытаюсь показать welcome-screen');
+    try {
+      const activeScreen = document.querySelector('.screen.active');
       
-      // Пытаемся активировать welcome-screen
-      const welcomeScreen = document.getElementById('welcome-screen');
-      if (welcomeScreen) {
-        // Сначала скрываем все экраны
-        document.querySelectorAll('.screen').forEach(screen => {
-          screen.classList.remove('active');
-        });
+      if (!activeScreen) {
+        console.warn('[Loader] Активный экран не найден, активируем welcome-screen');
         
-        // Показываем welcome-screen
-        welcomeScreen.classList.add('active');
-        console.log('[Loader] welcome-screen активирован');
+        // Находим welcome-screen
+        const welcomeScreen = document.getElementById('welcome-screen');
+        if (welcomeScreen) {
+          // Деактивируем все экраны
+          document.querySelectorAll('.screen').forEach(screen => {
+            screen.classList.remove('active');
+          });
+          
+          // Активируем welcome-screen
+          welcomeScreen.classList.add('active');
+          console.log('[Loader] welcome-screen активирован');
+        } else {
+          console.error('[Loader] welcome-screen не найден');
+        }
       } else {
-        console.error('[Loader] welcome-screen не найден');
+        console.log('[Loader] Активный экран найден:', activeScreen.id);
       }
-    } else {
-      console.log('[Loader] Активный экран найден:', activeScreen.id);
+    } catch (error) {
+      console.error('[Loader] Ошибка при активации экрана:', error);
     }
   };
   
-  // Инициализация обработчиков событий для удаления экрана загрузки
-  const initRemovalHandlers = () => {
-    console.log('[Loader] Инициализация обработчиков удаления');
+  // Проверка загрузки JS файлов
+  const checkJsFilesLoaded = () => {
+    console.log('[Loader] Проверка загрузки JS файлов');
     
-    // 1. Гарантированное удаление после максимального времени загрузки (8 секунд)
-    console.log('[Loader] Установка таймера принудительного удаления (8 сек)');
-    const timeoutId = setTimeout(() => {
-      console.log('[Loader] Сработал таймер максимального времени загрузки');
-      removeLoadingOverlay('timeout');
-    }, 8000);
-    
-    // 2. Удаление после события load
-    console.log('[Loader] Установка обработчика события window.load');
-    window.addEventListener('load', () => {
-      console.log('[Loader] Событие window.load сработало');
-      // Небольшая задержка для завершения инициализации компонентов
-      setTimeout(() => {
-        removeLoadingOverlay('window_load');
-        clearTimeout(timeoutId); // Очищаем таймер максимального времени
-      }, 1000);
-    });
-    
-    // 3. Удаление после DOMContentLoaded + проверка активности экрана
-    console.log('[Loader] Установка обработчика события DOMContentLoaded');
-    document.addEventListener('DOMContentLoaded', () => {
-      console.log('[Loader] Событие DOMContentLoaded сработало');
+    try {
+      // Проверяем ключевые объекты
+      const mainLoaded = typeof window.casinoApp !== 'undefined';
+      const slotsLoaded = typeof window.slotsGame !== 'undefined';
+      const rouletteLoaded = typeof window.rouletteGame !== 'undefined';
+      const guessNumberLoaded = typeof window.guessNumberGame !== 'undefined';
+      const minerLoaded = typeof window.minerGame !== 'undefined';
+      const crushLoaded = typeof window.crushGame !== 'undefined';
       
-      // Даем время на инициализацию скриптов
-      setTimeout(() => {
-        if (!loaderRemoved) {
-          console.log('[Loader] Проверка после DOMContentLoaded + 3 сек');
-          const casinoApp = window.casinoApp;
-          const activeScreen = document.querySelector('.screen.active');
-          
-          if (casinoApp && activeScreen) {
-            console.log('[Loader] Приложение инициализировано, экран активен');
-            removeLoadingOverlay('dom_ready_success');
-          } else {
-            console.warn('[Loader] После DOMContentLoaded: casinoApp:', !!casinoApp, 'активный экран:', !!activeScreen);
-            
-            // Если через 5 секунд после DOMContentLoaded по-прежнему нет активного экрана
-            if (!activeScreen) {
-              checkMainScreenVisibility();
-            }
-            
-            // Но в любом случае удаляем загрузчик
-            setTimeout(() => {
-              if (!loaderRemoved) {
-                console.warn('[Loader] Принудительное удаление после DOMContentLoaded + 5 сек');
-                removeLoadingOverlay('dom_ready_forced');
-              }
-            }, 2000);
-          }
+      console.log('[Loader] Статус загрузки JS компонентов:', {
+        main: mainLoaded,
+        slots: slotsLoaded,
+        roulette: rouletteLoaded,
+        guessNumber: guessNumberLoaded,
+        miner: minerLoaded,
+        crush: crushLoaded
+      });
+      
+      // Если основной объект casinoApp загружен, считаем это успехом
+      if (mainLoaded) {
+        jsScriptsLoaded = true;
+        console.log('[Loader] Основной модуль приложения загружен');
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('[Loader] Ошибка при проверке JS файлов:', error);
+      return false;
+    }
+  };
+  
+  // Проверка инициализации DOM
+  const isDomInitialized = () => {
+    try {
+      const welcomeScreen = document.getElementById('welcome-screen');
+      const gameCards = document.querySelectorAll('.game-card');
+      const balanceDisplay = document.getElementById('balance-amount');
+      
+      // Считаем DOM инициализированным, если найдены ключевые элементы
+      const initialized = welcomeScreen && gameCards.length > 0 && balanceDisplay;
+      
+      if (initialized && !domInitialized) {
+        domInitialized = true;
+        console.log('[Loader] DOM инициализирован');
+      }
+      
+      return initialized;
+    } catch (error) {
+      console.error('[Loader] Ошибка при проверке DOM:', error);
+      return false;
+    }
+  };
+  
+  // Периодическая проверка загрузки
+  const startLoadingChecks = () => {
+    let checkCount = 0;
+    
+    checkInterval = setInterval(() => {
+      checkCount++;
+      
+      // Проверяем инициализацию DOM и загрузку скриптов
+      const domReady = isDomInitialized();
+      const scriptsReady = checkJsFilesLoaded();
+      
+      console.log(`[Loader] Проверка #${checkCount}: DOM=${domReady}, Scripts=${scriptsReady}`);
+      
+      // Если всё готово, удаляем загрузчик
+      if (domReady && scriptsReady) {
+        removeLoadingScreen('check_success');
+        clearInterval(checkInterval);
+      }
+      
+      // Если что-то не загрузилось после 10 попыток, принимаем экстренные меры
+      if (checkCount >= 10) {
+        console.warn('[Loader] Достигнут лимит проверок, применяем экстренные меры');
+        
+        // Если основные сценарии загружены, но DOM не инициализирован, 
+        // пытаемся активировать главный экран
+        if (scriptsReady && !domReady) {
+          activateMainScreen();
         }
-      }, 3000);
-    });
-    
-    // 4. Слушаем ошибки и логируем их для отладки
-    console.log('[Loader] Установка глобального обработчика ошибок');
-    window.addEventListener('error', (event) => {
-      console.error('[Loader] Перехвачена ошибка:', event.error);
-      console.error('[Loader] Сообщение:', event.message);
-      console.error('[Loader] Источник:', event.filename, 'Строка:', event.lineno, 'Символ:', event.colno);
-      
-      // Не удаляем загрузчик при ошибках, пусть сработает таймер
-    });
+        
+        // В любом случае удаляем экран загрузки
+        removeLoadingScreen('max_checks');
+        clearInterval(checkInterval);
+      }
+    }, 1000); // Проверка каждую секунду
   };
   
-  // Проверка загрузки ключевых скриптов
-  const checkScriptsLoaded = () => {
-    console.log('[Loader] Проверка загрузки ключевых скриптов');
-    
-    // Создаем массив для отслеживания загрузки скриптов
-    const scriptsToCheck = [
-      { url: 'js/main.js', loaded: false },
-      { url: 'js/games/slots.js', loaded: false },
-      { url: 'js/games/roulette.js', loaded: false },
-      { url: 'js/games/guessnumber.js', loaded: false },
-      { url: 'js/games/miner.js', loaded: false },
-      { url: 'js/games/crush.js', loaded: false }
-    ];
-    
-    // Проверяем существующие скрипты в DOM
-    const loadedScripts = Array.from(document.querySelectorAll('script')).map(s => s.src);
-    console.log('[Loader] Загруженные скрипты:', loadedScripts);
-    
-    // Обновляем статус загрузки
-    scriptsToCheck.forEach(script => {
-      const isLoaded = loadedScripts.some(src => src.includes(script.url));
-      script.loaded = isLoaded;
-      console.log(`[Loader] Скрипт ${script.url} ${isLoaded ? 'загружен' : 'не загружен'}`);
-    });
-    
-    // Проверяем загрузку всех скриптов
-    const allLoaded = scriptsToCheck.every(script => script.loaded);
-    console.log(`[Loader] Все скрипты ${allLoaded ? 'загружены' : 'не загружены'}`);
-    
-    return allLoaded;
-  };
-  
-  // Инициализация загрузчика
-  const initLoader = () => {
+  // Основная функция инициализации загрузчика
+  const initializeLoader = () => {
     console.log('[Loader] Инициализация загрузчика');
     
     try {
-      // Создаем оверлей загрузки
-      createLoadingOverlay();
+      // Настраиваем экран загрузки
+      setupLoadingScreen();
       
-      // Инициализируем обработчики для удаления оверлея
-      initRemovalHandlers();
+      // Устанавливаем максимальное время ожидания (8 секунд)
+      console.log('[Loader] Установка таймера принудительного удаления (8 сек)');
+      loadingTimeoutId = setTimeout(() => {
+        console.log('[Loader] Сработал таймер максимального времени ожидания');
+        removeLoadingScreen('timeout');
+      }, 8000);
       
-      // Дополнительная проверка загрузки скриптов после DOMContentLoaded
-      document.addEventListener('DOMContentLoaded', () => {
+      // Запускаем периодические проверки загрузки
+      startLoadingChecks();
+      
+      // Подписываемся на основные события загрузки
+      window.addEventListener('load', () => {
+        console.log('[Loader] Событие window.load сработало');
+        
+        // Через небольшую задержку проверяем состояние
         setTimeout(() => {
-          checkScriptsLoaded();
+          if (!isLoaderRemoved) {
+            console.log('[Loader] Проверка инициализации после window.load');
+            const domReady = isDomInitialized();
+            const scriptsReady = checkJsFilesLoaded();
+            
+            if (domReady && scriptsReady) {
+              removeLoadingScreen('window_load_success');
+            } else {
+              // Даем еще 2 секунды и затем принудительно удаляем загрузчик
+              setTimeout(() => {
+                if (!isLoaderRemoved) {
+                  removeLoadingScreen('window_load_timeout');
+                }
+              }, 2000);
+            }
+          }
         }, 1000);
       });
       
-      console.log('[Loader] Загрузчик успешно инициализирован');
+      // Обработка случаев, когда DOMContentLoaded произошел раньше
+      if (document.readyState === 'interactive' || document.readyState === 'complete') {
+        console.log('[Loader] Документ уже загружен, проверяем состояние');
+        
+        setTimeout(() => {
+          if (!isLoaderRemoved) {
+            const domReady = isDomInitialized();
+            const scriptsReady = checkJsFilesLoaded();
+            
+            if (domReady && scriptsReady) {
+              removeLoadingScreen('document_already_loaded');
+            }
+          }
+        }, 1000);
+      } else {
+        // Подписываемся на событие загрузки DOM
+        document.addEventListener('DOMContentLoaded', () => {
+          console.log('[Loader] Событие DOMContentLoaded сработало');
+          
+          // Даем время для выполнения скриптов
+          setTimeout(() => {
+            if (!isLoaderRemoved) {
+              const domReady = isDomInitialized();
+              const scriptsReady = checkJsFilesLoaded();
+              
+              if (domReady && scriptsReady) {
+                removeLoadingScreen('dom_content_loaded');
+              }
+            }
+          }, 2000);
+        });
+      }
+      
+      // Обработка глобальных ошибок
+      window.addEventListener('error', (event) => {
+        console.error('[Loader] Перехвачена ошибка:', {
+          message: event.message,
+          source: event.filename,
+          line: event.lineno,
+          column: event.colno
+        });
+        
+        // Не удаляем загрузчик при ошибках, позволяем таймеру сработать
+      });
     } catch (error) {
       console.error('[Loader] Критическая ошибка при инициализации загрузчика:', error);
       
-      // В случае критической ошибки, удаляем загрузчик через 10 секунд
+      // Устанавливаем таймер аварийного завершения
       setTimeout(() => {
-        if (!loaderRemoved) {
-          console.warn('[Loader] Аварийное удаление загрузчика');
-          removeLoadingOverlay('critical_error');
+        if (!isLoaderRemoved) {
+          removeLoadingScreen('critical_error');
         }
-      }, 10000);
+      }, 5000);
     }
   };
   
-  // Запускаем инициализацию загрузчика
-  initLoader();
+  // Запуск загрузчика
+  initializeLoader();
 })();
