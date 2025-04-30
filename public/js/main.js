@@ -35,8 +35,18 @@ const casinoApp = (() => {
     console.log('[Main] Начало инициализации приложения');
     
     try {
+      // Обновляем прогресс загрузки
+      if (window.appLoader && typeof window.appLoader.updateProgress === 'function') {
+        window.appLoader.updateProgress(15);
+      }
+      
       // Инициализация UI
       setupEventListeners();
+      
+      // Обновляем прогресс загрузки
+      if (window.appLoader && typeof window.appLoader.updateProgress === 'function') {
+        window.appLoader.updateProgress(30);
+      }
       
       // Инициализация Telegram WebApp
       if (tgApp) {
@@ -70,6 +80,11 @@ const casinoApp = (() => {
         console.log('[Main] Telegram WebApp недоступен, использую демо-режим');
       }
       
+      // Обновляем прогресс загрузки
+      if (window.appLoader && typeof window.appLoader.updateProgress === 'function') {
+        window.appLoader.updateProgress(50);
+      }
+      
       // Обновление интерфейса
       updateBalance();
       
@@ -85,21 +100,49 @@ const casinoApp = (() => {
         welcomeScreen.classList.add('active');
       }
       
+      // Обновляем прогресс загрузки
+      if (window.appLoader && typeof window.appLoader.updateProgress === 'function') {
+        window.appLoader.updateProgress(70);
+      }
+      
       // Отмечаем успешную инициализацию
       appInitialized = true;
       console.log('[Main] Приложение инициализировано');
       
-      // Удаляем экран загрузки
-      const loadingOverlay = document.getElementById('loadingOverlay');
-      if (loadingOverlay) {
-        loadingOverlay.style.opacity = '0';
-        setTimeout(() => {
-          loadingOverlay.style.display = 'none';
-        }, 500);
-      }
-      
       // Инициализируем игры
       initializeGames();
+      
+      // Обновляем прогресс загрузки до 100%
+      if (window.appLoader && typeof window.appLoader.updateProgress === 'function') {
+        window.appLoader.updateProgress(100);
+      }
+      
+      // Сообщаем загрузчику, что инициализация завершена
+      try {
+        if (window.appLoader && typeof window.appLoader.mainReady === 'function') {
+          window.appLoader.mainReady();
+          console.log('[Main] Уведомлен загрузчик о завершении инициализации');
+        } else {
+          // Для обратной совместимости, удаляем экран загрузки напрямую
+          const loadingOverlay = document.getElementById('loadingOverlay');
+          if (loadingOverlay) {
+            loadingOverlay.style.opacity = '0';
+            setTimeout(() => {
+              loadingOverlay.style.display = 'none';
+            }, 500);
+          }
+        }
+      } catch (loaderError) {
+        console.error('[Main] Ошибка при взаимодействии с загрузчиком:', loaderError);
+        // Удаляем экран загрузки напрямую при ошибке
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        if (loadingOverlay) {
+          loadingOverlay.style.opacity = '0';
+          setTimeout(() => {
+            loadingOverlay.style.display = 'none';
+          }, 500);
+        }
+      }
       
       return true;
     } catch (error) {
@@ -112,13 +155,35 @@ const casinoApp = (() => {
         welcomeScreen.classList.add('active');
       }
       
-      // Удаляем экран загрузки даже в случае ошибки
-      const loadingOverlay = document.getElementById('loadingOverlay');
-      if (loadingOverlay) {
-        loadingOverlay.style.opacity = '0';
-        setTimeout(() => {
-          loadingOverlay.style.display = 'none';
-        }, 500);
+      // Обновляем прогресс загрузки и уведомляем загрузчик о завершении
+      try {
+        if (window.appLoader && typeof window.appLoader.updateProgress === 'function') {
+          window.appLoader.updateProgress(100); // Показываем 100% прогресса даже при ошибке
+        }
+        
+        if (window.appLoader && typeof window.appLoader.mainReady === 'function') {
+          window.appLoader.mainReady(); // Уведомляем загрузчик о необходимости показать интерфейс
+          console.log('[Main] Уведомлен загрузчик о завершении с ошибкой');
+        } else {
+          // Для обратной совместимости, удаляем экран загрузки напрямую
+          const loadingOverlay = document.getElementById('loadingOverlay');
+          if (loadingOverlay) {
+            loadingOverlay.style.opacity = '0';
+            setTimeout(() => {
+              loadingOverlay.style.display = 'none';
+            }, 500);
+          }
+        }
+      } catch (loaderError) {
+        console.error('[Main] Ошибка при взаимодействии с загрузчиком:', loaderError);
+        // Удаляем экран загрузки напрямую при ошибке
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        if (loadingOverlay) {
+          loadingOverlay.style.opacity = '0';
+          setTimeout(() => {
+            loadingOverlay.style.display = 'none';
+          }, 500);
+        }
       }
       
       return false;
@@ -128,6 +193,11 @@ const casinoApp = (() => {
   // Инициализация игр
   const initializeGames = () => {
     console.log('[Main] Инициализация игр');
+    
+    // Обновляем прогресс загрузки
+    if (window.appLoader && typeof window.appLoader.updateProgress === 'function') {
+      window.appLoader.updateProgress(75);
+    }
     
     // Инициализация игровых модулей
     try {
@@ -160,6 +230,11 @@ const casinoApp = (() => {
         window.crushGame.init();
         gamesInitialized.crush = true;
         console.log('[Main] Игра Crush инициализирована');
+      }
+      
+      // Обновляем прогресс загрузки
+      if (window.appLoader && typeof window.appLoader.updateProgress === 'function') {
+        window.appLoader.updateProgress(90);
       }
       
       console.log('[Main] Статус инициализации игр:', gamesInitialized);
@@ -784,6 +859,11 @@ const casinoApp = (() => {
 // Запускаем инициализацию приложения при загрузке страницы
 document.addEventListener('DOMContentLoaded', function() {
   console.log('[Main] DOM полностью загружен');
+  
+  // Сообщаем загрузчику о начале инициализации
+  if (window.appLoader && typeof window.appLoader.updateProgress === 'function') {
+    window.appLoader.updateProgress(5);
+  }
   
   // Делаем глобальный объект casinoApp
   window.casinoApp = casinoApp;
