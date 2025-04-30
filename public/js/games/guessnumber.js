@@ -163,3 +163,9 @@ const guessNumberGame = (() => {
       makeGuess
     };
   })();
+  // Добавить в конец файла guessnumber.js
+// После строки: })();
+
+// Глобальный экспорт объекта игры
+window.guessNumberGame = guessNumberGame;
+console.log('[GuessNumber] Экспорт игрового объекта в глобальную область видимости');

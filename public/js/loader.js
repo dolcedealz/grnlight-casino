@@ -138,7 +138,26 @@ console.log('[Loader] Запущен улучшенный загрузчик');
     },
     
     // Метод для обновления прогресса из main.js
-    updateProgress: updateProgress
+    updateProgress: updateProgress,
+    
+    // Новый метод для проверки доступности игровых объектов
+    checkGames: function() {
+      console.log('[Loader] Проверка доступности игровых объектов');
+      
+      // Диагностика игровых объектов
+      const games = {
+        slots: typeof window.slotsGame === 'object',
+        roulette: typeof window.rouletteGame === 'object',
+        guessnumber: typeof window.guessNumberGame === 'object',
+        miner: typeof window.minerGame === 'object',
+        crush: typeof window.crushGame === 'object'
+      };
+      
+      // Вывод результатов в консоль
+      console.log('[Loader] Результаты проверки:', games);
+      
+      return games;
+    }
   };
   
   // Резервный таймер для удаления экрана загрузки

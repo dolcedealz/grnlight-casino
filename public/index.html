@@ -189,6 +189,7 @@
                 
                 <!-- Roulette Game Screen -->
                 <div id="roulette-screen" class="screen">
+                    <!-- Содержимое для рулетки -->
                     <div class="game-header">
                         <button class="back-btn">← Back</button>
                         <h2>Roulette</h2>
@@ -244,6 +245,7 @@
                 
                 <!-- Guess Number Game Screen -->
                 <div id="guessnumber-screen" class="screen">
+                    <!-- Содержимое для Guess Number -->
                     <div class="game-header">
                         <button class="back-btn">← Back</button>
                         <h2>Guess The Number</h2>
@@ -268,6 +270,7 @@
                 
                 <!-- Miner Game Screen -->
                 <div id="miner-screen" class="screen">
+                    <!-- Содержимое для Miner -->
                     <div class="game-header">
                         <button class="back-btn">← Back</button>
                         <h2>Miner</h2>
@@ -307,6 +310,7 @@
                 
                 <!-- Crush Game Screen -->
                 <div id="crush-screen" class="screen">
+                    <!-- Содержимое для Crush -->
                     <div class="game-header">
                         <button class="back-btn">← Back</button>
                         <h2>Crush</h2>
@@ -383,8 +387,11 @@
         </div>
     </div>
 
-    <!-- Безопасная загрузка скриптов -->
+    <!-- Улучшенная система загрузки скриптов -->
     <script>
+        // Диагностическая информация
+        console.log('Версия приложения: 1.0.1 (исправленная)');
+        
         // Управление процессом загрузки
         let scriptLoadCount = 0;
         const totalScripts = 7; // Telegram + loader + main + 5 игр
@@ -425,23 +432,72 @@
         }
         
         // Функция загрузки скрипта с обработкой ошибок
-        function loadScript(src, callback) {
-            const script = document.createElement('script');
-            script.src = src;
-            script.async = true;
+        function loadScript(src) {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = src;
+                script.async = true;
+                
+                script.onload = function() {
+                    scriptLoadCount++;
+                    updateLoadingProgress((scriptLoadCount / totalScripts) * 100);
+                    console.log(`Скрипт загружен [${scriptLoadCount}/${totalScripts}]: ${src}`);
+                    resolve();
+                };
+                
+                script.onerror = function(err) {
+                    console.error('Ошибка загрузки скрипта:', src);
+                    reject(new Error('Failed to load ' + src));
+                };
+                
+                document.body.appendChild(script);
+            });
+        }
+        
+        // Функция последовательной загрузки скриптов
+        async function loadScriptsSequentially(scripts) {
+            try {
+                for (const script of scripts) {
+                    await loadScript(script);
+                }
+                return true;
+            } catch (error) {
+                console.error('Ошибка при последовательной загрузке скриптов:', error);
+                return false;
+            }
+        }
+        
+        // Экспортируем глобальные игровые объекты явно, если они не созданы модулями
+        function exportGameObjects() {
+            // Слоты
+            if (typeof slotsGame !== 'undefined' && !window.slotsGame) {
+                window.slotsGame = slotsGame;
+                console.log('slotsGame экспортирован глобально');
+            }
             
-            script.onload = function() {
-                scriptLoadCount++;
-                updateLoadingProgress((scriptLoadCount / totalScripts) * 100);
-                if (callback) callback(null);
-            };
+            // Рулетка
+            if (typeof rouletteGame !== 'undefined' && !window.rouletteGame) {
+                window.rouletteGame = rouletteGame;
+                console.log('rouletteGame экспортирован глобально');
+            }
             
-            script.onerror = function(err) {
-                console.error('Ошибка загрузки скрипта:', src);
-                if (callback) callback(new Error('Failed to load ' + src));
-            };
+            // Угадай число
+            if (typeof guessNumberGame !== 'undefined' && !window.guessNumberGame) {
+                window.guessNumberGame = guessNumberGame;
+                console.log('guessNumberGame экспортирован глобально');
+            }
             
-            document.body.appendChild(script);
+            // Сапер
+            if (typeof minerGame !== 'undefined' && !window.minerGame) {
+                window.minerGame = minerGame;
+                console.log('minerGame экспортирован глобально');
+            }
+            
+            // Crush
+            if (typeof crushGame !== 'undefined' && !window.crushGame) {
+                window.crushGame = crushGame;
+                console.log('crushGame экспортирован глобально');
+            }
         }
         
         // Инициализация приложения после загрузки всех скриптов
@@ -450,6 +506,17 @@
             
             try {
                 console.log('Инициализация приложения...');
+                
+                // Экспортируем игровые объекты в глобальное пространство, если они еще не экспортированы
+                exportGameObjects();
+                
+                // Проверяем доступность игровых объектов
+                console.log('Проверка игровых объектов:');
+                console.log('- slotsGame:', typeof window.slotsGame === 'object' ? 'доступен' : 'недоступен');
+                console.log('- rouletteGame:', typeof window.rouletteGame === 'object' ? 'доступен' : 'недоступен');
+                console.log('- guessNumberGame:', typeof window.guessNumberGame === 'object' ? 'доступен' : 'недоступен');
+                console.log('- minerGame:', typeof window.minerGame === 'object' ? 'доступен' : 'недоступен');
+                console.log('- crushGame:', typeof window.crushGame === 'object' ? 'доступен' : 'недоступен');
                 
                 // Показываем контент
                 const appContent = document.getElementById('app-content');
@@ -483,52 +550,33 @@
                 console.log('DOM загружен, начинаем загрузку скриптов');
                 updateLoadingProgress(5);
                 
-                // 1. Сначала загружаем Telegram WebApp API
-                loadScript('https://telegram.org/js/telegram-web-app.js', function(err) {
-                    if (err) return handleLoadError(err);
-                    updateLoadingProgress(15);
-                    
-                    // 2. Затем загружаем emergency loader
-                    loadScript('js/loader.js', function(err) {
-                        if (err) return handleLoadError(err);
-                        updateLoadingProgress(25);
-                        
-                        // 3. Затем основной скрипт приложения
-                        loadScript('js/main.js', function(err) {
-                            if (err) return handleLoadError(err);
-                            updateLoadingProgress(40);
-                            
-                            // 4. Затем загружаем игровые скрипты параллельно
-                            let gameScriptsLoaded = 0;
-                            const gameScripts = [
-                                'js/games/slots.js',
-                                'js/games/roulette.js',
-                                'js/games/guessnumber.js',
-                                'js/games/miner.js',
-                                'js/games/crush.js'
-                            ];
-                            
-                            function gameScriptLoaded(err) {
-                                if (err) {
-                                    handleLoadError(err);
-                                    return;
-                                }
-                                
-                                gameScriptsLoaded++;
-                                updateLoadingProgress(40 + (gameScriptsLoaded / gameScripts.length) * 60);
-                                
-                                // Когда все игровые скрипты загружены, инициализируем приложение
-                                if (gameScriptsLoaded === gameScripts.length) {
-                                    console.log('Все скрипты загружены');
-                                    initializeApp();
-                                }
-                            }
-                            
-                            // Загружаем игровые скрипты
-                            gameScripts.forEach(script => loadScript(script, gameScriptLoaded));
-                        });
+                // Определяем порядок загрузки скриптов
+                const scripts = [
+                    'https://telegram.org/js/telegram-web-app.js',  // Сначала загружаем Telegram WebApp API
+                    'js/loader.js',                                // Затем emergency loader
+                    'js/main.js',                                  // Затем основной скрипт приложения
+                    'js/games/slots.js',                           // Затем игровые скрипты ПОСЛЕДОВАТЕЛЬНО
+                    'js/games/roulette.js',
+                    'js/games/guessnumber.js',
+                    'js/games/miner.js',
+                    'js/games/crush.js'
+                ];
+                
+                // Последовательная загрузка всех скриптов
+                loadScriptsSequentially(scripts)
+                    .then(success => {
+                        if (success) {
+                            console.log('Все скрипты успешно загружены');
+                            initializeApp();
+                        } else {
+                            console.error('Произошла ошибка при загрузке скриптов');
+                            handleLoadError(new Error('Ошибка загрузки скриптов'));
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Критическая ошибка загрузки скриптов:', error);
+                        handleLoadError(error);
                     });
-                });
             } catch (error) {
                 console.error('Ошибка в обработчике DOMContentLoaded:', error);
                 handleLoadError(error);
@@ -538,9 +586,10 @@
         // Запасной вариант для удаления загрузочного экрана
         window.addEventListener('load', function() {
             setTimeout(function() {
-                if (!document.getElementById('app-content').classList.contains('loaded')) {
+                const appContent = document.getElementById('app-content');
+                if (appContent && !appContent.classList.contains('loaded')) {
                     console.log('Принудительное удаление загрузочного экрана');
-                    document.getElementById('app-content').classList.add('loaded');
+                    appContent.classList.add('loaded');
                     
                     const loadingOverlay = document.getElementById('loadingOverlay');
                     if (loadingOverlay) {
@@ -552,6 +601,3 @@
                 }
             }, 5000); // 5 секунд максимальное время загрузки
         });
-    </script>
-</body>
-</html>

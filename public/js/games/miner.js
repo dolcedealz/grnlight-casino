@@ -561,3 +561,9 @@ const minerGame = (() => {
     updateMineCount
   };
 })();
+// Добавить в конец файла miner.js
+// После строки: })();
+
+// Глобальный экспорт объекта игры
+window.minerGame = minerGame;
+console.log('[Miner] Экспорт игрового объекта в глобальную область видимости');

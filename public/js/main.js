@@ -109,6 +109,9 @@ const casinoApp = (() => {
       appInitialized = true;
       console.log('[Main] Приложение инициализировано');
       
+      // Экспортируем игровые объекты в глобальное пространство, если они еще не экспортированы
+      exportGameObjects();
+      
       // Инициализируем игры
       initializeGames();
       
@@ -190,7 +193,50 @@ const casinoApp = (() => {
     }
   };
   
-  // Инициализация игр
+  // Экспорт игровых объектов в глобальную область видимости
+  const exportGameObjects = () => {
+    console.log('[Main] Проверка и экспорт игровых объектов...');
+    
+    // Слоты
+    if (typeof slotsGame !== 'undefined' && !window.slotsGame) {
+      window.slotsGame = slotsGame;
+      console.log('[Main] slotsGame экспортирован глобально');
+    }
+      
+    // Рулетка
+    if (typeof rouletteGame !== 'undefined' && !window.rouletteGame) {
+      window.rouletteGame = rouletteGame;
+      console.log('[Main] rouletteGame экспортирован глобально');
+    }
+      
+    // Угадай число
+    if (typeof guessNumberGame !== 'undefined' && !window.guessNumberGame) {
+      window.guessNumberGame = guessNumberGame;
+      console.log('[Main] guessNumberGame экспортирован глобально');
+    }
+      
+    // Сапер
+    if (typeof minerGame !== 'undefined' && !window.minerGame) {
+      window.minerGame = minerGame;
+      console.log('[Main] minerGame экспортирован глобально');
+    }
+      
+    // Crush
+    if (typeof crushGame !== 'undefined' && !window.crushGame) {
+      window.crushGame = crushGame;
+      console.log('[Main] crushGame экспортирован глобально');
+    }
+    
+    // Диагностический вывод текущего состояния
+    console.log('[Main] Статус доступности игровых объектов:');
+    console.log('- slotsGame:', typeof window.slotsGame === 'object' ? 'доступен' : 'недоступен');
+    console.log('- rouletteGame:', typeof window.rouletteGame === 'object' ? 'доступен' : 'недоступен');
+    console.log('- guessNumberGame:', typeof window.guessNumberGame === 'object' ? 'доступен' : 'недоступен');
+    console.log('- minerGame:', typeof window.minerGame === 'object' ? 'доступен' : 'недоступен');
+    console.log('- crushGame:', typeof window.crushGame === 'object' ? 'доступен' : 'недоступен');
+  };
+  
+  // Инициализация игр - УЛУЧШЕННАЯ ВЕРСИЯ
   const initializeGames = () => {
     console.log('[Main] Инициализация игр');
     
@@ -201,35 +247,73 @@ const casinoApp = (() => {
     
     // Инициализация игровых модулей
     try {
-      // Проверяем существование игровых объектов
+      // Логируем статус доступности игровых объектов перед инициализацией
+      console.log('[Main] Доступные игровые объекты:');
+      console.log('[Main] slotsGame:', typeof window.slotsGame);
+      console.log('[Main] rouletteGame:', typeof window.rouletteGame);
+      console.log('[Main] guessNumberGame:', typeof window.guessNumberGame);
+      console.log('[Main] minerGame:', typeof window.minerGame);
+      console.log('[Main] crushGame:', typeof window.crushGame);
+      
+      // Проверяем существование игровых объектов с дополнительной диагностикой
       if (window.slotsGame && typeof window.slotsGame.init === 'function') {
-        window.slotsGame.init();
-        gamesInitialized.slots = true;
-        console.log('[Main] Игра Slots инициализирована');
+        try {
+          window.slotsGame.init();
+          gamesInitialized.slots = true;
+          console.log('[Main] Игра Slots инициализирована успешно');
+        } catch (slotError) {
+          console.error('[Main] Ошибка инициализации Slots:', slotError);
+        }
+      } else {
+        console.warn('[Main] Игра Slots не доступна:', window.slotsGame);
       }
       
       if (window.rouletteGame && typeof window.rouletteGame.init === 'function') {
-        window.rouletteGame.init();
-        gamesInitialized.roulette = true;
-        console.log('[Main] Игра Roulette инициализирована');
+        try {
+          window.rouletteGame.init();
+          gamesInitialized.roulette = true;
+          console.log('[Main] Игра Roulette инициализирована успешно');
+        } catch (rouletteError) {
+          console.error('[Main] Ошибка инициализации Roulette:', rouletteError);
+        }
+      } else {
+        console.warn('[Main] Игра Roulette не доступна:', window.rouletteGame);
       }
       
       if (window.guessNumberGame && typeof window.guessNumberGame.init === 'function') {
-        window.guessNumberGame.init();
-        gamesInitialized.guessnumber = true;
-        console.log('[Main] Игра Guess Number инициализирована');
+        try {
+          window.guessNumberGame.init();
+          gamesInitialized.guessnumber = true;
+          console.log('[Main] Игра Guess Number инициализирована успешно');
+        } catch (guessNumberError) {
+          console.error('[Main] Ошибка инициализации Guess Number:', guessNumberError);
+        }
+      } else {
+        console.warn('[Main] Игра Guess Number не доступна:', window.guessNumberGame);
       }
       
       if (window.minerGame && typeof window.minerGame.init === 'function') {
-        window.minerGame.init();
-        gamesInitialized.miner = true;
-        console.log('[Main] Игра Miner инициализирована');
+        try {
+          window.minerGame.init();
+          gamesInitialized.miner = true;
+          console.log('[Main] Игра Miner инициализирована успешно');
+        } catch (minerError) {
+          console.error('[Main] Ошибка инициализации Miner:', minerError);
+        }
+      } else {
+        console.warn('[Main] Игра Miner не доступна:', window.minerGame);
       }
       
       if (window.crushGame && typeof window.crushGame.init === 'function') {
-        window.crushGame.init();
-        gamesInitialized.crush = true;
-        console.log('[Main] Игра Crush инициализирована');
+        try {
+          window.crushGame.init();
+          gamesInitialized.crush = true;
+          console.log('[Main] Игра Crush инициализирована успешно');
+        } catch (crushError) {
+          console.error('[Main] Ошибка инициализации Crush:', crushError);
+        }
+      } else {
+        console.warn('[Main] Игра Crush не доступна:', window.crushGame);
       }
       
       // Обновляем прогресс загрузки
@@ -238,8 +322,16 @@ const casinoApp = (() => {
       }
       
       console.log('[Main] Статус инициализации игр:', gamesInitialized);
+      
+      // Если нет успешно инициализированных игр, выводим предупреждение
+      const anyGameInitialized = Object.values(gamesInitialized).some(status => status === true);
+      if (!anyGameInitialized) {
+        console.warn('[Main] Ни одна из игр не была успешно инициализирована!');
+        console.warn('[Main] Это может быть связано с проблемами в загрузке скриптов или доступностью DOM-элементов');
+      }
+      
     } catch (error) {
-      console.error('[Main] Ошибка при инициализации игр:', error);
+      console.error('[Main] Критическая ошибка при инициализации игр:', error);
     }
   };
   

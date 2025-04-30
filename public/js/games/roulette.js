@@ -341,3 +341,9 @@ const rouletteGame = (() => {
       spin
     };
   })();
+  // Добавить в конец файла roulette.js
+// После строки: })();
+
+// Глобальный экспорт объекта игры
+window.rouletteGame = rouletteGame;
+console.log('[Roulette] Экспорт игрового объекта в глобальную область видимости');
