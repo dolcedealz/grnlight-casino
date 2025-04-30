@@ -1,14 +1,10 @@
-/* Modern CSS Enhancements for Greenlight Casino */
+/* Simplified CSS for Greenlight Casino */
 
-/* 1. CSS Variables Update - Expanded color palette and design metrics */
+/* 1. Simplified CSS Variables */
 :root {
-  /* Core branding colors */
+  /* Core colors */
   --primary-green: #00A86B;
-  --primary-glow: #26D07C;
   --gold: #FFD700;
-  --dark-gold: #BF9B30;
-  
-  /* Extended color system */
   --black: #000000;
   --dark-gray: #121212;
   --medium-gray: #2A2A2A;
@@ -18,39 +14,21 @@
   --win-color: #4CAF50;
   --lose-color: #F44336;
   
-  /* UI Components */
-  --card-bg: #1C1C1C;
-  --bg-fade: rgba(0, 0, 0, 0.8);
-  
-  /* Spacing system */
-  --space-xs: 0.25rem;
+  /* Simplified spacing system */
   --space-sm: 0.5rem;
   --space-md: 1rem;
   --space-lg: 1.5rem;
-  --space-xl: 2rem;
-  --space-xxl: 3rem;
   
-  /* Border radius */
+  /* Simplified border radius */
   --radius-sm: 5px;
   --radius-md: 10px;
   --radius-lg: 20px;
-  --radius-circle: 50%;
   
-  /* Shadows & effects */
-  --shadow-sm: 0 2px 10px rgba(0, 0, 0, 0.1);
-  --shadow-md: 0 5px 15px rgba(0, 0, 0, 0.2);
-  --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.4);
-  --glow-green: 0 0 20px var(--primary-glow);
-  --glow-gold: 0 0 15px rgba(255, 215, 0, 0.3);
-  
-  /* Animations */
-  --transition-fast: 0.2s ease;
+  /* Simplified transitions */
   --transition-normal: 0.3s ease;
-  --transition-slow: 0.5s ease;
-  --transition-bounce: 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-/* 2. Modern Reset with better defaults */
+/* 2. Basic reset with better defaults */
 *, *::before, *::after {
   margin: 0;
   padding: 0;
@@ -59,7 +37,7 @@
 
 html {
   font-size: 16px;
-  -webkit-tap-highlight-color: transparent; /* Removes tap highlight on mobile */
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
@@ -69,9 +47,6 @@ body {
   line-height: 1.6;
   overflow-x: hidden;
   min-height: 100vh;
-  text-rendering: optimizeSpeed; /* Improves performance */
-  -webkit-font-smoothing: antialiased; /* Better font rendering */
-  -moz-osx-font-smoothing: grayscale;
 }
 
 img, picture, video, canvas, svg {
@@ -83,48 +58,28 @@ input, button, textarea, select {
   font: inherit;
 }
 
-/* 3. Modern Layout - Improved app container with better background */
+/* 3. Simplified layout - removed external image URL */
 .app-container {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  background: linear-gradient(rgba(0, 0, 0, 0.85), rgba(0, 0, 0, 0.95)),
-    url('https://images.unsplash.com/photo-1560518883-ce09059eeffa?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80');
-  background-size: cover;
-  background-attachment: fixed;
-  background-position: center;
+  background: var(--dark-gray);
   position: relative;
-  z-index: 0;
 }
 
-/* Add subtle texture overlay */
-.app-container::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-image: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M20 20.5V18H0v-2h20v-2H0v-2h20v-2H0V8h20V6H0V4h20V2H0V0h22v20h2V0h2v20h2V0h2v20h2V0h2v20h2V0h4v22H20v-1.5zM0 20h2v20H0V20zm4 0h2v20H4V20zm4 0h2v20H8V20zm4 0h2v20h-2V20zm4 0h2v20h-2V20zm8 4h20v2H24v-2zm0 4h20v2H24v-2zm0 4h20v2H24v-2zm0 4h20v2H24v-2z' fill='rgba(255,215,0,0.05)' fill-opacity='0.05' fill-rule='evenodd'/%3E%3C/svg%3E");
-  z-index: -1;
-  opacity: 0.05;
-  pointer-events: none;
-}
-
-/* 4. Enhanced Header Bar with subtle gradient and glow */
+/* 4. Simplified header */
 .header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 1rem 1.5rem;
-  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.95), rgba(18, 18, 18, 0.85));
-  box-shadow: 0 2px 20px rgba(0, 168, 107, 0.3);
+  background: var(--black);
+  border-bottom: 1px solid var(--primary-green);
   position: relative;
   z-index: 10;
-  border-bottom: 1px solid var(--primary-green);
 }
 
-/* Improved logo styling */
+/* Simplified logo styling */
 .logo {
   display: flex;
   align-items: center;
@@ -135,77 +90,37 @@ input, button, textarea, select {
   margin: 0;
   font-size: 1.8rem;
   color: var(--gold);
-  text-shadow: 0 0 10px rgba(255, 215, 0, 0.4);
   font-weight: 700;
-  letter-spacing: 1px;
 }
 
-/* Enhanced green light effect */
+/* Simplified green light */
 .green-light {
-  width: 24px;
-  height: 24px;
-  background: radial-gradient(circle at center, var(--primary-glow) 30%, var(--primary-green) 70%);
+  width: 20px;
+  height: 20px;
+  background: var(--primary-green);
   border-radius: 50%;
-  box-shadow: 0 0 20px var(--primary-glow), 0 0 40px rgba(38, 208, 124, 0.2);
   position: relative;
-  animation: pulse 3s infinite ease-in-out;
 }
 
-.green-light::after {
-  content: '';
-  position: absolute;
-  top: 20%;
-  left: 20%;
-  width: 30%;
-  height: 30%;
-  background-color: rgba(255, 255, 255, 0.8);
-  border-radius: 50%;
-  filter: blur(1px);
-}
-
-@keyframes pulse {
-  0%, 100% { 
-    box-shadow: 0 0 15px var(--primary-glow);
-    transform: scale(1);
-  }
-  50% { 
-    box-shadow: 0 0 30px var(--primary-glow), 0 0 40px rgba(38, 208, 124, 0.4);
-    transform: scale(1.1);
-  }
-}
-
-/* Improved balance display */
+/* Simplified balance display */
 .balance {
   display: flex;
   align-items: center;
-  background: linear-gradient(135deg, rgba(0, 0, 0, 0.8), rgba(20, 20, 20, 0.6));
-  border: 1px solid var(--dark-gold);
+  background: var(--black);
+  border: 1px solid var(--gold);
   padding: 0.5rem 1.2rem;
   border-radius: 50px;
   font-size: 1.2rem;
   font-weight: bold;
   color: var(--gold);
-  box-shadow: 0 0 10px rgba(255, 215, 0, 0.15);
-  transition: all var(--transition-normal);
-}
-
-.balance:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 0 15px rgba(255, 215, 0, 0.3);
 }
 
 .star {
   margin-left: 8px;
   font-size: 1.3rem;
-  animation: twinkle 3s infinite ease-in-out;
 }
 
-@keyframes twinkle {
-  0%, 100% { opacity: 0.8; transform: scale(1); }
-  50% { opacity: 1; transform: scale(1.1); }
-}
-
-/* 5. Modern Content Area */
+/* 5. Simplified content area */
 .main-content {
   flex: 1;
   padding: 1.5rem;
@@ -215,7 +130,7 @@ input, button, textarea, select {
   align-items: center;
 }
 
-/* 6. Improved Screens with better transitions */
+/* 6. Simplified screen transitions */
 .screen {
   display: none;
   flex-direction: column;
@@ -224,30 +139,13 @@ input, button, textarea, select {
   max-width: 1200px;
   margin: 0 auto;
   padding: 1.5rem;
-  opacity: 0;
-  transform: translateY(20px);
-  transition: opacity var(--transition-normal), transform var(--transition-normal);
 }
 
 .screen.active {
-  display: flex !important;
-  opacity: 1 !important;
-  transform: translateY(0) !important;
-  animation: fadeInUp 0.5s var(--transition-bounce) forwards;
+  display: flex;
 }
 
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* 7. Modernized Game Cards Grid */
+/* 7. Game selection grid */
 .game-selection {
   width: 100%;
   max-width: 800px;
@@ -256,21 +154,7 @@ input, button, textarea, select {
 .game-selection h2 {
   font-size: 2.2rem;
   margin-bottom: 2.5rem;
-  text-shadow: var(--glow-gold);
   text-align: center;
-  position: relative;
-}
-
-.game-selection h2::after {
-  content: '';
-  position: absolute;
-  left: 50%;
-  bottom: -10px;
-  transform: translateX(-50%);
-  height: 2px;
-  width: 80px;
-  background: linear-gradient(90deg, transparent, var(--primary-green), transparent);
-  box-shadow: var(--glow-green);
 }
 
 .game-grid {
@@ -280,11 +164,9 @@ input, button, textarea, select {
   width: 100%;
 }
 
-/* 8. Improved Game Card Design */
+/* 8. Simplified game card */
 .game-card {
-  position: relative;
-  overflow: hidden;
-  background: linear-gradient(135deg, #2c2c2c, #1a1a1a);
+  background: var(--medium-gray);
   border-radius: var(--radius-md);
   padding: 1.5rem 1rem;
   display: flex;
@@ -292,75 +174,18 @@ input, button, textarea, select {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all var(--transition-bounce);
-  border: 1px solid rgba(0, 168, 107, 0.2);
-  box-shadow: var(--shadow-md);
+  transition: transform var(--transition-normal);
+  border: 1px solid var(--primary-green);
   height: 160px;
-  /* Add modern glass effect */
-  backdrop-filter: blur(5px);
-  -webkit-backdrop-filter: blur(5px);
-}
-
-.game-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 5px;
-  background: linear-gradient(to right, transparent, var(--primary-green), transparent);
-  opacity: 0;
-  transition: opacity var(--transition-normal);
-}
-
-.game-card::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(to top, rgba(0, 168, 107, 0.05), transparent);
-  opacity: 0;
-  transition: opacity var(--transition-normal);
-  z-index: 1;
-  pointer-events: none;
 }
 
 .game-card:hover {
-  transform: translateY(-10px) scale(1.03);
-  border-color: var(--primary-green);
-  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.4), 0 0 15px rgba(0, 168, 107, 0.3);
-}
-
-.game-card:hover::before,
-.game-card:hover::after {
-  opacity: 1;
-}
-
-.game-card:active {
-  transform: translateY(-5px) scale(0.98);
-  transition: transform 0.1s;
+  transform: translateY(-5px);
 }
 
 .game-icon {
   font-size: 3rem;
   margin-bottom: 1rem;
-  text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
-  transition: transform var(--transition-normal);
-  position: relative;
-  z-index: 2;
-}
-
-.game-card:hover .game-icon {
-  transform: scale(1.1);
-  animation: bounce 0.5s var(--transition-bounce);
-}
-
-@keyframes bounce {
-  0%, 20%, 50%, 80%, 100% {transform: translateY(0) scale(1.1);}
-  40% {transform: translateY(-10px) scale(1.15);}
-  60% {transform: translateY(-5px) scale(1.12);}
 }
 
 .game-name {
@@ -368,19 +193,11 @@ input, button, textarea, select {
   font-weight: bold;
   color: var(--gold);
   text-transform: uppercase;
-  letter-spacing: 1px;
-  position: relative;
-  z-index: 2;
-  transition: color var(--transition-normal);
 }
 
-.game-card:hover .game-name {
-  color: var(--white);
-}
-
-/* 9. Modern Action Buttons */
+/* 9. Action buttons */
 .action-btn {
-  background: linear-gradient(135deg, var(--primary-green), #005b3b);
+  background: var(--primary-green);
   color: white;
   border: none;
   padding: 0.8rem 2rem;
@@ -388,66 +205,20 @@ input, button, textarea, select {
   font-size: 1.1rem;
   font-weight: bold;
   cursor: pointer;
-  transition: all var(--transition-bounce);
-  box-shadow: 0 4px 15px rgba(0, 168, 107, 0.3);
+  transition: all var(--transition-normal);
   text-transform: uppercase;
-  letter-spacing: 1px;
-  position: relative;
-  overflow: hidden;
-}
-
-.action-btn::after {
-  content: '';
-  position: absolute;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: linear-gradient(
-    to right,
-    rgba(255, 255, 255, 0) 0%,
-    rgba(255, 255, 255, 0.05) 40%,
-    rgba(255, 255, 255, 0.1) 50%,
-    rgba(255, 255, 255, 0.05) 60%,
-    rgba(255, 255, 255, 0) 100%
-  );
-  transform: rotate(30deg);
-  transition: transform 0.7s;
-  opacity: 0;
 }
 
 .action-btn:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 7px 20px rgba(0, 168, 107, 0.5);
-}
-
-.action-btn:hover::after {
-  opacity: 1;
-  transform: rotate(30deg) translate(400px, 0);
-}
-
-.action-btn:active {
-  transform: translateY(0);
+  opacity: 0.9;
 }
 
 .action-btn:disabled {
   background: var(--light-gray);
   cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
 }
 
-/* Add haptic feedback hints for mobile */
-@media (hover: none) {
-  .game-card:active,
-  .action-btn:active,
-  .nav-btn:active,
-  .close-modal:active {
-    touch-action: manipulation;
-  }
-}
-
-/* 10. Enhanced Forms and Inputs */
+/* 10. Form inputs */
 input[type="text"],
 input[type="number"],
 select {
@@ -458,9 +229,7 @@ select {
   color: var(--white);
   font-size: 1rem;
   width: 100%;
-  transition: all var(--transition-normal);
-  backdrop-filter: blur(5px);
-  -webkit-backdrop-filter: blur(5px);
+  transition: border-color var(--transition-normal);
 }
 
 input[type="text"]:focus,
@@ -468,20 +237,15 @@ input[type="number"]:focus,
 select:focus {
   outline: none;
   border-color: var(--gold);
-  box-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
 }
 
-/* Improved select dropdown with custom arrow */
+/* Simplified select dropdown */
 select {
   appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%2300A86B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 10px center;
-  background-size: 16px;
   padding-right: 40px;
 }
 
-/* 11. Modern Modal Design */
+/* 11. Simplified modal */
 .modal {
   display: none;
   position: fixed;
@@ -494,33 +258,15 @@ select {
   justify-content: center;
   align-items: center;
   padding: 1rem;
-  opacity: 0;
-  transition: opacity var(--transition-normal);
-}
-
-.modal[style*="display: flex"] {
-  opacity: 1;
-  animation: fadeIn 0.3s forwards;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
 }
 
 .modal-content {
-  background: linear-gradient(to bottom, #2c2c2c, #1a1a1a);
+  background: var(--dark-gray);
   width: 100%;
   max-width: 500px;
   border-radius: var(--radius-md);
   overflow: hidden;
-  opacity: 0;
-  transform: scale(0.9);
-  transition: all var(--transition-bounce);
   border: 1px solid var(--primary-green);
-  box-shadow: var(--shadow-lg);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
 }
 
 .modal-header {
@@ -528,70 +274,40 @@ select {
   justify-content: space-between;
   align-items: center;
   padding: 1.2rem 1.5rem;
-  background: linear-gradient(to right, rgba(0, 0, 0, 0.7), rgba(0, 168, 107, 0.1));
+  background: var(--black);
   border-bottom: 1px solid var(--primary-green);
 }
 
 .modal-header h2 {
   margin: 0;
   font-size: 1.5rem;
-  background: linear-gradient(to right, var(--white), var(--gold));
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: var(--gold);
 }
 
 .close-modal {
   color: var(--light-gray);
   font-size: 1.5rem;
   cursor: pointer;
-  transition: all var(--transition-normal);
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-circle);
+  transition: color var(--transition-normal);
 }
 
 .close-modal:hover {
   color: var(--white);
-  background-color: rgba(255, 255, 255, 0.1);
-  transform: rotate(90deg);
 }
 
 .modal-body {
   padding: 1.5rem;
   max-height: 70vh;
   overflow-y: auto;
-  /* Modern scrollbar */
-  scrollbar-width: thin;
-  scrollbar-color: var(--primary-green) rgba(0, 0, 0, 0.3);
 }
 
-/* Custom scrollbar for Chrome, Edge, and Safari */
-.modal-body::-webkit-scrollbar {
-  width: 8px;
-}
-
-.modal-body::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.3);
-  border-radius: 10px;
-}
-
-.modal-body::-webkit-scrollbar-thumb {
-  background-color: var(--primary-green);
-  border-radius: 10px;
-}
-
-/* 12. Enhanced Bottom Navigation */
+/* 12. Bottom navigation */
 .bottom-nav {
   display: flex;
   justify-content: space-around;
   align-items: center;
   padding: 0.8rem 0;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.95), rgba(20, 20, 20, 0.9));
-  box-shadow: 0 -2px 20px rgba(0, 0, 0, 0.5);
+  background: var(--black);
   border-top: 1px solid var(--primary-green);
   position: relative;
   z-index: 5;
@@ -602,53 +318,31 @@ select {
   flex-direction: column;
   align-items: center;
   padding: 0.5rem 1.5rem;
-  border-radius: var(--radius-sm);
   color: var(--light-gray);
-  transition: all var(--transition-normal);
-  position: relative;
   background: none;
   border: none;
+  transition: color var(--transition-normal);
 }
 
 .nav-btn.active {
   color: var(--primary-green);
 }
 
-.nav-btn.active::after {
-  content: '';
-  position: absolute;
-  bottom: -0.8rem;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 6px;
-  height: 6px;
-  background-color: var(--primary-green);
-  border-radius: var(--radius-circle);
-  box-shadow: var(--glow-green);
-}
-
 .nav-btn:hover {
   color: var(--white);
-  transform: translateY(-2px);
 }
 
 .nav-icon {
   font-size: 1.5rem;
   margin-bottom: 0.3rem;
-  transition: transform var(--transition-normal);
-}
-
-.nav-btn:hover .nav-icon {
-  transform: scale(1.1);
 }
 
 .nav-label {
   font-size: 0.8rem;
   text-transform: uppercase;
-  letter-spacing: 1px;
 }
 
-/* 13. Game Result Display Enhancement */
+/* 13. Game result display */
 .result {
   min-height: 50px;
   margin: 1.5rem 0;
@@ -657,37 +351,24 @@ select {
   border-radius: var(--radius-md);
   font-weight: bold;
   font-size: 1.1rem;
-  opacity: 0;
-  transform: translateY(20px);
-  transition: all var(--transition-bounce);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
 }
 
 .result.win {
-  background: linear-gradient(135deg, rgba(76, 175, 80, 0.1), rgba(76, 175, 80, 0.2));
+  background: rgba(76, 175, 80, 0.1);
   border: 1px solid var(--win-color);
   color: var(--win-color);
-  box-shadow: 0 0 20px rgba(76, 175, 80, 0.2);
 }
 
 .result.lose {
-  background: linear-gradient(135deg, rgba(244, 67, 54, 0.1), rgba(244, 67, 54, 0.2));
+  background: rgba(244, 67, 54, 0.1);
   border: 1px solid var(--lose-color);
   color: var(--lose-color);
-  box-shadow: 0 0 20px rgba(244, 67, 54, 0.2);
 }
 
 /* Result icons */
 .win-icon, .lose-icon, .cashout-icon, .crash-icon {
   font-size: 2.5rem;
   margin-bottom: 0.5rem;
-  animation: scaleIn 0.5s var(--transition-bounce);
-}
-
-@keyframes scaleIn {
-  from { transform: scale(0); }
-  to { transform: scale(1); }
 }
 
 .win-title, .lose-title, .cashout-text, .crash-text {
@@ -695,20 +376,14 @@ select {
   margin-bottom: 0.5rem;
 }
 
-.win-description, .lose-description {
-  font-size: 1rem;
-  opacity: 0.8;
-}
-
 .win-amount {
   font-size: 1.5rem;
   color: var(--win-color);
   margin-top: 0.5rem;
   font-weight: bold;
-  text-shadow: 0 0 10px rgba(76, 175, 80, 0.3);
 }
 
-/* 14. Game History and Transactions Lists */
+/* 14. History and transaction lists */
 .history-list,
 .transaction-list {
   display: flex;
@@ -718,22 +393,17 @@ select {
 
 .history-item,
 .transaction-item {
-  background: linear-gradient(to right, rgba(0, 0, 0, 0.4), rgba(42, 42, 42, 0.2));
+  background: var(--medium-gray);
   padding: 1rem;
   border-radius: var(--radius-sm);
   display: flex;
   justify-content: space-between;
   align-items: center;
   border: 1px solid rgba(255, 255, 255, 0.05);
-  transition: all var(--transition-normal);
-  backdrop-filter: blur(5px);
-  -webkit-backdrop-filter: blur(5px);
 }
 
 .history-item:hover,
 .transaction-item:hover {
-  background: linear-gradient(to right, rgba(0, 0, 0, 0.5), rgba(0, 168, 107, 0.1));
-  transform: translateX(5px);
   border-left: 2px solid var(--primary-green);
 }
 
@@ -761,38 +431,12 @@ select {
 .transaction-amount.positive {
   color: var(--win-color);
   font-weight: bold;
-  position: relative;
-}
-
-.history-outcome.win::before,
-.transaction-amount.positive::before {
-  content: '';
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  background-color: var(--win-color);
-  border-radius: var(--radius-circle);
-  margin-right: 5px;
-  box-shadow: 0 0 5px var(--win-color);
 }
 
 .history-outcome.loss,
 .transaction-amount.negative {
   color: var(--lose-color);
   font-weight: bold;
-  position: relative;
-}
-
-.history-outcome.loss::before,
-.transaction-amount.negative::before {
-  content: '';
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  background-color: var(--lose-color);
-  border-radius: var(--radius-circle);
-  margin-right: 5px;
-  box-shadow: 0 0 5px var(--lose-color);
 }
 
 .history-date,
@@ -812,7 +456,7 @@ select {
   border: 1px dashed rgba(255, 255, 255, 0.1);
 }
 
-/* 15. Loading Overlay and Spinner */
+/* 15. CRITICAL: Simplified loading overlay */
 .loading-overlay {
   position: fixed;
   top: 0;
@@ -832,39 +476,16 @@ select {
   color: var(--white);
   font-size: 1.5rem;
   margin-top: 2rem;
-  font-family: 'Poiret One', 'Century Gothic', sans-serif;
-  letter-spacing: 2px;
   text-align: center;
 }
 
 .loading-spinner {
-  width: 60px;
-  height: 60px;
-  position: relative;
-}
-
-.loading-spinner::before,
-.loading-spinner::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
+  width: 40px;
+  height: 40px;
+  border: 4px solid rgba(0, 0, 0, 0.1);
   border-radius: 50%;
-  border: 3px solid transparent;
-}
-
-.loading-spinner::before {
-  border-top-color: var(--primary-green);
-  border-right-color: var(--primary-green);
-  animation: spin 1.2s linear infinite;
-}
-
-.loading-spinner::after {
-  border-bottom-color: var(--gold);
-  border-left-color: var(--gold);
-  animation: spin 0.8s linear infinite reverse;
+  border-top: 4px solid var(--primary-green);
+  animation: spin 1s linear infinite;
 }
 
 @keyframes spin {
@@ -872,169 +493,9 @@ select {
   100% { transform: rotate(360deg); }
 }
 
-/* Game-specific loading animations */
-.game-loading {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 200px;
-}
+/* GAME-SPECIFIC STYLES - SIMPLIFIED */
 
-.slots-loading .loading-icon {
-  font-size: 2rem;
-  animation: slotSpin 1.5s infinite;
-}
-
-@keyframes slotSpin {
-  0% { content: '🍒'; }
-  20% { content: '🍋'; }
-  40% { content: '🍇'; }
-  60% { content: '💎'; }
-  80% { content: '7️⃣'; }
-  100% { content: '🍒'; }
-}
-
-.roulette-loading .loading-icon {
-  font-size: 2rem;
-  animation: rotateBall 1.5s infinite linear;
-}
-
-@keyframes rotateBall {
-  0% { transform: rotate(0deg) translateX(20px) rotate(0deg); }
-  100% { transform: rotate(360deg) translateX(20px) rotate(-360deg); }
-}
-
-/* Page transition animations */
-.page-transition {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: var(--black);
-  z-index: 9998;
-  transform: scaleX(0);
-  transform-origin: right;
-  transition: transform 0.5s var(--transition-normal);
-}
-
-.page-transition.active {
-  transform: scaleX(1);
-  transform-origin: left;
-}
-
-/* 16. Notifications System */
-.notification-container {
-  position: fixed;
-  top: 20px;
-  right: 20px;
-  width: 300px;
-  z-index: 9999;
-}
-
-.notification {
-  background: linear-gradient(to right, rgba(0, 0, 0, 0.85), rgba(42, 42, 42, 0.85));
-  border-left: 4px solid var(--primary-green);
-  border-radius: var(--radius-sm);
-  padding: 1rem;
-  margin-bottom: 10px;
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-  display: flex;
-  align-items: center;
-  transform: translateX(120%);
-  transition: transform 0.5s var(--transition-bounce);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-}
-
-.notification.show {
-  transform: translateX(0);
-}
-
-.notification.success {
-  border-color: var(--win-color);
-}
-
-.notification.error {
-  border-color: var(--lose-color);
-}
-
-.notification-icon {
-  font-size: 1.5rem;
-  margin-right: 1rem;
-}
-
-.notification-content {
-  flex: 1;
-}
-
-.notification-message {
-  font-size: 0.9rem;
-  color: var(--white);
-}
-
-.notification-close {
-  color: var(--light-gray);
-  font-size: 1.2rem;
-  cursor: pointer;
-  transition: color var(--transition-normal);
-}
-
-.notification-close:hover {
-  color: var(--white);
-}
-
-/* 17. Button press effects */
-.card-pressed {
-  transform: scale(0.95) !important;
-  transition: transform 0.1s ease !important;
-}
-
-.btn-pressed {
-  transform: scale(0.95);
-  opacity: 0.8;
-  transition: all 0.1s ease;
-}
-
-/* 18. Balance update animation */
-.balance-updated {
-  animation: pulse-balance 0.5s ease;
-}
-
-@keyframes pulse-balance {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.1); color: var(--primary-green); }
-}
-
-/* 19. Fallback error message for emergency recovery */
-.error-message {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background: rgba(0, 0, 0, 0.9);
-  color: white;
-  padding: 2rem;
-  border-radius: 10px;
-  text-align: center;
-  z-index: 10000;
-  max-width: 90%;
-}
-
-.error-message button {
-  background: var(--primary-green);
-  color: white;
-  border: none;
-  padding: 0.5rem 1rem;
-  border-radius: 5px;
-  margin-top: 1rem;
-  cursor: pointer;
-}
-
-/* 20. GAME-SPECIFIC STYLES */
-
-/* SLOTS GAME ENHANCEMENTS */
+/* SLOTS GAME */
 .slots-container {
   display: flex;
   flex-direction: column;
@@ -1047,98 +508,34 @@ select {
 .slot-reels {
   display: flex;
   gap: 1rem;
-  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.7), rgba(10, 10, 10, 0.5));
+  background: var(--black);
   padding: 2rem;
   border-radius: var(--radius-md);
-  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5), 0 10px 30px rgba(0, 0, 0, 0.3);
   border: 2px solid var(--gold);
-  position: relative;
-  overflow: hidden;
-}
-
-/* Add decorative elements to slots */
-.slot-reels::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 10px;
-  background: linear-gradient(to right, var(--gold), transparent, var(--gold));
-  opacity: 0.3;
-}
-
-.slot-reels::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 10px;
-  background: linear-gradient(to right, var(--gold), transparent, var(--gold));
-  opacity: 0.3;
 }
 
 .reel {
-  width: 90px;
-  height: 90px;
-  background: linear-gradient(to bottom, #333, #222);
+  width: 80px;
+  height: 80px;
+  background: var(--medium-gray);
   border-radius: var(--radius-sm);
   display: flex;
   justify-content: center;
   align-items: center;
-  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.8);
   border: 1px solid rgba(255, 255, 255, 0.1);
   overflow: hidden;
-  position: relative;
-}
-
-.reel::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(to bottom, 
-    rgba(255,255,255,0.15) 0%,
-    rgba(255,255,255,0) 50%,
-    rgba(255,255,255,0.15) 100%);
-  pointer-events: none;
-}
-
-.symbol-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  width: 100%;
-  height: 100%;
-  transition: transform 0.2s;
-}
-
-.symbol-container.stopped {
-  animation: stopBounce 0.5s var(--transition-bounce);
-}
-
-@keyframes stopBounce {
-  0% { transform: translateY(-10px); }
-  25% { transform: translateY(5px); }
-  50% { transform: translateY(-3px); }
-  75% { transform: translateY(2px); }
-  100% { transform: translateY(0); }
 }
 
 .symbol {
-  font-size: 3rem;
+  font-size: 2.5rem;
   display: flex;
   justify-content: center;
   align-items: center;
   width: 100%;
   height: 100%;
-  text-shadow: 0 0 5px rgba(255, 255, 255, 0.3);
 }
 
-/* ROULETTE GAME ENHANCEMENTS */
+/* ROULETTE GAME */
 .roulette-container {
   display: flex;
   flex-direction: column;
@@ -1153,7 +550,6 @@ select {
   height: 280px;
   position: relative;
   margin-bottom: 1rem;
-  filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.5));
 }
 
 .wheel-outer {
@@ -1161,8 +557,7 @@ select {
   width: 100%;
   height: 100%;
   border-radius: 50%;
-  background: linear-gradient(135deg, #444, #222);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+  background: var(--medium-gray);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -1177,21 +572,8 @@ select {
   background-color: var(--dark-gray);
   position: relative;
   transform-origin: center;
-  transition: transform 4s cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition: transform 4s ease-out;
   border: 3px solid #444;
-  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.8);
-}
-
-.wheel-inner::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  background: radial-gradient(circle at center, transparent 60%, rgba(0, 0, 0, 0.5));
-  pointer-events: none;
 }
 
 .wheel-number {
@@ -1205,48 +587,32 @@ select {
   font-size: 0.8rem;
   font-weight: bold;
   transform-origin: center;
-  box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.5);
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.5);
 }
 
 .wheel-number.red {
-  background: linear-gradient(135deg, #ff0000, #c80000);
+  background: var(--lose-color);
 }
 
 .wheel-number.black {
-  background: linear-gradient(135deg, #333, #000);
+  background: var(--black);
 }
 
 .wheel-number.green {
-  background: linear-gradient(135deg, var(--primary-green), #005b3b);
+  background: var(--primary-green);
 }
 
 .ball {
   position: absolute;
-  width: 12px;
-  height: 12px;
-  background: radial-gradient(circle at 30% 30%, white, #d0d0d0);
+  width: 10px;
+  height: 10px;
+  background: white;
   border-radius: 50%;
-  box-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
   transform-origin: center;
-  transition: transform 4s cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition: transform 4s ease-out;
   z-index: 2;
 }
 
-/* Add dealer's peg */
-.wheel-peg {
-  position: absolute;
-  top: -15px;
-  left: calc(50% - 5px);
-  width: 10px;
-  height: 10px;
-  background-color: var(--white);
-  border-radius: 50%;
-  z-index: 10;
-  box-shadow: 0 0 5px rgba(255, 255, 255, 0.8);
-}
-
-/* GUESS NUMBER GAME ENHANCEMENTS */
+/* GUESS NUMBER GAME */
 .guessnumber-container {
   display: flex;
   flex-direction: column;
@@ -1259,26 +625,10 @@ select {
 .number-range {
   text-align: center;
   padding: 1.5rem;
-  background: linear-gradient(to right, rgba(0, 0, 0, 0.6), rgba(0, 168, 107, 0.1), rgba(0, 0, 0, 0.6));
+  background: var(--medium-gray);
   border-radius: var(--radius-md);
   border: 1px solid var(--primary-green);
   width: 100%;
-  position: relative;
-  overflow: hidden;
-}
-
-.number-range::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(to right, 
-    transparent 0%,
-    rgba(0, 168, 107, 0.05) 50%,
-    transparent 100%);
-  pointer-events: none;
 }
 
 .number-range p {
@@ -1289,24 +639,11 @@ select {
 .number-range span {
   color: var(--gold);
   font-weight: bold;
-  text-shadow: 0 0 5px rgba(255, 215, 0, 0.3);
 }
 
 .guess-input {
   width: 100%;
   max-width: 200px;
-  position: relative;
-}
-
-.guess-input::after {
-  content: '🔍';
-  position: absolute;
-  right: 15px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 1.2rem;
-  opacity: 0.7;
-  pointer-events: none;
 }
 
 .guess-input input {
@@ -1314,11 +651,10 @@ select {
   font-size: 1.5rem;
   padding: 1rem;
   font-weight: bold;
-  letter-spacing: 2px;
   color: var(--gold);
 }
 
-/* MINER GAME ENHANCEMENTS */
+/* MINER GAME */
 .miner-container {
   display: flex;
   flex-direction: column;
@@ -1333,10 +669,9 @@ select {
   justify-content: space-between;
   width: 100%;
   padding: 1rem 1.5rem;
-  background: linear-gradient(to right, rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.4));
+  background: var(--medium-gray);
   border-radius: var(--radius-md);
   border: 1px solid var(--primary-green);
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
 }
 
 .mines-count,
@@ -1349,7 +684,6 @@ select {
 .potential-win {
   color: var(--gold);
   font-weight: bold;
-  text-shadow: 0 0 5px rgba(255, 215, 0, 0.2);
 }
 
 .miner-grid {
@@ -1357,64 +691,40 @@ select {
   grid-template-columns: repeat(5, 1fr);
   gap: 0.8rem;
   width: 100%;
-  perspective: 1000px;
 }
 
 .grid-cell {
   aspect-ratio: 1;
-  background: linear-gradient(135deg, #333, #222);
+  background: var(--medium-gray);
   border-radius: var(--radius-sm);
   display: flex;
   justify-content: center;
   align-items: center;
   font-size: 1.5rem;
   cursor: pointer;
-  transition: all var(--transition-normal);
+  transition: background-color var(--transition-normal);
   border: 1px solid rgba(255, 255, 255, 0.05);
-  transform-style: preserve-3d;
-  position: relative;
 }
 
 .grid-cell:hover {
-  transform: scale(1.05) rotateY(10deg);
-  background: linear-gradient(135deg, #444, #333);
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-  border-color: rgba(0, 168, 107, 0.3);
+  background: #444;
+  border-color: var(--primary-green);
 }
 
 .grid-cell.revealed {
-  background: linear-gradient(135deg, var(--primary-green), #008c59);
+  background: var(--primary-green);
   color: var(--white);
-  transform: scale(1) rotateY(180deg);
-  animation: reveal 0.5s forwards;
-}
-
-@keyframes reveal {
-  0% { transform: rotateY(0deg); }
-  100% { transform: rotateY(180deg); }
 }
 
 .grid-cell.mine {
-  background: linear-gradient(135deg, var(--medium-gray), #1a1a1a);
+  background: var(--medium-gray);
 }
 
 .grid-cell.exploded {
-  background: linear-gradient(135deg, var(--lose-color), #b71c1c);
-  transform: scale(1.1);
-  z-index: 1;
-  animation: explode 0.5s forwards;
+  background: var(--lose-color);
 }
 
-@keyframes explode {
-  0% { transform: scale(1); }
-  20% { transform: scale(1.2); }
-  40% { transform: scale(0.9); }
-  60% { transform: scale(1.1); }
-  80% { transform: scale(0.95); }
-  100% { transform: scale(1); }
-}
-
-/* CRUSH GAME ENHANCEMENTS */
+/* CRUSH GAME */
 .crush-container {
   display: flex;
   flex-direction: column;
@@ -1428,103 +738,28 @@ select {
   font-size: 3rem;
   font-weight: bold;
   color: var(--gold);
-  text-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
-  transition: all var(--transition-normal);
   min-height: 70px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.multiplier-display.active {
-  animation: pulse-text 1s infinite alternate;
-}
-
-@keyframes pulse-text {
-  0% { transform: scale(1); }
-  100% { transform: scale(1.05); text-shadow: 0 0 20px rgba(255, 215, 0, 0.6); }
-}
-
 .multiplier-display.crashed {
   color: var(--lose-color);
-  animation: shake 0.5s ease;
 }
 
 .multiplier-display.cashed-out {
   color: var(--win-color);
-  animation: celebrate 0.7s ease;
-}
-
-@keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  20%, 60% { transform: translateX(-5px); }
-  40%, 80% { transform: translateX(5px); }
-}
-
-@keyframes celebrate {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.2); }
-  100% { transform: scale(1); }
 }
 
 .crush-graph {
   width: 100%;
   height: 200px;
-  background: rgba(0, 0, 0, 0.3);
+  background: var(--medium-gray);
   border-radius: var(--radius-md);
   position: relative;
   overflow: hidden;
   border: 1px solid var(--primary-green);
-  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.3);
-}
-
-.graph-line {
-  fill: none;
-  stroke: var(--primary-green);
-  stroke-width: 3;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  filter: drop-shadow(0 0 3px var(--primary-glow));
-}
-
-.crash-history {
-  width: 100%;
-  margin-top: 1rem;
-  padding: 1rem;
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: var(--radius-md);
-  border: 1px solid rgba(0, 168, 107, 0.2);
-}
-
-.crash-history h3 {
-  font-size: 1.2rem;
-  margin-bottom: 1rem;
-  color: var(--white);
-  text-align: center;
-}
-
-.history-items {
-  display: flex;
-  gap: 0.5rem;
-  overflow-x: auto;
-  padding-bottom: 0.5rem;
-  /* Modern scrollbar */
-  scrollbar-width: thin;
-  scrollbar-color: var(--primary-green) rgba(0, 0, 0, 0.3);
-}
-
-.history-items::-webkit-scrollbar {
-  height: 6px;
-}
-
-.history-items::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.3);
-  border-radius: 10px;
-}
-
-.history-items::-webkit-scrollbar-thumb {
-  background-color: var(--primary-green);
-  border-radius: 10px;
 }
 
 /* Game header with back button */
@@ -1539,25 +774,22 @@ select {
   flex: 1;
   text-align: center;
   color: var(--gold);
-  text-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
   margin: 0;
 }
 
 .back-btn {
-  background: linear-gradient(135deg, rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.4));
+  background: var(--medium-gray);
   border: 1px solid var(--primary-green);
   color: var(--white);
   padding: 0.5rem 1rem;
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all var(--transition-normal);
+  transition: background-color var(--transition-normal);
   font-weight: bold;
 }
 
 .back-btn:hover {
-  background: linear-gradient(135deg, rgba(0, 0, 0, 0.7), rgba(0, 168, 107, 0.1));
-  transform: translateX(-3px);
-  box-shadow: 0 0 10px rgba(0, 168, 107, 0.2);
+  background: #444;
 }
 
 /* Bet controls */
@@ -1581,10 +813,10 @@ select {
   justify-content: center;
 }
 
-/* 21. Responsive Design */
+/* Responsive design */
 @media (max-width: 768px) {
   html {
-    font-size: 14px; /* Slightly reduce base font size */
+    font-size: 14px;
   }
   
   .game-grid {
@@ -1599,57 +831,9 @@ select {
   .logo h1 {
     font-size: 1.5rem;
   }
-  
-  .green-light {
-    width: 20px;
-    height: 20px;
-  }
-  
-  .balance {
-    padding: 0.4rem 1rem;
-    font-size: 1rem;
-  }
-  
-  .modal-content {
-    max-width: 95%;
-    max-height: 90vh;
-  }
-  
-  .modal-body {
-    max-height: 60vh;
-  }
-  
-  /* Add tactile feedback for mobile */
-  .game-card:active,
-  .action-btn:active,
-  .nav-btn:active {
-    transform: scale(0.95);
-    transition: transform 0.1s;
-  }
 }
 
-/* 22. Helper classes for better Z-indexing */
-.z-top {
-  z-index: 10000;
-}
-
-.z-high {
-  z-index: 1000;
-}
-
-.z-mid {
-  z-index: 100;
-}
-
-.z-low {
-  z-index: 10;
-}
-
-.z-bottom {
-  z-index: 1;
-}
-
-/* 23. Visibility helpers */
+/* Visibility helpers */
 .hidden {
   display: none !important;
 }
