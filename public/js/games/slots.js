@@ -3,12 +3,12 @@
 // Улучшенная версия игры Slots с матрицей 3x3 и реалистичным вращением
 const slotsGame = (() => {
   // Элементы игры
-  const spinBtn = document.getElementById('spin-btn');
-  const slotsResult = document.getElementById('slots-result');
-  const slotsBet = document.getElementById('slots-bet');
+  let spinBtn;
+  let slotsResult;
+  let slotsBet;
   
   // Контейнер для слотов (будет создан динамически)
-  let slotsContainer = document.querySelector('.slot-reels');
+  let slotsContainer;
   let reels = [];
   
   // Состояние игры
@@ -51,12 +51,21 @@ const slotsGame = (() => {
   function init() {
     console.log('Инициализация игры Slots');
     
+    // Получаем элементы DOM
+    spinBtn = document.getElementById('spin-btn');
+    slotsResult = document.getElementById('slots-result');
+    slotsBet = document.getElementById('slots-bet');
+    slotsContainer = document.querySelector('.slot-reels');
+    
     // Создаем новый контейнер для слотов 3x3
     createSlotsContainer();
     
     // Добавляем обработчики событий
     if (spinBtn) {
       spinBtn.addEventListener('click', spin);
+      console.log('Slots: обработчик spin-btn установлен');
+    } else {
+      console.warn('Slots: spin-btn не найден в DOM');
     }
     
     // Настраиваем звуки
@@ -69,51 +78,55 @@ const slotsGame = (() => {
     if (slotsResult) {
       slotsResult.style.display = 'none';
     }
+    
+    console.log('Slots: инициализация завершена успешно');
+    return true;
   }
   
   // Создание контейнера для слотов 3x3
   function createSlotsContainer() {
-    const oldContainer = slotsContainer;
+    // Очищаем массив барабанов
+    reels = [];
     
-    // Если контейнер существует, находим его родителя
-    if (oldContainer) {
-      const parent = oldContainer.parentElement;
+    // Проверяем наличие контейнера
+    if (!slotsContainer) {
+      console.error('Slots: не найден контейнер для слотов');
+      slotsContainer = document.querySelector('.slot-reels');
       
-      // Создаем новый контейнер
-      const newContainer = document.createElement('div');
-      newContainer.className = 'slot-reels new-slot-reels';
-      
-      // Создаем сетку 3x3
-      for (let row = 0; row < rowCount; row++) {
-        const rowElement = document.createElement('div');
-        rowElement.className = 'slot-row';
-        
-        for (let col = 0; col < colCount; col++) {
-          const reel = document.createElement('div');
-          reel.className = 'reel';
-          reel.dataset.row = row;
-          reel.dataset.col = col;
-          
-          // Создаем контейнер для символов (лента)
-          const reelStrip = document.createElement('div');
-          reelStrip.className = 'reel-strip';
-          reel.appendChild(reelStrip);
-          
-          rowElement.appendChild(reel);
-          reels.push(reelStrip);
-        }
-        
-        newContainer.appendChild(rowElement);
+      if (!slotsContainer) {
+        console.error('Slots: контейнер all-slot-reels также не найден');
+        return;
       }
-      
-      // Заменяем старый контейнер
-      if (parent) {
-        parent.replaceChild(newContainer, oldContainer);
-        slotsContainer = newContainer;
-      }
-    } else {
-      console.error('Не найден контейнер для слотов');
     }
+    
+    // Очищаем контейнер
+    slotsContainer.innerHTML = '';
+    console.log('Slots: очистка контейнера');
+    
+    // Создаем сетку 3x3
+    for (let row = 0; row < rowCount; row++) {
+      const rowElement = document.createElement('div');
+      rowElement.className = 'slot-row';
+      
+      for (let col = 0; col < colCount; col++) {
+        const reel = document.createElement('div');
+        reel.className = 'reel';
+        reel.dataset.row = row;
+        reel.dataset.col = col;
+        
+        // Создаем контейнер для символов (лента)
+        const reelStrip = document.createElement('div');
+        reelStrip.className = 'reel-strip';
+        reel.appendChild(reelStrip);
+        
+        rowElement.appendChild(reel);
+        reels.push(reelStrip);
+      }
+      
+      slotsContainer.appendChild(rowElement);
+    }
+    
+    console.log('Slots: создано барабанов:', reels.length);
   }
   
   // Настройка звуков
@@ -190,8 +203,26 @@ const slotsGame = (() => {
   
   // Запуск вращения
   async function spin() {
+    console.log('Slots: запуск вращения');
+    
+    // Проверка наличия casinoApp
+    if (!window.casinoApp) {
+      console.error('Slots: casinoApp не найден');
+      alert('Ошибка инициализации приложения');
+      return;
+    }
+    
     // Проверяем, не вращаются ли уже барабаны
-    if (isSpinning) return;
+    if (isSpinning) {
+      console.log('Slots: барабаны уже вращаются');
+      return;
+    }
+    
+    // Проверка наличия элементов
+    if (!slotsBet) {
+      console.error('Slots: элемент ставки не найден');
+      return;
+    }
     
     // Получаем размер ставки
     const betAmount = parseInt(slotsBet.value);
@@ -250,6 +281,12 @@ const slotsGame = (() => {
       for (let i = 0; i < reels.length; i++) {
         const row = Math.floor(i / colCount);
         const col = i % colCount;
+        
+        // Проверяем наличие барабана
+        if (!reels[i]) {
+          console.error(`Slots: барабан ${i} не найден`);
+          continue;
+        }
         
         // Вращение с задержкой в зависимости от столбца
         const promise = animateReel(reels[i], 
@@ -495,7 +532,10 @@ const slotsGame = (() => {
   
   // Отображение результата игры
   function displayResult(isWin, amount, description) {
-    if (!slotsResult) return;
+    if (!slotsResult) {
+      console.error('Slots: элемент slotsResult не найден');
+      return;
+    }
     
     // Обновляем текст результата
     if (isWin) {
@@ -578,9 +618,6 @@ const slotsGame = (() => {
     });
   }
   
-  // Инициализация при загрузке страницы
-  document.addEventListener('DOMContentLoaded', init);
-  
   // Возвращаем публичные методы
   return {
     init,
@@ -588,5 +625,15 @@ const slotsGame = (() => {
   };
 })();
 
-// ВАЖНОЕ ИЗМЕНЕНИЕ: Экспортируем объект в глобальную область видимости
+// Глобальный экспорт объекта игры
 window.slotsGame = slotsGame;
+
+// Регистрация в новой структуре
+if (window.registerGame) {
+  window.registerGame('slotsGame', slotsGame);
+  console.log('[Slots] Игра зарегистрирована в центральном хранилище');
+} else {
+  console.warn('[Slots] Функция registerGame не найдена, используем только глобальный экспорт');
+}
+
+console.log('[Slots] Экспорт игрового объекта завершен');
