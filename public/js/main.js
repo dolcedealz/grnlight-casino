@@ -80,10 +80,89 @@ async function initApp() {
     // Add event listeners for other elements
     addEventListeners();
     
+    // Применяем стили для мобильных устройств
+    applyMobileStyles();
+    
     console.log('App initialization completed');
   } catch (error) {
     console.error('Error during app initialization:', error);
     showNotification('Error initializing app. Please try again later.');
+  }
+}
+
+// Функция для применения стилей для мобильных устройств
+function applyMobileStyles() {
+  // Проверяем, является ли устройство мобильным
+  const isMobile = window.innerWidth <= 768;
+  
+  if (isMobile) {
+    // Увеличиваем размер кнопок и отступы для более удобного нажатия
+    const actionButtons = document.querySelectorAll('.action-btn');
+    const navButtons = document.querySelectorAll('.nav-btn');
+    
+    actionButtons.forEach(button => {
+      button.style.padding = '1rem 2rem';
+      button.style.fontSize = '1.1rem';
+    });
+    
+    navButtons.forEach(button => {
+      button.style.padding = '0.8rem 1.5rem';
+    });
+    
+    // Настраиваем размер игровых карточек
+    const gameCards = document.querySelectorAll('.game-card');
+    gameCards.forEach(card => {
+      card.style.minHeight = '140px';
+    });
+  }
+}
+
+// Функция тактильной обратной связи
+function provideTactileFeedback(type = 'light') {
+  // Проверяем доступность API вибрации в Telegram WebApp
+  if (tgApp && tgApp.HapticFeedback) {
+    switch (type) {
+      case 'light':
+        tgApp.HapticFeedback.impactOccurred('light');
+        break;
+      case 'medium':
+        tgApp.HapticFeedback.impactOccurred('medium');
+        break;
+      case 'heavy':
+        tgApp.HapticFeedback.impactOccurred('heavy');
+        break;
+      case 'success':
+        tgApp.HapticFeedback.notificationOccurred('success');
+        break;
+      case 'warning':
+        tgApp.HapticFeedback.notificationOccurred('warning');
+        break;
+      case 'error':
+        tgApp.HapticFeedback.notificationOccurred('error');
+        break;
+    }
+  } else if ('vibrate' in navigator) {
+    // Если API Telegram недоступно, используем стандартный Web Vibration API
+    switch (type) {
+      case 'light':
+        navigator.vibrate(5);
+        break;
+      case 'medium':
+        navigator.vibrate(10);
+        break;
+      case 'heavy':
+        navigator.vibrate(15);
+        break;
+      case 'success':
+        navigator.vibrate([10, 50, 10]);
+        break;
+      case 'warning':
+        navigator.vibrate([10, 50, 10, 50, 10]);
+        break;
+      case 'error':
+        navigator.vibrate([50, 100, 50]);
+        break;
+    }
   }
 }
 
@@ -103,11 +182,21 @@ function setupGameCardHandlers() {
     const newCard = card.cloneNode(true);
     card.parentNode.replaceChild(newCard, card);
     
-    // Add onclick handler directly
+    // Add onclick handler directly with tactile feedback
     newCard.onclick = function(e) {
       e.preventDefault();
       e.stopPropagation();
       console.log('Game card clicked:', game);
+      
+      // Добавляем тактильную обратную связь
+      provideTactileFeedback('medium');
+      
+      // Добавляем визуальный эффект нажатия
+      this.classList.add('card-pressed');
+      setTimeout(() => {
+        this.classList.remove('card-pressed');
+      }, 150);
+      
       showGameScreen(game);
     };
   });
@@ -248,6 +337,15 @@ async function processGameResult(gameType, betAmount, outcome, winAmount, gameDa
       return null;
     }
     
+    // Предоставляем тактильную обратную связь в зависимости от результата
+    if (outcome === 'win') {
+      provideTactileFeedback('success');
+    } else if (outcome === 'lose') {
+      provideTactileFeedback('warning');
+    } else {
+      provideTactileFeedback('light');
+    }
+    
     const response = await fetch(`${API_URL}/games/play`, {
       method: 'POST',
       headers: {
@@ -302,6 +400,12 @@ function updateBalance() {
   
   if (balanceDisplay) {
     balanceDisplay.textContent = currentUser.balance;
+    
+    // Добавляем анимацию обновления баланса
+    balanceDisplay.classList.add('balance-updated');
+    setTimeout(() => {
+      balanceDisplay.classList.remove('balance-updated');
+    }, 500);
   }
   
   if (profileBalance) {
@@ -463,6 +567,9 @@ function showModal(modal) {
     return;
   }
   
+  // Тактильная обратная связь при открытии модального окна
+  provideTactileFeedback('light');
+  
   modal.style.display = 'flex';
   
   // Add fade-in animation
@@ -506,11 +613,27 @@ function addEventListeners() {
   const historyModal = document.getElementById('history-modal');
   const profileModal = document.getElementById('profile-modal');
   const closeModalButtons = document.querySelectorAll('.close-modal');
+  const actionButtons = document.querySelectorAll('.action-btn');
+  
+  // Добавляем тактильную обратную связь для всех кнопок действий
+  actionButtons.forEach(button => {
+    button.addEventListener('click', () => {
+      provideTactileFeedback('medium');
+    });
+  });
   
   // Back button click events
   backButtons.forEach(button => {
     button.addEventListener('click', () => {
       console.log('Back button clicked');
+      provideTactileFeedback('light');
+      
+      // Добавляем визуальный эффект нажатия
+      button.classList.add('btn-pressed');
+      setTimeout(() => {
+        button.classList.remove('btn-pressed');
+      }, 150);
+      
       showScreen('welcome-screen');
     });
   });
@@ -519,6 +642,7 @@ function addEventListeners() {
   if (homeBtn) {
     homeBtn.addEventListener('click', () => {
       console.log('Home button clicked');
+      provideTactileFeedback('light');
       showScreen('welcome-screen');
       updateActiveNavButton(homeBtn);
     });
@@ -527,6 +651,7 @@ function addEventListeners() {
   if (historyBtn) {
     historyBtn.addEventListener('click', () => {
       console.log('History button clicked');
+      provideTactileFeedback('light');
       getGameHistory();
       showModal(historyModal);
       updateActiveNavButton(historyBtn);
@@ -536,6 +661,7 @@ function addEventListeners() {
   if (profileBtn) {
     profileBtn.addEventListener('click', () => {
       console.log('Profile button clicked');
+      provideTactileFeedback('light');
       getTransactionHistory();
       showModal(profileModal);
       updateActiveNavButton(profileBtn);
@@ -546,6 +672,7 @@ function addEventListeners() {
   closeModalButtons.forEach(button => {
     button.addEventListener('click', () => {
       console.log('Close modal button clicked');
+      provideTactileFeedback('light');
       const modal = button.closest('.modal');
       hideModal(modal);
       updateActiveNavButton(homeBtn);
@@ -591,5 +718,6 @@ window.casinoApp = {
   processGameResult,
   showNotification,
   currentUser,
-  showScreen
+  showScreen,
+  provideTactileFeedback // Экспортируем функцию тактильной обратной связи
 };

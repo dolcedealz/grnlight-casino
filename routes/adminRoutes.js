@@ -1,23 +1,27 @@
+// routes/adminRoutes.js
 const express = require('express');
 const router = express.Router();
 const adminController = require('../controllers/adminController');
 
-// All admin routes should go through admin check middleware
+// Все админские маршруты должны проходить через проверку админских прав
 router.use(adminController.isAdmin);
 
-// Get all users
+// Получение всех пользователей
 router.get('/users', adminController.getAllUsers);
 
-// Update user win rate
+// Обновление шанса выигрыша пользователя
 router.post('/user/winrate', adminController.updateWinRate);
 
-// Update user balance
+// Обновление баланса пользователя
 router.post('/user/balance', adminController.updateUserBalance);
 
-// Ban/unban user
+// Блокировка/разблокировка пользователя
 router.post('/user/ban', adminController.toggleBan);
 
-// Get casino statistics
+// Получение статистики казино
 router.get('/statistics', adminController.getStatistics);
+
+// Новый маршрут: получение детальной статистики пользователя
+router.get('/user/stats/:telegramId', adminController.getUserDetailedStats);
 
 module.exports = router;

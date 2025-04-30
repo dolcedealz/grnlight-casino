@@ -1,19 +1,18 @@
 // public/js/games/crush.js
 
-// Улучшенная версия игры Crush с детальной анимацией и историей
+// Улучшенная версия игры Crash с качественным графиком и лучшим интерфейсом
 const crushGame = (() => {
   // Элементы игры
   const startBtn = document.getElementById('start-crush-btn');
   const cashoutBtn = document.getElementById('cash-crush-btn');
   const crushBet = document.getElementById('crush-bet');
   const multiplierDisplay = document.getElementById('multiplier');
-  const graphLine = document.getElementById('graph-line');
   const crushGraph = document.getElementById('crush-graph');
   const crushResult = document.getElementById('crush-result');
   
-  // Новые элементы для улучшенной версии
-  let gameStatsContainer;
-  let crashHistoryContainer;
+  // Элементы для графика
+  let graphCanvas;
+  let graphCtx;
   
   // Состояние игры
   let isPlaying = false;
@@ -21,35 +20,42 @@ const crushGame = (() => {
   let gameInterval = null;
   let crashPoint = 1.00;
   let betAmount = 0;
-  let graphPoints = [];
   let gameStartTime = 0;
+  let graphPoints = [];
+  
+  // История игр
   let gameHistory = [];
   const MAX_HISTORY = 10;
-  let currentSpeedMultiplier = 1;
   
   // Звуки
   let startSound, tickSound, cashoutSound, crashSound;
   
-  // Статистика
-  let stats = {
-    gamesPlayed: 0,
-    wins: 0,
-    losses: 0,
-    highestMultiplier: 1.0,
-    totalWinnings: 0,
-    totalLosses: 0
-  };
-  
   // Инициализация
   function init() {
-    console.log('Инициализация игры Crush');
+    console.log('Инициализация игры Crash');
+    
+    // Создаем canvas для графика, если его еще нет
+    if (!graphCanvas && crushGraph) {
+      graphCanvas = document.createElement('canvas');
+      graphCanvas.id = 'crush-canvas';
+      graphCanvas.width = crushGraph.clientWidth;
+      graphCanvas.height = crushGraph.clientHeight;
+      crushGraph.appendChild(graphCanvas);
+      
+      // Получаем контекст
+      graphCtx = graphCanvas.getContext('2d');
+    }
     
     // Добавляем обработчики событий
-    startBtn.addEventListener('click', startGame);
-    cashoutBtn.addEventListener('click', cashout);
+    if (startBtn) {
+      startBtn.addEventListener('click', startGame);
+    }
+    if (cashoutBtn) {
+      cashoutBtn.addEventListener('click', cashout);
+    }
     
-    // Создаем новые элементы интерфейса
-    createNewElements();
+    // Обработчик изменения размера окна
+    window.addEventListener('resize', handleResize);
     
     // Настраиваем звуки
     setupSounds();
@@ -60,95 +66,25 @@ const crushGame = (() => {
     // Загружаем историю
     loadHistory();
     
-    // Загружаем статистику
-    loadStats();
+    // Создаем интерфейс истории
+    createHistoryUI();
     
     // Скрываем результат
-    if (crushResult) crushResult.style.display = 'none';
+    if (crushResult) {
+      crushResult.style.display = 'none';
+    }
   }
   
-  // Создание новых элементов
-  function createNewElements() {
-    const crushContainer = document.querySelector('.crush-container');
-    if (!crushContainer) return;
-    
-    // 1. История крашей
-    if (!document.querySelector('.crash-history')) {
-      crashHistoryContainer = document.createElement('div');
-      crashHistoryContainer.className = 'crash-history';
-      crashHistoryContainer.innerHTML = `
-        <h3>История крашей</h3>
-        <div class="history-items"></div>
-      `;
+  // Обработка изменения размера окна
+  function handleResize() {
+    if (graphCanvas && crushGraph) {
+      graphCanvas.width = crushGraph.clientWidth;
+      graphCanvas.height = crushGraph.clientHeight;
+      resetGraph();
       
-      // Вставляем после графика
-      crushGraph.after(crashHistoryContainer);
-    }
-    
-    // 2. Статистика игры
-    if (!document.querySelector('.game-stats')) {
-      gameStatsContainer = document.createElement('div');
-      gameStatsContainer.className = 'game-stats';
-      gameStatsContainer.innerHTML = `
-        <div class="stats-header">Статистика</div>
-        <div class="stats-grid">
-          <div class="stat-item">
-            <div class="stat-label">Игр сыграно</div>
-            <div class="stat-value" id="games-played">0</div>
-          </div>
-          <div class="stat-item">
-            <div class="stat-label">Побед</div>
-            <div class="stat-value" id="wins">0</div>
-          </div>
-          <div class="stat-item">
-            <div class="stat-label">Поражений</div>
-            <div class="stat-value" id="losses">0</div>
-          </div>
-          <div class="stat-item">
-            <div class="stat-label">Рекорд</div>
-            <div class="stat-value" id="highest-multiplier">1.00x</div>
-          </div>
-        </div>
-      `;
-      
-      // Вставляем после истории крашей
-      if (crushResult) {
-        crushResult.after(gameStatsContainer);
-      } else {
-        crushContainer.appendChild(gameStatsContainer);
-      }
-    }
-    
-    // 3. Контроль скорости (замедление/ускорение)
-    if (!document.querySelector('.speed-control')) {
-      const speedControl = document.createElement('div');
-      speedControl.className = 'speed-control';
-      speedControl.innerHTML = `
-        <div class="speed-label">Скорость:</div>
-        <div class="speed-buttons">
-          <button class="speed-btn" data-speed="0.5">0.5x</button>
-          <button class="speed-btn active" data-speed="1">1x</button>
-          <button class="speed-btn" data-speed="2">2x</button>
-        </div>
-      `;
-      
-      // Вставляем перед контролями ставки
-      const crushControls = document.querySelector('.crush-controls');
-      if (crushControls) {
-        crushControls.prepend(speedControl);
-        
-        // Добавляем обработчики событий для кнопок скорости
-        const speedButtons = speedControl.querySelectorAll('.speed-btn');
-        speedButtons.forEach(btn => {
-          btn.addEventListener('click', () => {
-            const speed = parseFloat(btn.getAttribute('data-speed'));
-            setGameSpeed(speed);
-            
-            // Обновляем активную кнопку
-            speedButtons.forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-          });
-        });
+      // Перерисовываем текущий график, если игра активна
+      if (isPlaying && graphPoints.length > 0) {
+        redrawGraph();
       }
     }
   }
@@ -172,72 +108,85 @@ const crushGame = (() => {
     }
   }
   
-  // Установка скорости игры
-  function setGameSpeed(speed) {
-    currentSpeedMultiplier = speed;
-    console.log(`Скорость игры изменена на ${speed}x`);
+  // Создание интерфейса истории
+  function createHistoryUI() {
+    // Проверяем, существует ли контейнер игры
+    const crushContainer = document.querySelector('.crush-container');
+    if (!crushContainer) return;
+    
+    // Проверяем, существует ли уже контейнер истории
+    let historyContainer = document.querySelector('.crush-history');
+    
+    if (!historyContainer) {
+      // Создаем контейнер для истории
+      historyContainer = document.createElement('div');
+      historyContainer.className = 'crush-history';
+      historyContainer.innerHTML = `
+        <h3>История</h3>
+        <div class="history-items"></div>
+      `;
+      
+      // Добавляем после графика
+      if (crushGraph) {
+        crushGraph.after(historyContainer);
+      } else {
+        crushContainer.appendChild(historyContainer);
+      }
+    }
+    
+    // Обновляем содержимое истории
+    updateHistoryDisplay();
   }
   
   // Сброс графика
   function resetGraph() {
-    if (!graphLine) return;
+    if (!graphCtx) return;
     
-    graphLine.style.strokeDasharray = '1000';
-    graphLine.style.strokeDashoffset = '1000';
+    // Очищаем холст
+    graphCtx.clearRect(0, 0, graphCanvas.width, graphCanvas.height);
+    
+    // Рисуем сетку
+    drawGrid();
+    
+    // Сбрасываем точки
     graphPoints = [];
-    updateGraph();
   }
   
-  // Обновление графика с текущими точками
-  function updateGraph() {
-    if (!graphLine || graphPoints.length < 2) return;
+  // Рисование сетки графика
+  function drawGrid() {
+    if (!graphCtx) return;
     
-    // Очищаем текущий путь
-    graphLine.setAttribute('d', '');
+    const width = graphCanvas.width;
+    const height = graphCanvas.height;
     
-    // Создаем SVG путь из точек
-    let path = `M ${graphPoints[0].x} ${graphPoints[0].y}`;
+    // Стиль сетки
+    graphCtx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+    graphCtx.lineWidth = 1;
     
-    for (let i = 1; i < graphPoints.length; i++) {
-      path += ` L ${graphPoints[i].x} ${graphPoints[i].y}`;
+    // Горизонтальные линии
+    for (let y = height; y >= 0; y -= height / 4) {
+      graphCtx.beginPath();
+      graphCtx.moveTo(0, y);
+      graphCtx.lineTo(width, y);
+      graphCtx.stroke();
     }
     
-    // Устанавливаем новый путь
-    graphLine.setAttribute('d', path);
-    
-    // Анимируем отрисовку пути
-    const length = graphLine.getTotalLength ? graphLine.getTotalLength() : 1000;
-    graphLine.style.strokeDasharray = length;
-    graphLine.style.strokeDashoffset = '0';
-  }
-  
-  // Добавление точки на график
-  function addGraphPoint(multiplier) {
-    if (!crushGraph) return;
-    
-    const graphWidth = crushGraph.clientWidth;
-    const graphHeight = crushGraph.clientHeight;
-    
-    // Вычисляем позицию x на основе прошедшего времени
-    const timeElapsed = Date.now() - gameStartTime;
-    // Учитываем множитель скорости (быстрее = точки ближе друг к другу)
-    const x = Math.min((timeElapsed / (15000 / currentSpeedMultiplier)) * graphWidth, graphWidth - 10);
-    
-    // Вычисляем позицию y на основе множителя (инвертировано для SVG)
-    // Используем логарифмическую шкалу для лучшей визуализации высоких множителей
-    const logMultiplier = Math.log(multiplier) / Math.log(1.5);
-    const y = graphHeight - (logMultiplier * graphHeight / 4);
-    
-    graphPoints.push({ x, y });
-    updateGraph();
+    // Вертикальные линии
+    for (let x = 0; x < width; x += width / 5) {
+      graphCtx.beginPath();
+      graphCtx.moveTo(x, 0);
+      graphCtx.lineTo(x, height);
+      graphCtx.stroke();
+    }
   }
   
   // Загрузка истории
   function loadHistory() {
-    // Генерируем некоторые случайные данные истории для демонстрации
+    // В реальном приложении здесь был бы запрос к API
+    // Для демонстрации генерируем случайную историю
     gameHistory = [];
     
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 10; i++) {
       const isCrash = Math.random() > 0.3; // 70% вероятность краша
       const crashMultiplier = isCrash ? 
         (1 + Math.random() * Math.random() * 4).toFixed(2) : 
@@ -254,22 +203,6 @@ const crushGame = (() => {
     updateHistoryDisplay();
   }
   
-  // Загрузка статистики
-  function loadStats() {
-    // В реальном приложении здесь был бы запрос к API
-    stats = {
-      gamesPlayed: 12,
-      wins: 5,
-      losses: 7,
-      highestMultiplier: 4.78,
-      totalWinnings: 1200,
-      totalLosses: 800
-    };
-    
-    // Обновляем отображение статистики
-    updateStatsDisplay();
-  }
-  
   // Обновление отображения истории
   function updateHistoryDisplay() {
     const historyItems = document.querySelector('.history-items');
@@ -282,36 +215,33 @@ const crushGame = (() => {
       const historyItem = document.createElement('div');
       historyItem.className = `history-item ${item.isCashedOut ? 'cashed-out' : 'crashed'}`;
       
+      // Определяем цвет в зависимости от множителя
+      let colorClass = '';
+      if (item.multiplier <= 1.5) {
+        colorClass = 'low';
+      } else if (item.multiplier <= 3) {
+        colorClass = 'medium';
+      } else if (item.multiplier <= 5) {
+        colorClass = 'high';
+      } else {
+        colorClass = 'extreme';
+      }
+      
       // Форматируем время
       const date = new Date(item.timestamp);
       const time = `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
       
+      historyItem.classList.add(colorClass);
       historyItem.innerHTML = `
         <div class="history-multiplier">${item.multiplier.toFixed(2)}x</div>
-        <div class="history-status">${item.isCashedOut ? '💰' : '💥'}</div>
-        <div class="history-time">${time}</div>
       `;
       
       historyItems.appendChild(historyItem);
     });
   }
   
-  // Обновление отображения статистики
-  function updateStatsDisplay() {
-    // Обновляем значения статистики
-    const gamesPlayedEl = document.getElementById('games-played');
-    const winsEl = document.getElementById('wins');
-    const lossesEl = document.getElementById('losses');
-    const highestMultiplierEl = document.getElementById('highest-multiplier');
-    
-    if (gamesPlayedEl) gamesPlayedEl.textContent = stats.gamesPlayed;
-    if (winsEl) winsEl.textContent = stats.wins;
-    if (lossesEl) lossesEl.textContent = stats.losses;
-    if (highestMultiplierEl) highestMultiplierEl.textContent = stats.highestMultiplier.toFixed(2) + 'x';
-  }
-  
   // Старт игры
-  function startGame() {
+  async function startGame() {
     // Получаем размер ставки
     betAmount = parseInt(crushBet.value);
     
@@ -329,11 +259,15 @@ const crushGame = (() => {
     
     // Сбрасываем состояние игры
     multiplier = 1.00;
-    if (multiplierDisplay) multiplierDisplay.textContent = multiplier.toFixed(2);
+    if (multiplierDisplay) {
+      multiplierDisplay.textContent = multiplier.toFixed(2);
+      multiplierDisplay.classList.remove('crashed', 'cashed-out');
+      multiplierDisplay.classList.add('active');
+    }
+    
     isPlaying = true;
     
-    // Вычисляем точку краша (случайное число между 1.0 и 10.0, с большей вероятностью для меньших значений)
-    // Используем экспоненциальное распределение для реалистичного поведения краша
+    // Вычисляем точку краша
     crashPoint = generateCrashPoint();
     console.log('Игра закончится на:', crashPoint.toFixed(2));
     
@@ -349,7 +283,7 @@ const crushGame = (() => {
       cashoutBtn.classList.add('active');
     }
     
-    // Скрываем предыдущий результат с анимацией
+    // Скрываем предыдущий результат
     if (crushResult) {
       crushResult.style.opacity = '0';
       crushResult.style.transform = 'translateY(20px)';
@@ -360,22 +294,21 @@ const crushGame = (() => {
       }, 300);
     }
     
+    // Тактильная обратная связь
+    if (window.casinoApp.provideTactileFeedback) {
+      window.casinoApp.provideTactileFeedback('medium');
+    }
+    
     // Сбрасываем график
     resetGraph();
     gameStartTime = Date.now();
-    addGraphPoint(multiplier);
+    addGraphPoint(1.00); // Начальная точка
     
     // Воспроизводим звук старта
     if (startSound) startSound.play();
     
-    // Изменяем стиль множителя
-    if (multiplierDisplay) {
-      multiplierDisplay.classList.remove('crashed', 'cashed-out');
-      multiplierDisplay.classList.add('active');
-    }
-    
     // Отправляем начальную ставку на сервер
-    window.casinoApp.processGameResult(
+    await window.casinoApp.processGameResult(
       'crush',
       betAmount,
       'bet',
@@ -384,47 +317,78 @@ const crushGame = (() => {
     );
     
     // Запускаем интервал игры
-    gameInterval = setInterval(updateGame, 100 / currentSpeedMultiplier);
+    gameInterval = setInterval(updateGame, 50); // Более частое обновление для плавности
   }
   
   // Генерация точки краша
   function generateCrashPoint() {
-    // Базовое значение - от 1.0 до примерно 4.0-5.0 с экспоненциальным убыванием вероятности
-    let randomBase = 1 + Math.random() * Math.random() * 4;
+    // Используем распределение с большей вероятностью малых значений
+    // и редкой вероятностью больших значений
     
-    // С небольшой вероятностью (примерно 1-2%) даем более высокие множители
-    const luckyBonus = Math.random() > 0.98 ? 2 + Math.random() * 3 : 0;
+    // Базовое случайное число от 0 до 1
+    const r = Math.random();
     
-    return randomBase + luckyBonus;
+    // Формула для распределения, имитирующего экспоненциальный рост с возможностью редких больших значений
+    // Обычно график будет крашиться между 1.0 и 2.0, но иногда может доходить до больших значений
+    let crash = 1.0;
+    
+    if (r < 0.5) {
+      // 50% шанс краша между 1.0 и 2.0
+      crash = 1.0 + r;
+    } else if (r < 0.8) {
+      // 30% шанс краша между 2.0 и 4.0
+      crash = 2.0 + (r - 0.5) * 6.67;
+    } else if (r < 0.95) {
+      // 15% шанс краша между 4.0 и 8.0
+      crash = 4.0 + (r - 0.8) * 26.67;
+    } else {
+      // 5% шанс краша между 8.0 и 100.0 (редкие крупные множители)
+      crash = 8.0 + (r - 0.95) * 1840;
+    }
+    
+    // Ограничиваем максимальное значение для безопасности
+    return Math.min(crash, 100.0);
   }
   
   // Обновление состояния игры
   function updateGame() {
     if (!isPlaying) return;
     
-    // Увеличиваем множитель (более быстрый рост с увеличением множителя)
-    const growth = 0.01 * (1 + (multiplier - 1) / 10);
-    multiplier += growth * currentSpeedMultiplier;
+    const elapsedTime = (Date.now() - gameStartTime) / 1000;
+    
+    // Обновляем множитель (более естественный рост)
+    // Формула обеспечивает экспоненциальный рост multiplier = e^(time * growthFactor)
+    const growthFactor = 0.5;
+    multiplier = Math.exp(elapsedTime * growthFactor);
+    
+    // Округляем до 2 знаков после запятой для отображения
+    const displayMultiplier = Math.floor(multiplier * 100) / 100;
     
     // Обновляем отображение
     if (multiplierDisplay) {
-      multiplierDisplay.textContent = multiplier.toFixed(2);
+      multiplierDisplay.textContent = displayMultiplier.toFixed(2);
       
       // Добавляем визуальный эффект для больших множителей
-      if (multiplier > 5) {
-        multiplierDisplay.classList.add('high-multiplier');
+      multiplierDisplay.classList.remove('low', 'medium', 'high', 'extreme');
+      
+      if (displayMultiplier <= 1.5) {
+        multiplierDisplay.classList.add('low');
+      } else if (displayMultiplier <= 3) {
+        multiplierDisplay.classList.add('medium');
+      } else if (displayMultiplier <= 5) {
+        multiplierDisplay.classList.add('high');
       } else {
-        multiplierDisplay.classList.remove('high-multiplier');
+        multiplierDisplay.classList.add('extreme');
       }
     }
     
-    // Добавляем точку на график каждые несколько обновлений
-    if (Math.random() > 0.5) {
-      addGraphPoint(multiplier);
+    // Добавляем точку на график каждые 100мс для плавности
+    if (Date.now() % 100 < 50) {
+      addGraphPoint(displayMultiplier);
     }
     
     // Воспроизводим звук тика при определенных множителях
-    if (multiplier % 1 < 0.02 && tickSound) {
+    if (Math.floor(multiplier * 2) / 2 === multiplier && tickSound) {
       tickSound.play();
     }
     
@@ -434,8 +398,114 @@ const crushGame = (() => {
     }
   }
   
+  // Добавление точки на график
+  function addGraphPoint(mult) {
+    const elapsedTimeMs = Date.now() - gameStartTime;
+    const elapsedTimeSec = elapsedTimeMs / 1000;
+    
+    // Масштабирование по времени
+    const timeScale = 2; // Сколько секунд должно помещаться по ширине графика
+    
+    // Сохраняем точку для возможного перерисовывания при ресайзе
+    graphPoints.push({
+      time: elapsedTimeSec,
+      multiplier: mult
+    });
+    
+    // Перерисовываем график
+    redrawGraph();
+  }
+  
+  // Перерисовка всего графика
+  function redrawGraph() {
+    if (!graphCtx || !graphCanvas) return;
+    
+    // Очищаем холст
+    graphCtx.clearRect(0, 0, graphCanvas.width, graphCanvas.height);
+    
+    // Рисуем сетку
+    drawGrid();
+    
+    // Если нет точек или всего одна точка, выходим
+    if (graphPoints.length < 2) return;
+    
+    const width = graphCanvas.width;
+    const height = graphCanvas.height;
+    
+    // Находим максимальные значения для масштабирования
+    const maxTime = Math.max(5, graphPoints[graphPoints.length - 1].time);
+    const maxMult = Math.max(5, ...graphPoints.map(p => p.multiplier));
+    
+    // Начинаем рисовать линию
+    graphCtx.beginPath();
+    
+    // Перемещаемся к первой точке
+    const x0 = (graphPoints[0].time / maxTime) * width;
+    const y0 = height - (graphPoints[0].multiplier / maxMult) * height;
+    graphCtx.moveTo(x0, y0);
+    
+    // Добавляем остальные точки
+    for (let i = 1; i < graphPoints.length; i++) {
+      const x = (graphPoints[i].time / maxTime) * width;
+      const y = height - (graphPoints[i].multiplier / maxMult) * height;
+      
+      // Используем кривую Безье для сглаживания
+      if (i < graphPoints.length - 1) {
+        // Контрольные точки для сглаживания
+        const nextX = (graphPoints[i + 1].time / maxTime) * width;
+        const nextY = height - (graphPoints[i + 1].multiplier / maxMult) * height;
+        
+        const cpx1 = x - (x - x0) / 2;
+        const cpy1 = y;
+        const cpx2 = x + (nextX - x) / 2;
+        const cpy2 = y;
+        
+        graphCtx.bezierCurveTo(cpx1, cpy1, cpx2, cpy2, x, y);
+      } else {
+        graphCtx.lineTo(x, y);
+      }
+      
+      // Запоминаем текущую точку для следующей итерации
+      x0 = x;
+      y0 = y;
+    }
+    
+    // Настройки линии
+    graphCtx.strokeStyle = 'rgba(0, 168, 107, 0.8)';
+    graphCtx.lineWidth = 3;
+    graphCtx.shadowColor = 'rgba(0, 168, 107, 0.5)';
+    graphCtx.shadowBlur = 10;
+    graphCtx.stroke();
+    
+    // Добавляем заливку под линией графика
+    graphCtx.lineTo(x0, height);
+    graphCtx.lineTo(0, height);
+    graphCtx.closePath();
+    
+    // Градиентная заливка
+    const gradient = graphCtx.createLinearGradient(0, 0, 0, height);
+    gradient.addColorStop(0, 'rgba(0, 168, 107, 0.5)');
+    gradient.addColorStop(1, 'rgba(0, 168, 107, 0)');
+    graphCtx.fillStyle = gradient;
+    graphCtx.fill();
+    
+    // Текущее значение множителя
+    const lastPoint = graphPoints[graphPoints.length - 1];
+    const lastX = (lastPoint.time / maxTime) * width;
+    const lastY = height - (lastPoint.multiplier / maxMult) * height;
+    
+    // Рисуем точку на конце линии
+    graphCtx.beginPath();
+    graphCtx.arc(lastX, lastY, 6, 0, Math.PI * 2);
+    graphCtx.fillStyle = 'rgba(0, 168, 107, 1)';
+    graphCtx.fill();
+    graphCtx.strokeStyle = 'white';
+    graphCtx.lineWidth = 2;
+    graphCtx.stroke();
+  }
+  
   // Обработка краша игры
-  function gameCrash() {
+  async function gameCrash() {
     // Останавливаем игру
     clearInterval(gameInterval);
     isPlaying = false;
@@ -443,11 +513,16 @@ const crushGame = (() => {
     // Воспроизводим звук краша
     if (crashSound) crashSound.play();
     
+    // Тактильная обратная связь
+    if (window.casinoApp.provideTactileFeedback) {
+      window.casinoApp.provideTactileFeedback('error');
+    }
+    
     // Обновляем интерфейс
     if (crushResult) {
       crushResult.innerHTML = `
         <div class="crash-icon">💥</div>
-        <div class="crash-text">Crashed at ${multiplier.toFixed(2)}x!</div>
+        <div class="crash-text">Crash at ${multiplier.toFixed(2)}x!</div>
       `;
       crushResult.classList.add('lose');
       crushResult.style.display = 'block';
@@ -458,7 +533,7 @@ const crushGame = (() => {
     }
     
     if (multiplierDisplay) {
-      multiplierDisplay.classList.remove('active', 'high-multiplier');
+      multiplierDisplay.classList.remove('active', 'low', 'medium', 'high', 'extreme');
       multiplierDisplay.classList.add('crashed');
     }
     
@@ -473,8 +548,8 @@ const crushGame = (() => {
       cashoutBtn.classList.add('disabled');
     }
     
-    // Добавляем финальную точку краша на график
-    addGraphPoint(multiplier);
+    // Анимация краша на графике
+    animateCrash();
     
     // Обновляем историю
     gameHistory.unshift({
@@ -491,17 +566,8 @@ const crushGame = (() => {
     // Обновляем отображение истории
     updateHistoryDisplay();
     
-    // Обновляем статистику
-    stats.gamesPlayed++;
-    stats.losses++;
-    stats.totalLosses += betAmount;
-    if (multiplier > stats.highestMultiplier) {
-      stats.highestMultiplier = multiplier;
-    }
-    updateStatsDisplay();
-    
     // Отправляем проигрыш на сервер
-    window.casinoApp.processGameResult(
+    await window.casinoApp.processGameResult(
       'crush',
       0, // Нет дополнительной ставки
       'lose',
@@ -511,13 +577,47 @@ const crushGame = (() => {
         finalMultiplier: multiplier
       }
     );
+  }
+  
+  // Анимация краша
+  function animateCrash() {
+    if (!graphCanvas || !graphCtx) return;
     
-    // Сбрасываем стиль множителя после задержки
-    setTimeout(() => {
-      if (multiplierDisplay) {
-        multiplierDisplay.classList.remove('crashed');
-      }
-    }, 2000);
+    // Добавляем визуальный эффект взрыва
+    const lastPoint = graphPoints[graphPoints.length - 1];
+    
+    // Находим позицию последней точки на графике
+    const width = graphCanvas.width;
+    const height = graphCanvas.height;
+    
+    // Максимальные значения для масштабирования
+    const maxTime = Math.max(5, lastPoint.time);
+    const maxMult = Math.max(5, lastPoint.multiplier);
+    
+    const crashX = (lastPoint.time / maxTime) * width;
+    const crashY = height - (lastPoint.multiplier / maxMult) * height;
+    
+    // Рисуем взрыв
+    const explosionRadius = 20;
+    const explosionColors = [
+      'rgba(255, 0, 0, 0.8)',
+      'rgba(255, 165, 0, 0.8)',
+      'rgba(255, 255, 0, 0.8)'
+    ];
+    
+    for (let i = 0; i < 3; i++) {
+      setTimeout(() => {
+        if (!graphCtx) return;
+        
+        graphCtx.beginPath();
+        graphCtx.arc(crashX, crashY, explosionRadius * (i + 1), 0, Math.PI * 2);
+        graphCtx.fillStyle = explosionColors[i];
+        graphCtx.fill();
+        
+        // Перерисовываем через небольшую задержку
+        setTimeout(redrawGraph, 150);
+      }, i * 100);
+    }
   }
   
   // Кешаут (досрочный выход)
@@ -530,6 +630,11 @@ const crushGame = (() => {
     
     // Воспроизводим звук кешаута
     if (cashoutSound) cashoutSound.play();
+    
+    // Тактильная обратная связь
+    if (window.casinoApp.provideTactileFeedback) {
+      window.casinoApp.provideTactileFeedback('success');
+    }
     
     // Вычисляем выигрыш
     const winAmount = Math.floor(betAmount * multiplier);
@@ -550,7 +655,7 @@ const crushGame = (() => {
     }
     
     if (multiplierDisplay) {
-      multiplierDisplay.classList.remove('active', 'high-multiplier');
+      multiplierDisplay.classList.remove('active', 'low', 'medium', 'high', 'extreme');
       multiplierDisplay.classList.add('cashed-out');
     }
     
@@ -564,6 +669,9 @@ const crushGame = (() => {
       cashoutBtn.classList.remove('active');
       cashoutBtn.classList.add('disabled');
     }
+    
+    // Анимация кешаута на графике
+    animateCashout();
     
     // Обновляем историю
     gameHistory.unshift({
@@ -580,15 +688,6 @@ const crushGame = (() => {
     // Обновляем отображение истории
     updateHistoryDisplay();
     
-    // Обновляем статистику
-    stats.gamesPlayed++;
-    stats.wins++;
-    stats.totalWinnings += winAmount - betAmount;
-    if (multiplier > stats.highestMultiplier) {
-      stats.highestMultiplier = multiplier;
-    }
-    updateStatsDisplay();
-    
     // Отправляем выигрыш на сервер
     await window.casinoApp.processGameResult(
       'crush',
@@ -601,41 +700,100 @@ const crushGame = (() => {
       }
     );
     
-    // Продолжаем анимировать до краша для визуального эффекта
-    let continueInterval = setInterval(() => {
-      // Увеличиваем множитель
-      const growth = 0.01 * (1 + (multiplier - 1) / 10);
-      multiplier += growth * currentSpeedMultiplier;
+    // Продолжаем показывать симуляцию графика до краша
+    simulateContinuation();
+  }
+  
+  // Анимация кешаута
+  function animateCashout() {
+    if (!graphCanvas || !graphCtx) return;
+    
+    // Добавляем визуальный эффект успешного кешаута
+    const lastPoint = graphPoints[graphPoints.length - 1];
+    
+    // Находим позицию последней точки на графике
+    const width = graphCanvas.width;
+    const height = graphCanvas.height;
+    
+    // Максимальные значения для масштабирования
+    const maxTime = Math.max(5, lastPoint.time);
+    const maxMult = Math.max(5, lastPoint.multiplier);
+    
+    const cashoutX = (lastPoint.time / maxTime) * width;
+    const cashoutY = height - (lastPoint.multiplier / maxMult) * height;
+    
+    // Рисуем эффект успешного кешаута
+    for (let i = 0; i < 3; i++) {
+      setTimeout(() => {
+        if (!graphCtx) return;
+        
+        graphCtx.beginPath();
+        graphCtx.arc(cashoutX, cashoutY, 15 - i * 3, 0, Math.PI * 2);
+        graphCtx.strokeStyle = 'rgba(0, 255, 0, ' + (0.8 - i * 0.2) + ')';
+        graphCtx.lineWidth = 3;
+        graphCtx.stroke();
+        
+        // Отмечаем точку кешаута на графике
+        graphCtx.beginPath();
+        graphCtx.arc(cashoutX, cashoutY, 8, 0, Math.PI * 2);
+        graphCtx.fillStyle = 'rgba(0, 255, 0, 0.8)';
+        graphCtx.fill();
+        graphCtx.strokeStyle = 'white';
+        graphCtx.lineWidth = 2;
+        graphCtx.stroke();
+      }, i * 100);
+    }
+  }
+  
+  // Симуляция продолжения графика после кешаута
+  function simulateContinuation() {
+    const cashoutMultiplier = multiplier;
+    const cashoutTime = (Date.now() - gameStartTime) / 1000;
+    
+    // Создаем интервал для симуляции продолжения графика
+    let simulationInterval = setInterval(() => {
+      // Вычисляем текущее время от начала игры
+      const elapsedTime = (Date.now() - gameStartTime) / 1000;
       
-      // Обновляем отображение (но не множитель игрока)
-      if (multiplierDisplay) {
-        multiplierDisplay.textContent = multiplier.toFixed(2);
-      }
+      // Обновляем множитель (используем ту же формулу, что и в updateGame)
+      const growthFactor = 0.5;
+      const simulatedMultiplier = Math.exp(elapsedTime * growthFactor);
+      const displayMultiplier = Math.floor(simulatedMultiplier * 100) / 100;
       
       // Добавляем точку на график
-      if (Math.random() > 0.5) {
-        addGraphPoint(multiplier);
+      if (Date.now() % 100 < 50) {
+        addGraphPoint(displayMultiplier);
       }
       
-      // Проверяем, должна ли анимация закончиться
-      if (multiplier >= crashPoint) {
-        clearInterval(continueInterval);
-        if (multiplierDisplay) {
-          multiplierDisplay.classList.remove('cashed-out');
+      // Проверяем, достигли ли точки краша
+      if (simulatedMultiplier >= crashPoint) {
+        clearInterval(simulationInterval);
+        
+        // Воспроизводим звук краша (тише)
+        if (crashSound) {
+          // Уменьшаем громкость для симуляции
+          crashSound.volume = 0.3;
+          crashSound.play();
+          crashSound.volume = 1.0; // Восстанавливаем громкость
         }
         
-        // Добавляем финальную точку краша на график
-        addGraphPoint(multiplier);
+        // Анимация краша на графике
+        animateCrash();
         
-        // Добавляем эффект краша для графика
-        if (crushGraph) {
-          crushGraph.classList.add('crashed-graph');
-          setTimeout(() => {
-            crushGraph.classList.remove('crashed-graph');
-          }, 1000);
+        // Показываем сообщение о том, что произошел бы краш
+        if (crushResult && crushResult.classList.contains('win')) {
+          const crashInfo = document.createElement('div');
+          crashInfo.className = 'crash-info';
+          crashInfo.textContent = `Would have crashed at ${crashPoint.toFixed(2)}x`;
+          crushResult.appendChild(crashInfo);
         }
       }
-    }, 100 / currentSpeedMultiplier);
+    }, 50);
+    
+    // Останавливаем симуляцию через 5 секунд для экономии ресурсов
+    setTimeout(() => {
+      clearInterval(simulationInterval);
+    }, 5000);
   }
   
   // Инициализация при загрузке

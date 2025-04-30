@@ -1,23 +1,27 @@
 // public/js/games/slots.js
 
-// Улучшенная версия игры Slots с анимациями и обратной связью
+// Улучшенная версия игры Slots с матрицей 3x3 и реалистичным вращением
 const slotsGame = (() => {
   // Элементы игры
-  const reels = [
-    document.getElementById('reel1'),
-    document.getElementById('reel2'),
-    document.getElementById('reel3')
-  ];
   const spinBtn = document.getElementById('spin-btn');
   const slotsResult = document.getElementById('slots-result');
   const slotsBet = document.getElementById('slots-bet');
   
+  // Контейнер для слотов (будет создан динамически)
+  let slotsContainer = document.querySelector('.slot-reels');
+  let reels = [];
+  
   // Состояние игры
   let isSpinning = false;
-  let symbols = ['🍒', '🍋', '🍇', '🍊', '🍉', '💎', '7️⃣', '🤑'];
+  const symbols = ['🍒', '🍋', '🍇', '🍊', '🍉', '💎', '7️⃣', '🤑'];
   
-  // Аудио эффекты
-  let spinSound, winSound, loseSound;
+  // Новые переменные для управления 3x3 матрицей
+  const rowCount = 3;
+  const colCount = 3;
+  let slotMatrix = []; // Хранит конечный результат
+  
+  // Звуки
+  let spinSound, stopSound, winSound, loseSound;
   
   // Значения символов (множители)
   const symbolValues = {
@@ -33,34 +37,83 @@ const slotsGame = (() => {
   
   // Описания выигрышных комбинаций
   const winDescriptions = {
-    fullMatch: {
-      '🍒': 'Три вишни! Х2 выигрыш!',
-      '🍋': 'Три лимона! Х2 выигрыш!',
-      '🍇': 'Три винограда! Х3 выигрыш!',
-      '🍊': 'Три апельсина! Х3 выигрыш!',
-      '🍉': 'Три арбуза! Х4 выигрыш!',
-      '💎': 'Три алмаза! Х5 выигрыш!',
-      '7️⃣': 'Джекпот! Три семерки! Х10 выигрыш!',
-      '🤑': 'Большой джекпот! Х15 выигрыш!'
-    },
-    partialMatch: 'Частичное совпадение! Получаете половину выигрыша!'
+    // Горизонтальные линии
+    horizontalLine: 'Горизонтальная линия! x{multiplier} выигрыш!',
+    // Вертикальные линии
+    verticalLine: 'Вертикальная линия! x{multiplier} выигрыш!',
+    // Диагонали
+    diagonal: 'Диагональная линия! x{multiplier} выигрыш!',
+    // Полное совпадение всех символов
+    fullMatch: 'Джекпот! Все символы совпадают! x{multiplier} выигрыш!'
   };
   
-  // Функция инициализации
+  // Инициализация
   function init() {
     console.log('Инициализация игры Slots');
     
+    // Создаем новый контейнер для слотов 3x3
+    createSlotsContainer();
+    
     // Добавляем обработчики событий
-    spinBtn.addEventListener('click', spin);
+    if (spinBtn) {
+      spinBtn.addEventListener('click', spin);
+    }
     
-    // Инициализируем барабаны случайными символами
-    populateReels();
-    
-    // Настраиваем звуки (если поддерживаются)
+    // Настраиваем звуки
     setupSounds();
     
+    // Заполняем слоты начальными символами
+    populateSlots();
+    
     // Скрываем результат
-    if (slotsResult) slotsResult.style.display = 'none';
+    if (slotsResult) {
+      slotsResult.style.display = 'none';
+    }
+  }
+  
+  // Создание контейнера для слотов 3x3
+  function createSlotsContainer() {
+    const oldContainer = slotsContainer;
+    
+    // Если контейнер существует, находим его родителя
+    if (oldContainer) {
+      const parent = oldContainer.parentElement;
+      
+      // Создаем новый контейнер
+      const newContainer = document.createElement('div');
+      newContainer.className = 'slot-reels new-slot-reels';
+      
+      // Создаем сетку 3x3
+      for (let row = 0; row < rowCount; row++) {
+        const rowElement = document.createElement('div');
+        rowElement.className = 'slot-row';
+        
+        for (let col = 0; col < colCount; col++) {
+          const reel = document.createElement('div');
+          reel.className = 'reel';
+          reel.dataset.row = row;
+          reel.dataset.col = col;
+          
+          // Создаем контейнер для символов (лента)
+          const reelStrip = document.createElement('div');
+          reelStrip.className = 'reel-strip';
+          reel.appendChild(reelStrip);
+          
+          rowElement.appendChild(reel);
+          reels.push(reelStrip);
+        }
+        
+        newContainer.appendChild(rowElement);
+      }
+      
+      // Заменяем старый контейнер
+      if (parent) {
+        parent.replaceChild(newContainer, oldContainer);
+        slotsContainer = newContainer;
+      }
+    } else {
+      console.error('Не найден контейнер для слотов');
+    }
   }
   
   // Настройка звуков
@@ -72,8 +125,8 @@ const slotsGame = (() => {
         const audioCtx = new AudioContext();
         
         // Заглушка для локальной разработки
-        // В реальном приложении здесь были бы реальные звуковые файлы
         spinSound = { play: () => console.log('Звук вращения') };
+        stopSound = { play: () => console.log('Звук остановки') };
         winSound = { play: () => console.log('Звук выигрыша') };
         loseSound = { play: () => console.log('Звук проигрыша') };
       }
@@ -82,23 +135,18 @@ const slotsGame = (() => {
     }
   }
   
-  // Заполнение барабанов символами
-  function populateReels() {
+  // Заполнение слотов случайными символами
+  function populateSlots() {
     reels.forEach(reel => {
-      // Очищаем текущее содержимое
+      // Очищаем ленту
       reel.innerHTML = '';
       
-      // Добавляем случайный символ с эффектом блеска
+      // Добавляем случайный символ
       const symbolElement = document.createElement('div');
       symbolElement.className = 'symbol';
       symbolElement.textContent = getRandomSymbol();
       
-      // Добавляем внутренний контейнер для эффекта блеска
-      const symbolContainer = document.createElement('div');
-      symbolContainer.className = 'symbol-container';
-      symbolContainer.appendChild(symbolElement);
-      
-      reel.appendChild(symbolContainer);
+      reel.appendChild(symbolElement);
     });
   }
   
@@ -108,9 +156,9 @@ const slotsGame = (() => {
     return symbols[randomIndex];
   }
   
-  // Функция для получения взвешенного случайного символа
-  // Более редкие символы имеют меньший шанс выпадения
+  // Получение взвешенного случайного символа
   function getWeightedRandomSymbol() {
+    // Веса символов (вероятности выпадения)
     const weights = {
       '🍒': 25, // 25% шанс
       '🍋': 20, // 20% шанс
@@ -140,7 +188,7 @@ const slotsGame = (() => {
     return symbols[0];
   }
   
-  // Вращение барабанов
+  // Запуск вращения
   async function spin() {
     // Проверяем, не вращаются ли уже барабаны
     if (isSpinning) return;
@@ -162,10 +210,17 @@ const slotsGame = (() => {
     
     // Устанавливаем состояние вращения
     isSpinning = true;
-    spinBtn.disabled = true;
-    spinBtn.textContent = 'ВРАЩЕНИЕ...';
+    if (spinBtn) {
+      spinBtn.disabled = true;
+      spinBtn.textContent = 'ВРАЩЕНИЕ...';
+    }
     
-    // Скрываем предыдущий результат с анимацией
+    // Тактильная обратная связь при запуске
+    if (window.casinoApp.provideTactileFeedback) {
+      window.casinoApp.provideTactileFeedback('medium');
+    }
+    
+    // Скрываем предыдущий результат
     if (slotsResult) {
       slotsResult.style.opacity = '0';
       slotsResult.style.transform = 'translateY(20px)';
@@ -179,32 +234,59 @@ const slotsGame = (() => {
     // Воспроизводим звук вращения
     if (spinSound) spinSound.play();
     
-    // Анимируем барабаны
-    const spinPromises = reels.map((reel, index) => animateReel(reel, index));
+    // Генерируем результаты для каждого барабана
+    // Определяем символы для матрицы 3x3
+    slotMatrix = [];
+    for (let row = 0; row < rowCount; row++) {
+      slotMatrix[row] = [];
+      for (let col = 0; col < colCount; col++) {
+        slotMatrix[row][col] = getWeightedRandomSymbol();
+      }
+    }
     
     try {
-      // Ждем, пока все барабаны остановятся
-      const finalSymbols = await Promise.all(spinPromises);
+      // Запускаем вращение барабанов с разными задержками для всех 9 позиций
+      const spinPromises = [];
+      for (let i = 0; i < reels.length; i++) {
+        const row = Math.floor(i / colCount);
+        const col = i % colCount;
+        
+        // Вращение с задержкой в зависимости от столбца
+        const promise = animateReel(reels[i], 
+                                   slotMatrix[row][col], 
+                                   col * 400 + row * 100); // Задержка для каждого барабана
+        spinPromises.push(promise);
+      }
+      
+      // Ждем окончания вращения всех барабанов
+      await Promise.all(spinPromises);
       
       // Проверяем результат
-      const result = checkWin(finalSymbols);
+      const result = checkWin(slotMatrix);
       
-      // Вычисляем выигрыш
+      // Рассчитываем выигрыш
       const winAmount = result.win ? Math.floor(betAmount * result.multiplier) : 0;
       
-      // Отображаем результат с анимацией
+      // Отображаем результат
       displayResult(result.win, winAmount, result.description);
       
-      // Воспроизводим звук победы или поражения
-      if (result.win && winSound) {
-        winSound.play();
-      } else if (!result.win && loseSound) {
-        loseSound.play();
+      // Тактильная обратная связь в зависимости от результата
+      if (result.win) {
+        if (window.casinoApp.provideTactileFeedback) {
+          window.casinoApp.provideTactileFeedback('success');
+        }
+        if (winSound) winSound.play();
+      } else {
+        if (window.casinoApp.provideTactileFeedback) {
+          window.casinoApp.provideTactileFeedback('warning');
+        }
+        if (loseSound) loseSound.play();
       }
       
       // Отправляем результат на сервер
       const gameData = {
-        symbols: finalSymbols,
+        matrix: slotMatrix,
+        winLines: result.winLines,
         multiplier: result.multiplier,
         description: result.description
       };
@@ -223,112 +305,195 @@ const slotsGame = (() => {
     } finally {
       // Сбрасываем состояние
       isSpinning = false;
-      spinBtn.disabled = false;
-      spinBtn.textContent = 'КРУТИТЬ';
+      if (spinBtn) {
+        spinBtn.disabled = false;
+        spinBtn.textContent = 'КРУТИТЬ';
+      }
     }
   }
   
-  // Анимация вращения барабана
-  function animateReel(reel, index) {
+  // Анимация вращения барабана с задержкой
+  function animateReel(reel, finalSymbol, delay) {
     return new Promise(resolve => {
-      // Количество вращений увеличивается с индексом барабана
-      // Это создает эффект последовательной остановки барабанов
-      const spins = 15 + index * 5;
-      let counter = 0;
+      // Удаляем существующие символы
+      reel.innerHTML = '';
       
-      // Сохраняем текущий символ
-      let currentSymbol = '';
+      // Создаем ленту символов для анимации (виртуальное вращение)
+      // Добавляем много случайных символов, последний будет итоговым
+      const symbolCount = 20 + Math.floor(Math.random() * 10);
       
-      // Создаем массив символов для анимации
-      let symbolsArray = [];
-      for (let i = 0; i < spins; i++) {
-        symbolsArray.push(getWeightedRandomSymbol());
+      // Добавляем финальный символ в конец
+      const symbols = [];
+      for (let i = 0; i < symbolCount; i++) {
+        symbols.push(getRandomSymbol());
+      }
+      symbols.push(finalSymbol);
+      
+      // Создаем ленту символов для анимации
+      for (let i = 0; i < symbols.length; i++) {
+        const symbolElement = document.createElement('div');
+        symbolElement.className = 'symbol';
+        symbolElement.textContent = symbols[i];
+        reel.appendChild(symbolElement);
       }
       
-      // Последний символ - это результат
-      // Мы можем манипулировать им для нужной вероятности выигрыша
-      currentSymbol = symbolsArray[symbolsArray.length - 1];
-      
-      // Интервал анимации
-      const interval = setInterval(() => {
-        if (counter >= symbolsArray.length) {
-          clearInterval(interval);
-          
-          // Добавляем класс для анимации остановки
-          const symbolContainer = reel.querySelector('.symbol-container');
-          if (symbolContainer) {
-            symbolContainer.classList.add('stopped');
-          }
-          
-          // Сбрасываем transform
+      // Запускаем анимацию с соответствующей задержкой
+      setTimeout(() => {
+        // Устанавливаем CSS переход для анимации прокрутки
+        reel.style.transition = 'transform 3s cubic-bezier(.17,.67,.83,1.3)';
+        
+        // Вычисляем высоту для прокрутки (до последнего символа)
+        const symbolHeight = 60; // Примерная высота символа
+        const scrollDistance = -(symbols.length - 1) * symbolHeight;
+        
+        // Запускаем прокрутку
+        reel.style.transform = `translateY(${scrollDistance}px)`;
+        
+        // Воспроизводим звук остановки с задержкой
+        setTimeout(() => {
+          if (stopSound) stopSound.play();
+        }, 2800); // Немного раньше завершения анимации
+        
+        // Завершаем анимацию
+        setTimeout(() => {
+          // Очищаем ленту и оставляем только конечный символ
+          reel.style.transition = 'none';
           reel.style.transform = 'translateY(0)';
+          reel.innerHTML = '';
           
-          // Добавляем небольшую задержку для визуального эффекта
-          setTimeout(() => {
-            resolve(currentSymbol);
-          }, 200);
+          const finalSymbolElement = document.createElement('div');
+          finalSymbolElement.className = 'symbol final';
+          finalSymbolElement.textContent = finalSymbol;
+          reel.appendChild(finalSymbolElement);
           
-          return;
-        }
-        
-        // Обновляем символ
-        const symbolElement = reel.querySelector('.symbol');
-        if (symbolElement) {
-          const newSymbol = symbolsArray[counter];
-          symbolElement.textContent = newSymbol;
-          currentSymbol = newSymbol;
-        }
-        
-        // Добавляем эффект дрожания
-        const randomOffset = Math.random() * 10 - 5;
-        reel.style.transform = `translateY(${randomOffset}px)`;
-        
-        // Увеличиваем счетчик
-        counter++;
-      }, 100 - (index * 10)); // Скорость зависит от индекса барабана
+          // Добавляем эффект свечения для финального символа
+          finalSymbolElement.classList.add('glow');
+          
+          resolve(finalSymbol);
+        }, 3000);
+      }, delay);
     });
   }
   
-  // Проверка выигрыша
-  function checkWin(symbols) {
-    // Проверяем все символы на совпадение (джекпот)
-    if (symbols[0] === symbols[1] && symbols[1] === symbols[2]) {
-      return {
-        win: true,
-        multiplier: symbolValues[symbols[0]],
-        description: winDescriptions.fullMatch[symbols[0]]
-      };
-    }
+  // Проверка выигрыша с новой логикой для матрицы 3x3
+  function checkWin(matrix) {
+    const winLines = [];
+    let highestMultiplier = 0;
+    let bestWinDescription = '';
     
-    // Проверяем совпадение двух символов
-    if (symbols[0] === symbols[1] || symbols[1] === symbols[2] || symbols[0] === symbols[2]) {
-      // Находим символ, который встречается как минимум дважды
-      let matchedSymbol;
-      
-      if (symbols[0] === symbols[1]) {
-        matchedSymbol = symbols[0];
-      } else if (symbols[1] === symbols[2]) {
-        matchedSymbol = symbols[1];
-      } else {
-        matchedSymbol = symbols[0];
+    // Проверка горизонтальных линий
+    for (let row = 0; row < rowCount; row++) {
+      // Если все символы в ряду одинаковые
+      if (matrix[row][0] === matrix[row][1] && matrix[row][1] === matrix[row][2]) {
+        const symbol = matrix[row][0];
+        const multiplier = symbolValues[symbol] * 1.5; // Увеличенный множитель для линии
+        
+        winLines.push({
+          type: 'horizontal',
+          row: row,
+          symbol: symbol,
+          multiplier: multiplier
+        });
+        
+        if (multiplier > highestMultiplier) {
+          highestMultiplier = multiplier;
+          bestWinDescription = winDescriptions.horizontalLine.replace('{multiplier}', multiplier);
+        }
       }
-      
-      return {
-        win: true,
-        multiplier: Math.floor(symbolValues[matchedSymbol] / 2), // Половина стоимости за две совпадающие
-        description: winDescriptions.partialMatch
-      };
     }
     
-    // Нет совпадений
+    // Проверка вертикальных линий
+    for (let col = 0; col < colCount; col++) {
+      // Если все символы в столбце одинаковые
+      if (matrix[0][col] === matrix[1][col] && matrix[1][col] === matrix[2][col]) {
+        const symbol = matrix[0][col];
+        const multiplier = symbolValues[symbol] * 1.5; // Увеличенный множитель для линии
+        
+        winLines.push({
+          type: 'vertical',
+          col: col,
+          symbol: symbol,
+          multiplier: multiplier
+        });
+        
+        if (multiplier > highestMultiplier) {
+          highestMultiplier = multiplier;
+          bestWinDescription = winDescriptions.verticalLine.replace('{multiplier}', multiplier);
+        }
+      }
+    }
+    
+    // Проверка диагонали сверху слева вниз справа
+    if (matrix[0][0] === matrix[1][1] && matrix[1][1] === matrix[2][2]) {
+      const symbol = matrix[0][0];
+      const multiplier = symbolValues[symbol] * 2; // Увеличенный множитель для диагонали
+      
+      winLines.push({
+        type: 'diagonal',
+        direction: 'main',
+        symbol: symbol,
+        multiplier: multiplier
+      });
+      
+      if (multiplier > highestMultiplier) {
+        highestMultiplier = multiplier;
+        bestWinDescription = winDescriptions.diagonal.replace('{multiplier}', multiplier);
+      }
+    }
+    
+    // Проверка диагонали снизу слева вверх справа
+    if (matrix[2][0] === matrix[1][1] && matrix[1][1] === matrix[0][2]) {
+      const symbol = matrix[2][0];
+      const multiplier = symbolValues[symbol] * 2; // Увеличенный множитель для диагонали
+      
+      winLines.push({
+        type: 'diagonal',
+        direction: 'anti',
+        symbol: symbol,
+        multiplier: multiplier
+      });
+      
+      if (multiplier > highestMultiplier) {
+        highestMultiplier = multiplier;
+        bestWinDescription = winDescriptions.diagonal.replace('{multiplier}', multiplier);
+      }
+    }
+    
+    // Проверка полного совпадения (все 9 символов одинаковые)
+    let allSame = true;
+    const firstSymbol = matrix[0][0];
+    
+    for (let row = 0; row < rowCount && allSame; row++) {
+      for (let col = 0; col < colCount && allSame; col++) {
+        if (matrix[row][col] !== firstSymbol) {
+          allSame = false;
+        }
+      }
+    }
+    
+    if (allSame) {
+      const jackpotMultiplier = symbolValues[firstSymbol] * 5; // Большой множитель для джекпота
+      
+      winLines.push({
+        type: 'jackpot',
+        symbol: firstSymbol,
+        multiplier: jackpotMultiplier
+      });
+      
+      highestMultiplier = jackpotMultiplier;
+      bestWinDescription = winDescriptions.fullMatch.replace('{multiplier}', jackpotMultiplier);
+    }
+    
+    // Возвращаем результат
     return {
-      win: false,
-      multiplier: 0,
-      description: 'Повезет в следующий раз!'
+      win: winLines.length > 0,
+      multiplier: highestMultiplier,
+      winLines: winLines,
+      description: bestWinDescription || 'Повезет в следующий раз!'
     };
   }
   
-  // Отображение результата игроку
+  // Отображение результата игры
   function displayResult(isWin, amount, description) {
     if (!slotsResult) return;
     
@@ -341,6 +506,9 @@ const slotsGame = (() => {
       `;
       slotsResult.classList.add('win');
       slotsResult.classList.remove('lose');
+      
+      // Подсвечиваем выигрышные линии
+      highlightWinLines();
     } else {
       slotsResult.innerHTML = `
         <div class="lose-icon">😢</div>
@@ -359,7 +527,58 @@ const slotsGame = (() => {
     }, 50);
   }
   
-  // Инициализация при загрузке
+  // Подсветка выигрышных линий
+  function highlightWinLines() {
+    // Здесь можно добавить визуальное выделение выигрышных линий
+    // Например, добавить подсветку символов, которые составляют выигрышную комбинацию
+    
+    const reelElements = document.querySelectorAll('.reel');
+    reelElements.forEach(reel => {
+      const row = parseInt(reel.dataset.row);
+      const col = parseInt(reel.dataset.col);
+      
+      // Проверяем, входит ли этот символ в выигрышную линию
+      let isWinningSymbol = false;
+      
+      // Горизонтальные линии
+      if (row < rowCount && col < colCount && 
+          slotMatrix[row][0] === slotMatrix[row][1] && 
+          slotMatrix[row][1] === slotMatrix[row][2]) {
+        isWinningSymbol = true;
+      }
+      
+      // Вертикальные линии
+      if (row < rowCount && col < colCount && 
+          slotMatrix[0][col] === slotMatrix[1][col] && 
+          slotMatrix[1][col] === slotMatrix[2][col]) {
+        isWinningSymbol = true;
+      }
+      
+      // Главная диагональ
+      if (row === col && 
+          slotMatrix[0][0] === slotMatrix[1][1] && 
+          slotMatrix[1][1] === slotMatrix[2][2]) {
+        isWinningSymbol = true;
+      }
+      
+      // Побочная диагональ
+      if (row + col === 2 && 
+          slotMatrix[2][0] === slotMatrix[1][1] && 
+          slotMatrix[1][1] === slotMatrix[0][2]) {
+        isWinningSymbol = true;
+      }
+      
+      // Подсвечиваем выигрышные символы
+      if (isWinningSymbol) {
+        const symbolElement = reel.querySelector('.symbol');
+        if (symbolElement) {
+          symbolElement.classList.add('winning');
+        }
+      }
+    });
+  }
+  
+  // Инициализация при загрузке страницы
   document.addEventListener('DOMContentLoaded', init);
   
   // Возвращаем публичные методы
