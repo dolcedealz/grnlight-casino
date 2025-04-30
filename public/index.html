@@ -291,5 +291,75 @@
     <script src="js/games/guessnumber.js"></script>
     <script src="js/games/miner.js"></script>
     <script src="js/games/crush.js"></script>
+    <!-- Добавьте этот скрипт перед закрывающим тегом </body> для отладки -->
+<script>
+    // Альтернативный экстренный скрипт для мониторинга загрузки
+    (function() {
+      console.log('[Debug] Инициализация отладочного скрипта');
+      
+      // Счетчик попыток проверки
+      let attempts = 0;
+      
+      // Функция для проверки загрузки приложения
+      function checkAppLoaded() {
+        attempts++;
+        console.log(`[Debug] Проверка загрузки приложения (попытка ${attempts})`);
+        
+        // Проверяем загрузку основных компонентов
+        const loadingOverlay = document.querySelector('.loading-overlay');
+        const welcomeScreen = document.getElementById('welcome-screen');
+        const gameCards = document.querySelectorAll('.game-card');
+        const casinoApp = window.casinoApp;
+        
+        // Выводим текущее состояние
+        console.log('[Debug] Текущее состояние:');
+        console.log('- Loading Overlay:', loadingOverlay ? 'найден' : 'не найден');
+        console.log('- Welcome Screen:', welcomeScreen ? 'найден' : 'не найден');
+        console.log('- Game Cards:', gameCards.length);
+        console.log('- Casino App:', casinoApp ? 'инициализирован' : 'не инициализирован');
+        
+        // Если загрузочный экран всё еще виден после 10 секунд, принудительно скрываем его
+        if (attempts >= 10 && loadingOverlay) {
+          console.warn('[Debug] Принудительное скрытие загрузочного экрана');
+          loadingOverlay.style.display = 'none';
+          
+          // Активируем welcome-screen если он существует и не активен
+          if (welcomeScreen && !welcomeScreen.classList.contains('active')) {
+            document.querySelectorAll('.screen').forEach(screen => {
+              screen.classList.remove('active');
+            });
+            welcomeScreen.classList.add('active');
+          }
+          
+          // Создаем информационное сообщение об ошибке загрузки
+          const errorMsg = document.createElement('div');
+          errorMsg.style.position = 'fixed';
+          errorMsg.style.bottom = '10px';
+          errorMsg.style.left = '10px';
+          errorMsg.style.backgroundColor = 'rgba(255, 0, 0, 0.8)';
+          errorMsg.style.color = 'white';
+          errorMsg.style.padding = '10px';
+          errorMsg.style.borderRadius = '5px';
+          errorMsg.style.zIndex = '9999';
+          errorMsg.innerHTML = `
+            <p>Debug mode: Loading issues detected</p>
+            <button onclick="location.reload()">Reload Page</button>
+          `;
+          document.body.appendChild(errorMsg);
+          
+          // Останавливаем проверки
+          return;
+        }
+        
+        // Продолжаем проверять, если приложение ещё не загружено полностью
+        if (attempts < 20) {
+          setTimeout(checkAppLoaded, 1000);
+        }
+      }
+      
+      // Запускаем проверку через 3 секунды после загрузки страницы
+      setTimeout(checkAppLoaded, 3000);
+    })();
+  </script>
 </body>
 </html>
