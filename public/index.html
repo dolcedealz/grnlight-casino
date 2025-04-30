@@ -1,128 +1,25 @@
-<!-- public/index.html - Simplified version -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Greenlight Casino</title>
-    <style>
-        /* Basic styles to make the app look decent */
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #121212;
-            color: white;
-            margin: 0;
-            padding: 0;
-        }
-        
-        .app-container {
-            max-width: 100%;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px 0;
-            border-bottom: 1px solid #333;
-            margin-bottom: 20px;
-        }
-        
-        .logo {
-            display: flex;
-            align-items: center;
-        }
-        
-        .logo h1 {
-            margin: 0;
-            color: #00A86B;
-        }
-        
-        .balance {
-            background: #222;
-            padding: 5px 15px;
-            border-radius: 20px;
-            border: 1px solid #444;
-        }
-        
-        .game-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-            gap: 15px;
-            margin-top: 20px;
-        }
-        
-        .game-card {
-            background: #1E1E1E;
-            border: 1px solid #333;
-            border-radius: 8px;
-            padding: 15px;
-            text-align: center;
-            cursor: pointer;
-            transition: transform 0.2s;
-        }
-        
-        .game-card:hover {
-            transform: translateY(-5px);
-            border-color: #00A86B;
-        }
-        
-        .game-icon {
-            font-size: 2em;
-            margin-bottom: 10px;
-        }
-        
-        .screen {
-            display: none;
-        }
-        
-        .screen.active {
-            display: block;
-        }
-        
-        .bottom-nav {
-            display: flex;
-            justify-content: space-around;
-            padding: 10px 0;
-            background: #1A1A1A;
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            border-top: 1px solid #333;
-        }
-        
-        .nav-btn {
-            background: none;
-            border: none;
-            color: #888;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            cursor: pointer;
-        }
-        
-        .nav-btn.active {
-            color: #00A86B;
-        }
-        
-        .nav-icon {
-            font-size: 1.5em;
-        }
-    </style>
+    <!-- Подключаем полноценный CSS -->
+    <link rel="stylesheet" href="css/style.css">
+    <!-- Добавляем шрифты для дизайна -->
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Poiret+One&display=swap" rel="stylesheet">
 </head>
 <body>
     <div class="app-container">
         <!-- Header -->
         <header class="header">
             <div class="logo">
+                <div class="green-light"></div>
                 <h1>Greenlight</h1>
             </div>
             <div class="balance">
                 <span id="balance-amount">0</span>
-                <span>⭐</span>
+                <span class="star">⭐</span>
             </div>
         </header>
 
@@ -130,157 +27,269 @@
         <main class="main-content">
             <!-- Welcome Screen -->
             <div id="welcome-screen" class="screen active">
-                <h2>Select a Game</h2>
-                <div class="game-grid">
-                    <div class="game-card" data-game="slots">
-                        <div class="game-icon">🎰</div>
-                        <div>Slots</div>
-                    </div>
-                    <div class="game-card" data-game="roulette">
-                        <div class="game-icon">🎲</div>
-                        <div>Roulette</div>
-                    </div>
-                    <div class="game-card" data-game="guessnumber">
-                        <div class="game-icon">🔢</div>
-                        <div>Guess Number</div>
-                    </div>
-                    <div class="game-card" data-game="miner">
-                        <div class="game-icon">💣</div>
-                        <div>Miner</div>
-                    </div>
-                    <div class="game-card" data-game="crush">
-                        <div class="game-icon">📈</div>
-                        <div>Crush</div>
+                <div class="game-selection">
+                    <h2>Select a Game</h2>
+                    <div class="game-grid">
+                        <div class="game-card" data-game="slots">
+                            <div class="game-icon">🎰</div>
+                            <div class="game-name">Slots</div>
+                        </div>
+                        <div class="game-card" data-game="roulette">
+                            <div class="game-icon">🎲</div>
+                            <div class="game-name">Roulette</div>
+                        </div>
+                        <div class="game-card" data-game="guessnumber">
+                            <div class="game-icon">🔢</div>
+                            <div class="game-name">Guess Number</div>
+                        </div>
+                        <div class="game-card" data-game="miner">
+                            <div class="game-icon">💣</div>
+                            <div class="game-name">Miner</div>
+                        </div>
+                        <div class="game-card" data-game="crush">
+                            <div class="game-icon">📈</div>
+                            <div class="game-name">Crush</div>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Placeholder for game screens -->
+            <!-- Slots Game Screen -->
             <div id="slots-screen" class="screen">
-                <h2>Slots Game</h2>
-                <p>Game coming soon</p>
-                <button class="back-btn">Back</button>
+                <div class="game-header">
+                    <button class="back-btn">← Back</button>
+                    <h2>Slots</h2>
+                </div>
+                <div class="slots-container">
+                    <div class="slot-reels">
+                        <!-- Слоты будут созданы динамически через JavaScript -->
+                    </div>
+                    <div id="slots-result" class="result"></div>
+                    <div class="bet-controls">
+                        <div class="bet-amount">
+                            <label for="slots-bet">Bet Amount:</label>
+                            <input type="number" id="slots-bet" min="1" value="10">
+                        </div>
+                        <button id="spin-btn" class="action-btn">SPIN</button>
+                    </div>
+                </div>
             </div>
             
+            <!-- Roulette Game Screen -->
             <div id="roulette-screen" class="screen">
-                <h2>Roulette Game</h2>
-                <p>Game coming soon</p>
-                <button class="back-btn">Back</button>
+                <div class="game-header">
+                    <button class="back-btn">← Back</button>
+                    <h2>Roulette</h2>
+                </div>
+                <div class="roulette-container">
+                    <div class="roulette-wheel">
+                        <div class="wheel-outer">
+                            <div id="wheel-inner" class="wheel-inner"></div>
+                            <div id="roulette-ball" class="ball"></div>
+                            <div class="wheel-peg"></div>
+                        </div>
+                    </div>
+                    <div id="roulette-result" class="result"></div>
+                    <div class="bet-controls">
+                        <div class="bet-options">
+                            <label for="roulette-bet-type">Bet Type:</label>
+                            <select id="roulette-bet-type">
+                                <option value="color">Color</option>
+                                <option value="number">Number</option>
+                                <option value="odd-even">Odd/Even</option>
+                            </select>
+                            
+                            <div id="bet-color-container" class="bet-type-container">
+                                <div class="color-options">
+                                    <button class="color-btn" data-color="red">Red</button>
+                                    <button class="color-btn" data-color="black">Black</button>
+                                    <button class="color-btn" data-color="green">Green (0)</button>
+                                </div>
+                            </div>
+                            
+                            <div id="bet-number-container" class="bet-type-container hidden">
+                                <label for="roulette-number">Choose Number (0-36):</label>
+                                <input type="number" id="roulette-number" min="0" max="36" value="0">
+                            </div>
+                            
+                            <div id="bet-odd-even-container" class="bet-type-container hidden">
+                                <div class="odd-even-options">
+                                    <button class="odd-even-btn" data-type="odd">Odd</button>
+                                    <button class="odd-even-btn" data-type="even">Even</button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="bet-amount">
+                            <label for="roulette-bet">Bet Amount:</label>
+                            <input type="number" id="roulette-bet" min="1" value="10">
+                        </div>
+                        
+                        <button id="spin-wheel-btn" class="action-btn">SPIN WHEEL</button>
+                    </div>
+                </div>
             </div>
             
+            <!-- Guess Number Game Screen -->
             <div id="guessnumber-screen" class="screen">
-                <h2>Guess Number Game</h2>
-                <p>Game coming soon</p>
-                <button class="back-btn">Back</button>
+                <div class="game-header">
+                    <button class="back-btn">← Back</button>
+                    <h2>Guess The Number</h2>
+                </div>
+                <div class="guessnumber-container">
+                    <div class="number-range">
+                        <p>Guess a number between <span id="min-range">1</span> and <span id="max-range">100</span></p>
+                    </div>
+                    <div class="guess-input">
+                        <input type="number" id="guess-input" min="1" max="100" value="50">
+                    </div>
+                    <div id="guess-result" class="result"></div>
+                    <div class="bet-controls">
+                        <div class="bet-amount">
+                            <label for="guess-bet">Bet Amount:</label>
+                            <input type="number" id="guess-bet" min="1" value="10">
+                        </div>
+                        <button id="guess-btn" class="action-btn">GUESS</button>
+                    </div>
+                </div>
             </div>
             
+            <!-- Miner Game Screen -->
             <div id="miner-screen" class="screen">
-                <h2>Miner Game</h2>
-                <p>Game coming soon</p>
-                <button class="back-btn">Back</button>
+                <div class="game-header">
+                    <button class="back-btn">← Back</button>
+                    <h2>Miner</h2>
+                </div>
+                <div class="miner-container">
+                    <div class="miner-info">
+                        <div class="mines-count">
+                            <span>Mines: </span>
+                            <select id="mines-count">
+                                <option value="3">3</option>
+                                <option value="5">5</option>
+                                <option value="7">7</option>
+                                <option value="10">10</option>
+                            </select>
+                        </div>
+                        <div class="potential-win">
+                            <span>Potential win: </span>
+                            <span id="potential-win">0</span> ⭐
+                        </div>
+                    </div>
+                    <div id="miner-grid" class="miner-grid">
+                        <!-- Ячейки будут добавлены динамически -->
+                    </div>
+                    <div id="miner-result" class="result"></div>
+                    <div class="bet-controls">
+                        <div class="bet-amount">
+                            <label for="miner-bet">Bet Amount:</label>
+                            <input type="number" id="miner-bet" min="1" value="10">
+                        </div>
+                        <div class="control-buttons">
+                            <button id="new-game-btn" class="action-btn">NEW GAME</button>
+                            <button id="cashout-btn" class="action-btn" disabled>CASHOUT</button>
+                        </div>
+                    </div>
+                </div>
             </div>
             
+            <!-- Crush Game Screen -->
             <div id="crush-screen" class="screen">
-                <h2>Crush Game</h2>
-                <p>Game coming soon</p>
-                <button class="back-btn">Back</button>
+                <div class="game-header">
+                    <button class="back-btn">← Back</button>
+                    <h2>Crush</h2>
+                </div>
+                <div class="crush-container">
+                    <div id="multiplier" class="multiplier-display">1.00</div>
+                    <div id="crush-graph" class="crush-graph">
+                        <!-- График будет создан динамически -->
+                    </div>
+                    <div id="crush-result" class="result"></div>
+                    <div class="bet-controls">
+                        <div class="bet-amount">
+                            <label for="crush-bet">Bet Amount:</label>
+                            <input type="number" id="crush-bet" min="1" value="10">
+                        </div>
+                        <div class="control-buttons">
+                            <button id="start-crush-btn" class="action-btn">START</button>
+                            <button id="cash-crush-btn" class="action-btn" disabled>CASH OUT</button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </main>
+
+        <!-- Modals -->
+        <div id="history-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Game History</h2>
+                    <span class="close-modal">&times;</span>
+                </div>
+                <div class="modal-body">
+                    <div id="history-list" class="history-list">
+                        <!-- История игр будет добавлена динамически -->
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="profile-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Profile</h2>
+                    <span class="close-modal">&times;</span>
+                </div>
+                <div class="modal-body">
+                    <div class="user-info">
+                        <h3>Welcome, <span id="user-name">Player</span>!</h3>
+                        <p>Balance: <span id="profile-balance">0</span> ⭐</p>
+                    </div>
+                    <h3>Transaction History</h3>
+                    <div id="transaction-list" class="transaction-list">
+                        <!-- История транзакций будет добавлена динамически -->
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <!-- Bottom Navigation -->
         <nav class="bottom-nav">
             <button id="history-btn" class="nav-btn">
                 <span class="nav-icon">📜</span>
-                <span>History</span>
+                <span class="nav-label">History</span>
             </button>
             <button id="home-btn" class="nav-btn active">
                 <span class="nav-icon">🏠</span>
-                <span>Home</span>
+                <span class="nav-label">Home</span>
             </button>
             <button id="profile-btn" class="nav-btn">
                 <span class="nav-icon">👤</span>
-                <span>Profile</span>
+                <span class="nav-label">Profile</span>
             </button>
         </nav>
+    </div>
+
+    <!-- Загрузчик и индикатор загрузки -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Loading Greenlight Casino...</div>
     </div>
 
     <!-- Telegram WebApp API -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     
-    <!-- Simple App Script -->
-    <script>
-    // Initialize Telegram WebApp
-    const tgApp = window.Telegram?.WebApp;
-    if (tgApp) {
-        try {
-            tgApp.expand();
-            console.log('Telegram WebApp expanded successfully');
-        } catch (error) {
-            console.error('Error expanding Telegram WebApp:', error);
-        }
-    }
+    <!-- Сначала загружаем loader.js для управления загрузкой -->
+    <script src="js/loader.js"></script>
     
-    // Basic navigation
-    document.addEventListener('DOMContentLoaded', function() {
-        // Game card click handlers
-        const gameCards = document.querySelectorAll('.game-card');
-        gameCards.forEach(card => {
-            card.addEventListener('click', function() {
-                const game = this.getAttribute('data-game');
-                if (!game) return;
-                
-                document.querySelectorAll('.screen').forEach(screen => {
-                    screen.classList.remove('active');
-                });
-                
-                const targetScreen = document.getElementById(`${game}-screen`);
-                if (targetScreen) {
-                    targetScreen.classList.add('active');
-                }
-            });
-        });
-        
-        // Back button handlers
-        const backButtons = document.querySelectorAll('.back-btn');
-        backButtons.forEach(button => {
-            button.addEventListener('click', function() {
-                document.querySelectorAll('.screen').forEach(screen => {
-                    screen.classList.remove('active');
-                });
-                
-                const welcomeScreen = document.getElementById('welcome-screen');
-                if (welcomeScreen) {
-                    welcomeScreen.classList.add('active');
-                }
-            });
-        });
-        
-        // Navigation button handlers
-        const homeBtn = document.getElementById('home-btn');
-        if (homeBtn) {
-            homeBtn.addEventListener('click', function() {
-                document.querySelectorAll('.screen').forEach(screen => {
-                    screen.classList.remove('active');
-                });
-                
-                const welcomeScreen = document.getElementById('welcome-screen');
-                if (welcomeScreen) {
-                    welcomeScreen.classList.add('active');
-                }
-                
-                updateActiveNavButton(this);
-            });
-        }
-        
-        // Helper for nav buttons
-        function updateActiveNavButton(activeButton) {
-            document.querySelectorAll('.nav-btn').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            
-            activeButton.classList.add('active');
-        }
-    });
-    </script>
+    <!-- Основной скрипт приложения -->
+    <script src="js/main.js"></script>
+    
+    <!-- Скрипты игр -->
+    <script src="js/games/slots.js"></script>
+    <script src="js/games/roulette.js"></script>
+    <script src="js/games/guessnumber.js"></script>
+    <script src="js/games/miner.js"></script>
+    <script src="js/games/crush.js"></script>
 </body>
 </html>
