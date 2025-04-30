@@ -1,142 +1,136 @@
-// Исправленный JavaScript файл для устранения проблемы белого экрана/бесконечной загрузки
-// Разместите этот код в начале вашего main.js или создайте новый файл loader.js и включите его первым
+// loader.js - Add this file to your public/js directory
 
-// Функция для обнаружения и исправления бесконечной загрузки
 (function() {
-  // Добавляем класс loading к body
-  document.body.classList.add('loading');
+  console.log('Loader script initialized');
   
-  // Создаем индикатор загрузки
-  const spinner = document.createElement('div');
-  spinner.className = 'loading-spinner';
-  document.body.appendChild(spinner);
-  
-  // Устанавливаем таймаут для автоматического восстановления
-  const loadTimeout = setTimeout(() => {
-    // Если страница не загрузилась через 10 секунд, выполним аварийное восстановление
-    console.log('Вынужденное восстановление после тайм-аута');
-    initializeEmergencyRecovery();
-  }, 10000);
-  
-  // Проверка успешной загрузки
-  window.addEventListener('load', () => {
-    clearTimeout(loadTimeout);
-    console.log('Страница загружена успешно');
+  // Create loading overlay
+  const createLoadingOverlay = () => {
+    const overlay = document.createElement('div');
+    overlay.className = 'loading-overlay';
+    overlay.id = 'loadingOverlay';
     
-    // Удаляем класс loading и спиннер с задержкой
+    // Create spinner
+    const spinner = document.createElement('div');
+    spinner.className = 'loading-spinner';
+    
+    // Create loading text
+    const loadingText = document.createElement('div');
+    loadingText.className = 'loading-text';
+    loadingText.textContent = 'Loading Greenlight Casino...';
+    
+    // Append elements
+    overlay.appendChild(spinner);
+    overlay.appendChild(loadingText);
+    document.body.appendChild(overlay);
+    
+    console.log('Loading overlay created');
+    return overlay;
+  };
+  
+  // Remove loading overlay
+  const removeLoadingOverlay = () => {
+    const overlay = document.getElementById('loadingOverlay');
+    if (overlay) {
+      overlay.style.opacity = '0';
+      setTimeout(() => {
+        if (overlay.parentNode) {
+          overlay.parentNode.removeChild(overlay);
+        }
+        console.log('Loading overlay removed');
+      }, 500);
+    }
+  };
+  
+  // Create the loading overlay
+  const overlay = createLoadingOverlay();
+  
+  // Set multiple fallback mechanisms to ensure loading screen is removed
+  
+  // Fallback 1: Remove after maximum time (15 seconds)
+  const maxLoadingTimeout = setTimeout(() => {
+    console.log('Maximum loading time reached, forcing removal');
+    removeLoadingOverlay();
+    initializeEmergencyUI();
+  }, 15000);
+  
+  // Fallback 2: Remove after load event with a reasonable delay
+  window.addEventListener('load', () => {
+    console.log('Window load event fired');
     setTimeout(() => {
-      document.body.classList.remove('loading');
-      if (spinner && spinner.parentNode) {
-        spinner.parentNode.removeChild(spinner);
-      }
-      
-      // Добавляем класс loaded к app-container
-      const appContainer = document.querySelector('.app-container');
-      if (appContainer) {
-        appContainer.classList.add('loaded');
-      }
-    }, 500);
+      clearTimeout(maxLoadingTimeout);
+      removeLoadingOverlay();
+    }, 1000);
   });
   
-  // Функция аварийного восстановления
-  function initializeEmergencyRecovery() {
-    console.log('Запуск аварийного восстановления...');
+  // Fallback 3: Try to detect DOM content loaded and then check app state
+  document.addEventListener('DOMContentLoaded', () => {
+    console.log('DOM content loaded event fired');
     
-    // Удаляем класс loading
-    document.body.classList.remove('loading');
-    
-    // Удаляем спиннер
-    if (spinner && spinner.parentNode) {
-      spinner.parentNode.removeChild(spinner);
-    }
-    
-    // Проверяем, отображается ли что-то на странице
-    const appContainer = document.querySelector('.app-container');
-    if (appContainer) {
-      appContainer.classList.add('loaded');
+    // Set a timer to check if app has initialized properly
+    setTimeout(() => {
+      const appContainer = document.querySelector('.app-container');
+      const anyScreenVisible = document.querySelector('.screen.active');
       
-      // Проверяем, видны ли экраны
-      const screens = document.querySelectorAll('.screen');
-      let anyScreenVisible = false;
-      
-      screens.forEach(screen => {
-        if (screen.classList.contains('active')) {
-          anyScreenVisible = true;
-        }
-      });
-      
-      // Если ни один экран не виден, показываем welcome-screen
-      if (!anyScreenVisible) {
-        const welcomeScreen = document.getElementById('welcome-screen');
-        if (welcomeScreen) {
-          welcomeScreen.classList.add('active');
+      // If no screen is active after 5 seconds, we might have a problem
+      if (appContainer && !anyScreenVisible) {
+        console.log('No active screen detected after DOM loaded - attempting recovery');
+        
+        try {
+          // Try to show the welcome screen
+          const welcomeScreen = document.getElementById('welcome-screen');
+          if (welcomeScreen) {
+            document.querySelectorAll('.screen').forEach(screen => {
+              screen.classList.remove('active');
+            });
+            welcomeScreen.classList.add('active');
+          }
+          
+          // Remove loading overlay
+          clearTimeout(maxLoadingTimeout);
+          removeLoadingOverlay();
+        } catch (error) {
+          console.error('Recovery attempt failed:', error);
         }
       }
-    }
-    
-    // Пробуем запустить приложение
-    try {
-      console.log('Инициализация упрощенного интерфейса...');
-      initializeMinimalUI();
-    } catch (error) {
-      console.error('Не удалось инициализировать интерфейс:', error);
-      showErrorMessage();
-    }
-  }
+    }, 5000);
+  });
   
-  // Функция инициализации минимального UI
-  function initializeMinimalUI() {
-    // Добавляем базовый функционал
-    const gameCards = document.querySelectorAll('.game-card');
-    const backButtons = document.querySelectorAll('.back-btn');
-    const navButtons = document.querySelectorAll('.nav-btn');
+  // Emergency UI initialization in case of main UI failure
+  function initializeEmergencyUI() {
+    console.log('Initializing emergency UI');
     
-    // Настройка игровых карточек
-    gameCards.forEach(card => {
-      card.addEventListener('click', function() {
-        const game = this.getAttribute('data-game');
-        if (!game) return;
-        
-        const targetScreen = document.getElementById(`${game}-screen`);
-        if (!targetScreen) return;
-        
-        // Скрываем все экраны
+    try {
+      // Show welcome screen
+      const welcomeScreen = document.getElementById('welcome-screen');
+      if (welcomeScreen) {
         document.querySelectorAll('.screen').forEach(screen => {
           screen.classList.remove('active');
         });
-        
-        // Показываем выбранный экран
-        targetScreen.classList.add('active');
+        welcomeScreen.classList.add('active');
+      }
+      
+      // Initialize minimal version of game card handlers
+      const gameCards = document.querySelectorAll('.game-card');
+      gameCards.forEach(card => {
+        card.onclick = function() {
+          const game = this.getAttribute('data-game');
+          if (!game) return;
+          
+          const targetScreen = document.getElementById(`${game}-screen`);
+          if (!targetScreen) return;
+          
+          document.querySelectorAll('.screen').forEach(screen => {
+            screen.classList.remove('active');
+          });
+          
+          targetScreen.classList.add('active');
+        };
       });
-    });
-    
-    // Настройка кнопок "назад"
-    backButtons.forEach(button => {
-      button.addEventListener('click', function() {
-        // Скрываем все экраны
-        document.querySelectorAll('.screen').forEach(screen => {
-          screen.classList.remove('active');
-        });
-        
-        // Показываем начальный экран
-        const welcomeScreen = document.getElementById('welcome-screen');
-        if (welcomeScreen) {
-          welcomeScreen.classList.add('active');
-        }
-      });
-    });
-    
-    // Настройка навигационных кнопок
-    navButtons.forEach(button => {
-      button.addEventListener('click', function() {
-        const targetId = this.id;
-        
-        // Обновляем активную кнопку
-        navButtons.forEach(btn => btn.classList.remove('active'));
-        this.classList.add('active');
-        
-        if (targetId === 'home-btn') {
-          // Показываем начальный экран
+      
+      // Setup back buttons
+      const backButtons = document.querySelectorAll('.back-btn');
+      backButtons.forEach(button => {
+        button.onclick = function() {
           document.querySelectorAll('.screen').forEach(screen => {
             screen.classList.remove('active');
           });
@@ -145,114 +139,27 @@
           if (welcomeScreen) {
             welcomeScreen.classList.add('active');
           }
-        }
-        // Обработка других навигационных кнопок (profile, history)
-        // ...
+        };
       });
-    });
-  }
-  
-  // Функция показа сообщения об ошибке
-  function showErrorMessage() {
-    // Создаем сообщение об ошибке
-    const errorMessage = document.createElement('div');
-    errorMessage.className = 'error-message';
-    errorMessage.innerHTML = `
-      <h2>Что-то пошло не так</h2>
-      <p>Не удалось загрузить приложение. Пожалуйста, обновите страницу.</p>
-      <button onclick="window.location.reload()">Обновить страницу</button>
-    `;
-    
-    // Стилизуем сообщение
-    errorMessage.style.position = 'fixed';
-    errorMessage.style.top = '50%';
-    errorMessage.style.left = '50%';
-    errorMessage.style.transform = 'translate(-50%, -50%)';
-    errorMessage.style.background = 'rgba(0, 0, 0, 0.8)';
-    errorMessage.style.color = 'white';
-    errorMessage.style.padding = '2rem';
-    errorMessage.style.borderRadius = '10px';
-    errorMessage.style.textAlign = 'center';
-    errorMessage.style.zIndex = '10000';
-    
-    // Стилизуем кнопку
-    const button = errorMessage.querySelector('button');
-    button.style.background = '#00A86B';
-    button.style.color = 'white';
-    button.style.border = 'none';
-    button.style.padding = '0.5rem 1rem';
-    button.style.borderRadius = '5px';
-    button.style.marginTop = '1rem';
-    button.style.cursor = 'pointer';
-    
-    // Добавляем на страницу
-    document.body.appendChild(errorMessage);
+      
+      console.log('Emergency UI initialized successfully');
+    } catch (error) {
+      console.error('Failed to initialize emergency UI:', error);
+      
+      // Last resort - show error message to user
+      const errorMessage = document.createElement('div');
+      errorMessage.innerHTML = `
+        <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); 
+                   display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 10000;">
+          <h2 style="color: white; margin-bottom: 20px;">Unable to load Greenlight Casino</h2>
+          <p style="color: white; margin-bottom: 20px;">Please try refreshing the page.</p>
+          <button onclick="window.location.reload()" 
+                  style="background: #00A86B; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer;">
+            Refresh Page
+          </button>
+        </div>
+      `;
+      document.body.appendChild(errorMessage);
+    }
   }
 })();
-
-// Основной код инициализации приложения
-document.addEventListener('DOMContentLoaded', function() {
-  // Здесь будет ваш оригинальный код инициализации
-  console.log('DOMContentLoaded: приложение инициализируется');
-  
-  // Проверка, что важные элементы существуют
-  const elementsToCheck = [
-    '.app-container',
-    '.header',
-    '.main-content',
-    '#welcome-screen',
-    '.game-card',
-    '.bottom-nav'
-  ];
-  
-  let allElementsExist = true;
-  
-  elementsToCheck.forEach(selector => {
-    if (!document.querySelector(selector)) {
-      console.error(`Элемент ${selector} не найден`);
-      allElementsExist = false;
-    }
-  });
-  
-  if (!allElementsExist) {
-    console.warn('Некоторые элементы отсутствуют, инициализация может быть неполной');
-  }
-  
-  // Инициализация с задержкой для гарантии загрузки DOM
-  setTimeout(() => {
-    try {
-      console.log('Безопасная инициализация с задержкой');
-      
-      // Базовая инициализация для показа главного экрана
-      const welcomeScreen = document.getElementById('welcome-screen');
-      if (welcomeScreen && !welcomeScreen.classList.contains('active')) {
-        document.querySelectorAll('.screen').forEach(screen => {
-          screen.classList.remove('active');
-        });
-        welcomeScreen.classList.add('active');
-      }
-      
-      // Инициализация игровых карточек (минимальная функциональность)
-      const gameCards = document.querySelectorAll('.game-card');
-      gameCards.forEach(card => {
-        card.addEventListener('click', function() {
-          const game = this.getAttribute('data-game');
-          if (!game) return;
-          
-          const targetScreen = document.getElementById(`${game}-screen`);
-          if (!targetScreen) return;
-          
-          // Скрываем все экраны
-          document.querySelectorAll('.screen').forEach(screen => {
-            screen.classList.remove('active');
-          });
-          
-          // Показываем выбранный экран
-          targetScreen.classList.add('active');
-        });
-      });
-    } catch (error) {
-      console.error('Ошибка при безопасной инициализации:', error);
-    }
-  }, 1000);
-});
