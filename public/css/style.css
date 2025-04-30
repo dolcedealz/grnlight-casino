@@ -50,126 +50,6 @@
   --transition-bounce: 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-/* Add these styles to your style.css file */
-
-/* Loading overlay styles */
-.loading-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.9);
-  z-index: 9999;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  transition: opacity 0.5s ease;
-}
-
-.loading-text {
-  color: var(--white);
-  font-size: 1.5rem;
-  margin-top: 2rem;
-  font-family: 'Poiret One', 'Century Gothic', sans-serif;
-  letter-spacing: 2px;
-  text-align: center;
-}
-
-.loading-spinner {
-  width: 60px;
-  height: 60px;
-  position: relative;
-}
-
-.loading-spinner::before,
-.loading-spinner::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  border: 3px solid transparent;
-}
-
-.loading-spinner::before {
-  border-top-color: var(--primary-green);
-  border-right-color: var(--primary-green);
-  animation: spin 1.2s linear infinite;
-}
-
-.loading-spinner::after {
-  border-bottom-color: var(--gold);
-  border-left-color: var(--gold);
-  animation: spin 0.8s linear infinite reverse;
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-/* Improved transition classes for screens */
-.screen {
-  opacity: 0;
-  transform: translateY(20px);
-  transition: opacity 0.3s ease, transform 0.3s ease;
-}
-
-.screen.active {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-/* Button press effects */
-.card-pressed {
-  transform: scale(0.95) !important;
-  transition: transform 0.1s ease !important;
-}
-
-.btn-pressed {
-  transform: scale(0.95);
-  opacity: 0.8;
-  transition: all 0.1s ease;
-}
-
-/* Balance update animation */
-.balance-updated {
-  animation: pulse-balance 0.5s ease;
-}
-
-@keyframes pulse-balance {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.1); color: var(--primary-green); }
-}
-
-/* Fallback error message for emergency recovery */
-.error-message {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background: rgba(0, 0, 0, 0.9);
-  color: white;
-  padding: 2rem;
-  border-radius: 10px;
-  text-align: center;
-  z-index: 10000;
-  max-width: 90%;
-}
-
-.error-message button {
-  background: var(--primary-green);
-  color: white;
-  border: none;
-  padding: 0.5rem 1rem;
-  border-radius: 5px;
-  margin-top: 1rem;
-  cursor: pointer;
-}
 /* 2. Modern Reset with better defaults */
 *, *::before, *::after {
   margin: 0;
@@ -350,9 +230,9 @@ input, button, textarea, select {
 }
 
 .screen.active {
-  display: flex;
-  opacity: 1;
-  transform: translateY(0);
+  display: flex !important;
+  opacity: 1 !important;
+  transform: translateY(0) !important;
   animation: fadeInUp 0.5s var(--transition-bounce) forwards;
 }
 
@@ -500,20 +380,659 @@ input, button, textarea, select {
 
 /* 9. Modern Action Buttons */
 .action-btn {
-    /* Mobile optimizations already defined above */
-  }
-  
-  /* Add haptic feedback hints for mobile */
-  @media (hover: none) {
-    .game-card:active,
-    .action-btn:active,
-    .nav-btn:active,
-    .close-modal:active {
-      touch-action: manipulation;
-    }
-  }
+  background: linear-gradient(135deg, var(--primary-green), #005b3b);
+  color: white;
+  border: none;
+  padding: 0.8rem 2rem;
+  border-radius: 50px;
+  font-size: 1.1rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all var(--transition-bounce);
+  box-shadow: 0 4px 15px rgba(0, 168, 107, 0.3);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  position: relative;
+  overflow: hidden;
+}
 
-/* 16. Game-Specific Enhancements */
+.action-btn::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    to right,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.05) 40%,
+    rgba(255, 255, 255, 0.1) 50%,
+    rgba(255, 255, 255, 0.05) 60%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  transform: rotate(30deg);
+  transition: transform 0.7s;
+  opacity: 0;
+}
+
+.action-btn:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 7px 20px rgba(0, 168, 107, 0.5);
+}
+
+.action-btn:hover::after {
+  opacity: 1;
+  transform: rotate(30deg) translate(400px, 0);
+}
+
+.action-btn:active {
+  transform: translateY(0);
+}
+
+.action-btn:disabled {
+  background: var(--light-gray);
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Add haptic feedback hints for mobile */
+@media (hover: none) {
+  .game-card:active,
+  .action-btn:active,
+  .nav-btn:active,
+  .close-modal:active {
+    touch-action: manipulation;
+  }
+}
+
+/* 10. Enhanced Forms and Inputs */
+input[type="text"],
+input[type="number"],
+select {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--primary-green);
+  border-radius: var(--radius-sm);
+  padding: 0.8rem 1rem;
+  color: var(--white);
+  font-size: 1rem;
+  width: 100%;
+  transition: all var(--transition-normal);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+}
+
+input[type="text"]:focus,
+input[type="number"]:focus,
+select:focus {
+  outline: none;
+  border-color: var(--gold);
+  box-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
+}
+
+/* Improved select dropdown with custom arrow */
+select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%2300A86B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 16px;
+  padding-right: 40px;
+}
+
+/* 11. Modern Modal Design */
+.modal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.8);
+  z-index: 100;
+  justify-content: center;
+  align-items: center;
+  padding: 1rem;
+  opacity: 0;
+  transition: opacity var(--transition-normal);
+}
+
+.modal[style*="display: flex"] {
+  opacity: 1;
+  animation: fadeIn 0.3s forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modal-content {
+  background: linear-gradient(to bottom, #2c2c2c, #1a1a1a);
+  width: 100%;
+  max-width: 500px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  opacity: 0;
+  transform: scale(0.9);
+  transition: all var(--transition-bounce);
+  border: 1px solid var(--primary-green);
+  box-shadow: var(--shadow-lg);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.2rem 1.5rem;
+  background: linear-gradient(to right, rgba(0, 0, 0, 0.7), rgba(0, 168, 107, 0.1));
+  border-bottom: 1px solid var(--primary-green);
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  background: linear-gradient(to right, var(--white), var(--gold));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.close-modal {
+  color: var(--light-gray);
+  font-size: 1.5rem;
+  cursor: pointer;
+  transition: all var(--transition-normal);
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-circle);
+}
+
+.close-modal:hover {
+  color: var(--white);
+  background-color: rgba(255, 255, 255, 0.1);
+  transform: rotate(90deg);
+}
+
+.modal-body {
+  padding: 1.5rem;
+  max-height: 70vh;
+  overflow-y: auto;
+  /* Modern scrollbar */
+  scrollbar-width: thin;
+  scrollbar-color: var(--primary-green) rgba(0, 0, 0, 0.3);
+}
+
+/* Custom scrollbar for Chrome, Edge, and Safari */
+.modal-body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.modal-body::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 10px;
+}
+
+.modal-body::-webkit-scrollbar-thumb {
+  background-color: var(--primary-green);
+  border-radius: 10px;
+}
+
+/* 12. Enhanced Bottom Navigation */
+.bottom-nav {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  padding: 0.8rem 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.95), rgba(20, 20, 20, 0.9));
+  box-shadow: 0 -2px 20px rgba(0, 0, 0, 0.5);
+  border-top: 1px solid var(--primary-green);
+  position: relative;
+  z-index: 5;
+}
+
+.nav-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.5rem 1.5rem;
+  border-radius: var(--radius-sm);
+  color: var(--light-gray);
+  transition: all var(--transition-normal);
+  position: relative;
+  background: none;
+  border: none;
+}
+
+.nav-btn.active {
+  color: var(--primary-green);
+}
+
+.nav-btn.active::after {
+  content: '';
+  position: absolute;
+  bottom: -0.8rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 6px;
+  height: 6px;
+  background-color: var(--primary-green);
+  border-radius: var(--radius-circle);
+  box-shadow: var(--glow-green);
+}
+
+.nav-btn:hover {
+  color: var(--white);
+  transform: translateY(-2px);
+}
+
+.nav-icon {
+  font-size: 1.5rem;
+  margin-bottom: 0.3rem;
+  transition: transform var(--transition-normal);
+}
+
+.nav-btn:hover .nav-icon {
+  transform: scale(1.1);
+}
+
+.nav-label {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* 13. Game Result Display Enhancement */
+.result {
+  min-height: 50px;
+  margin: 1.5rem 0;
+  padding: 1.5rem;
+  text-align: center;
+  border-radius: var(--radius-md);
+  font-weight: bold;
+  font-size: 1.1rem;
+  opacity: 0;
+  transform: translateY(20px);
+  transition: all var(--transition-bounce);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.result.win {
+  background: linear-gradient(135deg, rgba(76, 175, 80, 0.1), rgba(76, 175, 80, 0.2));
+  border: 1px solid var(--win-color);
+  color: var(--win-color);
+  box-shadow: 0 0 20px rgba(76, 175, 80, 0.2);
+}
+
+.result.lose {
+  background: linear-gradient(135deg, rgba(244, 67, 54, 0.1), rgba(244, 67, 54, 0.2));
+  border: 1px solid var(--lose-color);
+  color: var(--lose-color);
+  box-shadow: 0 0 20px rgba(244, 67, 54, 0.2);
+}
+
+/* Result icons */
+.win-icon, .lose-icon, .cashout-icon, .crash-icon {
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+  animation: scaleIn 0.5s var(--transition-bounce);
+}
+
+@keyframes scaleIn {
+  from { transform: scale(0); }
+  to { transform: scale(1); }
+}
+
+.win-title, .lose-title, .cashout-text, .crash-text {
+  font-size: 1.3rem;
+  margin-bottom: 0.5rem;
+}
+
+.win-description, .lose-description {
+  font-size: 1rem;
+  opacity: 0.8;
+}
+
+.win-amount {
+  font-size: 1.5rem;
+  color: var(--win-color);
+  margin-top: 0.5rem;
+  font-weight: bold;
+  text-shadow: 0 0 10px rgba(76, 175, 80, 0.3);
+}
+
+/* 14. Game History and Transactions Lists */
+.history-list,
+.transaction-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.history-item,
+.transaction-item {
+  background: linear-gradient(to right, rgba(0, 0, 0, 0.4), rgba(42, 42, 42, 0.2));
+  padding: 1rem;
+  border-radius: var(--radius-sm);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  transition: all var(--transition-normal);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+}
+
+.history-item:hover,
+.transaction-item:hover {
+  background: linear-gradient(to right, rgba(0, 0, 0, 0.5), rgba(0, 168, 107, 0.1));
+  transform: translateX(5px);
+  border-left: 2px solid var(--primary-green);
+}
+
+.history-game,
+.transaction-type {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.game-icon,
+.transaction-icon {
+  font-size: 1.3rem;
+}
+
+.history-details,
+.transaction-details {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.3rem;
+}
+
+.history-outcome.win,
+.transaction-amount.positive {
+  color: var(--win-color);
+  font-weight: bold;
+  position: relative;
+}
+
+.history-outcome.win::before,
+.transaction-amount.positive::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  background-color: var(--win-color);
+  border-radius: var(--radius-circle);
+  margin-right: 5px;
+  box-shadow: 0 0 5px var(--win-color);
+}
+
+.history-outcome.loss,
+.transaction-amount.negative {
+  color: var(--lose-color);
+  font-weight: bold;
+  position: relative;
+}
+
+.history-outcome.loss::before,
+.transaction-amount.negative::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  background-color: var(--lose-color);
+  border-radius: var(--radius-circle);
+  margin-right: 5px;
+  box-shadow: 0 0 5px var(--lose-color);
+}
+
+.history-date,
+.transaction-date {
+  font-size: 0.8rem;
+  color: var(--light-gray);
+  font-style: italic;
+}
+
+.empty-message {
+  text-align: center;
+  padding: 2rem;
+  color: var(--light-gray);
+  font-style: italic;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: var(--radius-md);
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+}
+
+/* 15. Loading Overlay and Spinner */
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.9);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  transition: opacity 0.5s ease;
+}
+
+.loading-text {
+  color: var(--white);
+  font-size: 1.5rem;
+  margin-top: 2rem;
+  font-family: 'Poiret One', 'Century Gothic', sans-serif;
+  letter-spacing: 2px;
+  text-align: center;
+}
+
+.loading-spinner {
+  width: 60px;
+  height: 60px;
+  position: relative;
+}
+
+.loading-spinner::before,
+.loading-spinner::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 3px solid transparent;
+}
+
+.loading-spinner::before {
+  border-top-color: var(--primary-green);
+  border-right-color: var(--primary-green);
+  animation: spin 1.2s linear infinite;
+}
+
+.loading-spinner::after {
+  border-bottom-color: var(--gold);
+  border-left-color: var(--gold);
+  animation: spin 0.8s linear infinite reverse;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Game-specific loading animations */
+.game-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+}
+
+.slots-loading .loading-icon {
+  font-size: 2rem;
+  animation: slotSpin 1.5s infinite;
+}
+
+@keyframes slotSpin {
+  0% { content: '🍒'; }
+  20% { content: '🍋'; }
+  40% { content: '🍇'; }
+  60% { content: '💎'; }
+  80% { content: '7️⃣'; }
+  100% { content: '🍒'; }
+}
+
+.roulette-loading .loading-icon {
+  font-size: 2rem;
+  animation: rotateBall 1.5s infinite linear;
+}
+
+@keyframes rotateBall {
+  0% { transform: rotate(0deg) translateX(20px) rotate(0deg); }
+  100% { transform: rotate(360deg) translateX(20px) rotate(-360deg); }
+}
+
+/* Page transition animations */
+.page-transition {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: var(--black);
+  z-index: 9998;
+  transform: scaleX(0);
+  transform-origin: right;
+  transition: transform 0.5s var(--transition-normal);
+}
+
+.page-transition.active {
+  transform: scaleX(1);
+  transform-origin: left;
+}
+
+/* 16. Notifications System */
+.notification-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  width: 300px;
+  z-index: 9999;
+}
+
+.notification {
+  background: linear-gradient(to right, rgba(0, 0, 0, 0.85), rgba(42, 42, 42, 0.85));
+  border-left: 4px solid var(--primary-green);
+  border-radius: var(--radius-sm);
+  padding: 1rem;
+  margin-bottom: 10px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  transform: translateX(120%);
+  transition: transform 0.5s var(--transition-bounce);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.notification.show {
+  transform: translateX(0);
+}
+
+.notification.success {
+  border-color: var(--win-color);
+}
+
+.notification.error {
+  border-color: var(--lose-color);
+}
+
+.notification-icon {
+  font-size: 1.5rem;
+  margin-right: 1rem;
+}
+
+.notification-content {
+  flex: 1;
+}
+
+.notification-message {
+  font-size: 0.9rem;
+  color: var(--white);
+}
+
+.notification-close {
+  color: var(--light-gray);
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: color var(--transition-normal);
+}
+
+.notification-close:hover {
+  color: var(--white);
+}
+
+/* 17. Button press effects */
+.card-pressed {
+  transform: scale(0.95) !important;
+  transition: transform 0.1s ease !important;
+}
+
+.btn-pressed {
+  transform: scale(0.95);
+  opacity: 0.8;
+  transition: all 0.1s ease;
+}
+
+/* 18. Balance update animation */
+.balance-updated {
+  animation: pulse-balance 0.5s ease;
+}
+
+@keyframes pulse-balance {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); color: var(--primary-green); }
+}
+
+/* 19. Fallback error message for emergency recovery */
+.error-message {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.9);
+  color: white;
+  padding: 2rem;
+  border-radius: 10px;
+  text-align: center;
+  z-index: 10000;
+  max-width: 90%;
+}
+
+.error-message button {
+  background: var(--primary-green);
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 5px;
+  margin-top: 1rem;
+  cursor: pointer;
+}
+
+/* 20. GAME-SPECIFIC STYLES */
 
 /* SLOTS GAME ENHANCEMENTS */
 .slots-container {
@@ -1008,652 +1527,61 @@ input, button, textarea, select {
   border-radius: 10px;
 }
 
-.history-item {
-  min-width: 80px;
-  padding: 0.7rem;
+/* Game header with back button */
+.game-header {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  border-radius: var(--radius-sm);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  transition: all var(--transition-normal);
-}
-
-.history-item.crashed {
-  background: linear-gradient(to bottom, rgba(244, 67, 54, 0.1), rgba(0, 0, 0, 0.2));
-  border-color: rgba(244, 67, 54, 0.3);
-}
-
-.history-item.cashed-out {
-  background: linear-gradient(to bottom, rgba(76, 175, 80, 0.1), rgba(0, 0, 0, 0.2));
-  border-color: rgba(76, 175, 80, 0.3);
-}
-
-.history-multiplier {
-  font-weight: bold;
-  color: var(--white);
-  font-size: 1rem;
-}
-
-.history-status {
-  font-size: 1.2rem;
-  margin: 0.3rem 0;
-}
-
-.history-time {
-  font-size: 0.7rem;
-  color: var(--light-gray);
-}
-
-/* 17. Loading Animations and Transitions */
-/* Fullscreen loading overlay */
-.loading-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
+  margin-bottom: 2rem;
   width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.8);
-  z-index: 9999;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  transition: opacity 0.5s ease;
 }
 
-.loading-text {
-  color: var(--white);
-  font-size: 1.5rem;
-  margin-top: 2rem;
-  font-family: 'Poiret One', 'Century Gothic', sans-serif;
-  letter-spacing: 2px;
-}
-
-.loading-spinner {
-  width: 60px;
-  height: 60px;
-  position: relative;
-}
-
-.loading-spinner::before,
-.loading-spinner::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  border: 3px solid transparent;
-}
-
-.loading-spinner::before {
-  border-top-color: var(--primary-green);
-  border-right-color: var(--primary-green);
-  animation: spin 1.2s linear infinite;
-}
-
-.loading-spinner::after {
-  border-bottom-color: var(--gold);
-  border-left-color: var(--gold);
-  animation: spin 0.8s linear infinite reverse;
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-/* Game-specific loading animations */
-.game-loading {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 200px;
-}
-
-.slots-loading .loading-icon {
-  font-size: 2rem;
-  animation: slotSpin 1.5s infinite;
-}
-
-@keyframes slotSpin {
-  0% { content: '🍒'; }
-  20% { content: '🍋'; }
-  40% { content: '🍇'; }
-  60% { content: '💎'; }
-  80% { content: '7️⃣'; }
-  100% { content: '🍒'; }
-}
-
-.roulette-loading .loading-icon {
-  font-size: 2rem;
-  animation: rotateBall 1.5s infinite linear;
-}
-
-@keyframes rotateBall {
-  0% { transform: rotate(0deg) translateX(20px) rotate(0deg); }
-  100% { transform: rotate(360deg) translateX(20px) rotate(-360deg); }
-}
-
-/* Page transition animations */
-.page-transition {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: var(--black);
-  z-index: 9998;
-  transform: scaleX(0);
-  transform-origin: right;
-  transition: transform 0.5s var(--transition-normal);
-}
-
-.page-transition.active {
-  transform: scaleX(1);
-  transform-origin: left;
-}
-
-/* 18. Notifications System */
-.notification-container {
-  position: fixed;
-  top: 20px;
-  right: 20px;
-  width: 300px;
-  z-index: 9999;
-}
-
-.notification {
-  background: linear-gradient(to right, rgba(0, 0, 0, 0.85), rgba(42, 42, 42, 0.85));
-  border-left: 4px solid var(--primary-green);
-  border-radius: var(--radius-sm);
-  padding: 1rem;
-  margin-bottom: 10px;
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-  display: flex;
-  align-items: center;
-  transform: translateX(120%);
-  transition: transform 0.5s var(--transition-bounce);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-}
-
-.notification.show {
-  transform: translateX(0);
-}
-
-.notification.success {
-  border-color: var(--win-color);
-}
-
-.notification.error {
-  border-color: var(--lose-color);
-}
-
-.notification-icon {
-  font-size: 1.5rem;
-  margin-right: 1rem;
-}
-
-.notification-content {
+.game-header h2 {
   flex: 1;
-}
-
-.notification-message {
-  font-size: 0.9rem;
-  color: var(--white);
-}
-
-.notification-close {
-  color: var(--light-gray);
-  font-size: 1.2rem;
-  cursor: pointer;
-  transition: color var(--transition-normal);
-}
-
-.notification-close:hover {
-  color: var(--white);
-}
-
-/* 9. Modern Action Buttons */
-.action-btn {
-  background: linear-gradient(135deg, var(--primary-green), #005b3b);
-  color: white;
-  border: none;
-  padding: 0.8rem 2rem;
-  border-radius: 50px;
-  font-size: 1.1rem;
-  font-weight: bold;
-  cursor: pointer;
-  transition: all var(--transition-bounce);
-  box-shadow: 0 4px 15px rgba(0, 168, 107, 0.3);
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  position: relative;
-  overflow: hidden;
-}
-
-.action-btn::after {
-  content: '';
-  position: absolute;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: linear-gradient(
-    to right,
-    rgba(255, 255, 255, 0) 0%,
-    rgba(255, 255, 255, 0.05) 40%,
-    rgba(255, 255, 255, 0.1) 50%,
-    rgba(255, 255, 255, 0.05) 60%,
-    rgba(255, 255, 255, 0) 100%
-  );
-  transform: rotate(30deg);
-  transition: transform 0.7s;
-  opacity: 0;
-}
-
-.action-btn:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 7px 20px rgba(0, 168, 107, 0.5);
-}
-
-.action-btn:hover::after {
-  opacity: 1;
-  transform: rotate(30deg) translate(400px, 0);
-}
-
-.action-btn:active {
-  transform: translateY(0);
-}
-
-.action-btn:disabled {
-  background: var(--light-gray);
-  cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
-}
-
-/* Add haptic feedback hints for mobile */
-@media (hover: none) {
-  .game-card:active,
-  .action-btn:active,
-  .nav-btn:active,
-  .close-modal:active {
-    touch-action: manipulation;
-  }
-}
-
-
-/* 10. Enhanced Forms and Inputs */
-input[type="text"],
-input[type="number"],
-select {
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid var(--primary-green);
-  border-radius: var(--radius-sm);
-  padding: 0.8rem 1rem;
-  color: var(--white);
-  font-size: 1rem;
-  width: 100%;
-  transition: all var(--transition-normal);
-  backdrop-filter: blur(5px);
-  -webkit-backdrop-filter: blur(5px);
-}
-
-input[type="text"]:focus,
-input[type="number"]:focus,
-select:focus {
-  outline: none;
-  border-color: var(--gold);
-  box-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
-}
-
-/* Improved select dropdown with custom arrow */
-select {
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%2300A86B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 10px center;
-  background-size: 16px;
-  padding-right: 40px;
-}
-
-/* 11. Modern Modal Design */
-.modal {
-  display: none;
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.8);
-  z-index: 100;
-  justify-content: center;
-  align-items: center;
-  padding: 1rem;
-  opacity: 0;
-  transition: opacity var(--transition-normal);
-}
-
-.modal[style*="display: flex"] {
-  opacity: 1;
-  animation: fadeIn 0.3s forwards;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-.modal-content {
-  background: linear-gradient(to bottom, #2c2c2c, #1a1a1a);
-  width: 100%;
-  max-width: 500px;
-  border-radius: var(--radius-md);
-  overflow: hidden;
-  opacity: 0;
-  transform: scale(0.9);
-  transition: all var(--transition-bounce);
-  border: 1px solid var(--primary-green);
-  box-shadow: var(--shadow-lg);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1.2rem 1.5rem;
-  background: linear-gradient(to right, rgba(0, 0, 0, 0.7), rgba(0, 168, 107, 0.1));
-  border-bottom: 1px solid var(--primary-green);
-}
-
-.modal-header h2 {
-  margin: 0;
-  font-size: 1.5rem;
-  background: linear-gradient(to right, var(--white), var(--gold));
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
-.close-modal {
-  color: var(--light-gray);
-  font-size: 1.5rem;
-  cursor: pointer;
-  transition: all var(--transition-normal);
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-circle);
-}
-
-.close-modal:hover {
-  color: var(--white);
-  background-color: rgba(255, 255, 255, 0.1);
-  transform: rotate(90deg);
-}
-
-.modal-body {
-  padding: 1.5rem;
-  max-height: 70vh;
-  overflow-y: auto;
-  /* Modern scrollbar */
-  scrollbar-width: thin;
-  scrollbar-color: var(--primary-green) rgba(0, 0, 0, 0.3);
-}
-
-/* Custom scrollbar for Chrome, Edge, and Safari */
-.modal-body::-webkit-scrollbar {
-  width: 8px;
-}
-
-.modal-body::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.3);
-  border-radius: 10px;
-}
-
-.modal-body::-webkit-scrollbar-thumb {
-  background-color: var(--primary-green);
-  border-radius: 10px;
-}
-
-/* 12. Enhanced Bottom Navigation */
-.bottom-nav {
-  display: flex;
-  justify-content: space-around;
-  align-items: center;
-  padding: 0.8rem 0;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.95), rgba(20, 20, 20, 0.9));
-  box-shadow: 0 -2px 20px rgba(0, 0, 0, 0.5);
-  border-top: 1px solid var(--primary-green);
-  position: relative;
-  z-index: 5;
-}
-
-.nav-btn {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 0.5rem 1.5rem;
-  border-radius: var(--radius-sm);
-  color: var(--light-gray);
-  transition: all var(--transition-normal);
-  position: relative;
-  background: none;
-  border: none;
-}
-
-.nav-btn.active {
-  color: var(--primary-green);
-}
-
-.nav-btn.active::after {
-  content: '';
-  position: absolute;
-  bottom: -0.8rem;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 6px;
-  height: 6px;
-  background-color: var(--primary-green);
-  border-radius: var(--radius-circle);
-  box-shadow: var(--glow-green);
-}
-
-.nav-btn:hover {
-  color: var(--white);
-  transform: translateY(-2px);
-}
-
-.nav-icon {
-  font-size: 1.5rem;
-  margin-bottom: 0.3rem;
-  transition: transform var(--transition-normal);
-}
-
-.nav-btn:hover .nav-icon {
-  transform: scale(1.1);
-}
-
-.nav-label {
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-}
-
-/* 13. Game Result Display Enhancement */
-.result {
-  min-height: 50px;
-  margin: 1.5rem 0;
-  padding: 1.5rem;
   text-align: center;
+  color: var(--gold);
+  text-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
+  margin: 0;
+}
+
+.back-btn {
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.4));
+  border: 1px solid var(--primary-green);
+  color: var(--white);
+  padding: 0.5rem 1rem;
   border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-normal);
   font-weight: bold;
-  font-size: 1.1rem;
-  opacity: 0;
-  transform: translateY(20px);
-  transition: all var(--transition-bounce);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
 }
 
-.result.win {
-  background: linear-gradient(135deg, rgba(76, 175, 80, 0.1), rgba(76, 175, 80, 0.2));
-  border: 1px solid var(--win-color);
-  color: var(--win-color);
-  box-shadow: 0 0 20px rgba(76, 175, 80, 0.2);
+.back-btn:hover {
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.7), rgba(0, 168, 107, 0.1));
+  transform: translateX(-3px);
+  box-shadow: 0 0 10px rgba(0, 168, 107, 0.2);
 }
 
-.result.lose {
-  background: linear-gradient(135deg, rgba(244, 67, 54, 0.1), rgba(244, 67, 54, 0.2));
-  border: 1px solid var(--lose-color);
-  color: var(--lose-color);
-  box-shadow: 0 0 20px rgba(244, 67, 54, 0.2);
-}
-
-/* Result icons */
-.win-icon, .lose-icon, .cashout-icon, .crash-icon {
-  font-size: 2.5rem;
-  margin-bottom: 0.5rem;
-  animation: scaleIn 0.5s var(--transition-bounce);
-}
-
-@keyframes scaleIn {
-  from { transform: scale(0); }
-  to { transform: scale(1); }
-}
-
-.win-title, .lose-title, .cashout-text, .crash-text {
-  font-size: 1.3rem;
-  margin-bottom: 0.5rem;
-}
-
-.win-description, .lose-description {
-  font-size: 1rem;
-  opacity: 0.8;
-}
-
-.win-amount {
-  font-size: 1.5rem;
-  color: var(--win-color);
-  margin-top: 0.5rem;
-  font-weight: bold;
-  text-shadow: 0 0 10px rgba(76, 175, 80, 0.3);
-}
-
-/* 14. Game History and Transactions Lists */
-.history-list,
-.transaction-list {
+/* Bet controls */
+.bet-controls, 
+.bet-options {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  width: 100%;
 }
 
-.history-item,
-.transaction-item {
-  background: linear-gradient(to right, rgba(0, 0, 0, 0.4), rgba(42, 42, 42, 0.2));
-  padding: 1rem;
-  border-radius: var(--radius-sm);
+.bet-amount {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  transition: all var(--transition-normal);
-  backdrop-filter: blur(5px);
-  -webkit-backdrop-filter: blur(5px);
-}
-
-.history-item:hover,
-.transaction-item:hover {
-  background: linear-gradient(to right, rgba(0, 0, 0, 0.5), rgba(0, 168, 107, 0.1));
-  transform: translateX(5px);
-  border-left: 2px solid var(--primary-green);
-}
-
-.history-game,
-.transaction-type {
-  display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 0.5rem;
 }
 
-.game-icon,
-.transaction-icon {
-  font-size: 1.3rem;
-}
-
-.history-details,
-.transaction-details {
+.control-buttons {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 0.3rem;
+  gap: 1rem;
+  justify-content: center;
 }
 
-.history-outcome.win,
-.transaction-amount.positive {
-  color: var(--win-color);
-  font-weight: bold;
-  position: relative;
-}
-
-.history-outcome.win::before,
-.transaction-amount.positive::before {
-  content: '';
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  background-color: var(--win-color);
-  border-radius: var(--radius-circle);
-  margin-right: 5px;
-  box-shadow: 0 0 5px var(--win-color);
-}
-
-.history-outcome.loss,
-.transaction-amount.negative {
-  color: var(--lose-color);
-  font-weight: bold;
-  position: relative;
-}
-
-.history-outcome.loss::before,
-.transaction-amount.negative::before {
-  content: '';
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  background-color: var(--lose-color);
-  border-radius: var(--radius-circle);
-  margin-right: 5px;
-  box-shadow: 0 0 5px var(--lose-color);
-}
-
-.history-date,
-.transaction-date {
-  font-size: 0.8rem;
-  color: var(--light-gray);
-  font-style: italic;
-}
-
-.empty-message {
-  text-align: center;
-  padding: 2rem;
-  color: var(--light-gray);
-  font-style: italic;
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: var(--radius-md);
-  border: 1px dashed rgba(255, 255, 255, 0.1);
-}
-
-/* 15. Enhanced Responsive Design */
+/* 21. Responsive Design */
 @media (max-width: 768px) {
   html {
     font-size: 14px; /* Slightly reduce base font size */
@@ -1698,5 +1626,43 @@ select {
     transform: scale(0.95);
     transition: transform 0.1s;
   }
-  
+}
+
+/* 22. Helper classes for better Z-indexing */
+.z-top {
+  z-index: 10000;
+}
+
+.z-high {
+  z-index: 1000;
+}
+
+.z-mid {
+  z-index: 100;
+}
+
+.z-low {
+  z-index: 10;
+}
+
+.z-bottom {
+  z-index: 1;
+}
+
+/* 23. Visibility helpers */
+.hidden {
+  display: none !important;
+}
+
+.visible {
+  display: block !important;
+}
+
+.flex-visible {
+  display: flex !important;
+}
+
+/* Make sure display:none actually works for screens */
+.screen:not(.active) {
+  display: none !important;
 }

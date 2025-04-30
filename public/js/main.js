@@ -114,14 +114,21 @@ async function initApp() {
   }
 }
 
-// Improved API handling with timeouts and fallbacks
+// Упрощенный вариант функции safeApiCall
 async function safeApiCall(apiFunction, fallbackValue = null) {
-  const timeoutPromise = new Promise((_, reject) => {
-    setTimeout(() => reject(new Error('API request timeout')), 10000);
-  });
-  
   try {
-    return await Promise.race([apiFunction(), timeoutPromise]);
+    // Установим таймаут для запроса
+    const timeoutId = setTimeout(() => {
+      console.error('API request timeout');
+    }, 10000);
+    
+    // Выполняем функцию
+    const result = await apiFunction();
+    
+    // Очищаем таймаут
+    clearTimeout(timeoutId);
+    
+    return result;
   } catch (error) {
     console.error('API error:', error);
     return fallbackValue;
