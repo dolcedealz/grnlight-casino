@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#121212">
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     <title>Greenlight Casino</title>
     
     <!-- Критический CSS инлайн для быстрого первоначального рендеринга -->
@@ -387,14 +388,42 @@
         </div>
     </div>
 
+    <!-- Определение глобального хранилища для игр -->
+    <script>
+        // Создаем глобальное пространство имен для игр
+        window.GreenLightGames = {
+            slotsGame: null,
+            rouletteGame: null,
+            guessNumberGame: null,
+            minerGame: null,
+            crushGame: null,
+            loaded: {
+                slots: false,
+                roulette: false,
+                guessnumber: false,
+                miner: false,
+                crush: false
+            }
+        };
+        
+        // Регистрация игры в глобальном хранилище
+        window.registerGame = function(name, gameObject) {
+            if (!window.GreenLightGames) return;
+            
+            console.log(`Регистрация игры: ${name}`);
+            window.GreenLightGames[name] = gameObject;
+            window.GreenLightGames.loaded[name.replace('Game', '')] = true;
+        };
+        
+        // Диагностическая информация
+        console.log('Версия приложения: 1.0.2 (улучшенная система загрузки)');
+    </script>
+
     <!-- Улучшенная система загрузки скриптов -->
     <script>
-        // Диагностическая информация
-        console.log('Версия приложения: 1.0.1 (исправленная)');
-        
         // Управление процессом загрузки
         let scriptLoadCount = 0;
-        const totalScripts = 7; // Telegram + loader + main + 5 игр
+        const totalScripts = 8; // Глобальные + Telegram + loader + main + 5 игр
         let loadingFailed = false;
         
         // Функция обновления прогресса загрузки
@@ -432,11 +461,11 @@
         }
         
         // Функция загрузки скрипта с обработкой ошибок
-        function loadScript(src) {
+        function loadScript(src, async = true) {
             return new Promise((resolve, reject) => {
                 const script = document.createElement('script');
                 script.src = src;
-                script.async = true;
+                script.async = async;
                 
                 script.onload = function() {
                     scriptLoadCount++;
@@ -457,46 +486,27 @@
         // Функция последовательной загрузки скриптов
         async function loadScriptsSequentially(scripts) {
             try {
-                for (const script of scripts) {
-                    await loadScript(script);
+                // Загружаем критические скрипты последовательно
+                for (let i = 0; i < 3; i++) { // Telegram + loader + main
+                    await loadScript(scripts[i], false); // Не асинхронно, строгий порядок
                 }
+                
+                // Обновляем прогресс
+                updateLoadingProgress(50);
+                
+                // Загружаем игровые скрипты (можно параллельно)
+                const gameScriptPromises = [];
+                for (let i = 3; i < scripts.length; i++) {
+                    gameScriptPromises.push(loadScript(scripts[i], true));
+                }
+                
+                await Promise.allSettled(gameScriptPromises);
+                
+                // Финальная проверка
                 return true;
             } catch (error) {
-                console.error('Ошибка при последовательной загрузке скриптов:', error);
+                console.error('Ошибка при загрузке скриптов:', error);
                 return false;
-            }
-        }
-        
-        // Экспортируем глобальные игровые объекты явно, если они не созданы модулями
-        function exportGameObjects() {
-            // Слоты
-            if (typeof slotsGame !== 'undefined' && !window.slotsGame) {
-                window.slotsGame = slotsGame;
-                console.log('slotsGame экспортирован глобально');
-            }
-            
-            // Рулетка
-            if (typeof rouletteGame !== 'undefined' && !window.rouletteGame) {
-                window.rouletteGame = rouletteGame;
-                console.log('rouletteGame экспортирован глобально');
-            }
-            
-            // Угадай число
-            if (typeof guessNumberGame !== 'undefined' && !window.guessNumberGame) {
-                window.guessNumberGame = guessNumberGame;
-                console.log('guessNumberGame экспортирован глобально');
-            }
-            
-            // Сапер
-            if (typeof minerGame !== 'undefined' && !window.minerGame) {
-                window.minerGame = minerGame;
-                console.log('minerGame экспортирован глобально');
-            }
-            
-            // Crush
-            if (typeof crushGame !== 'undefined' && !window.crushGame) {
-                window.crushGame = crushGame;
-                console.log('crushGame экспортирован глобально');
             }
         }
         
@@ -507,24 +517,13 @@
             try {
                 console.log('Инициализация приложения...');
                 
-                // Экспортируем игровые объекты в глобальное пространство, если они еще не экспортированы
-                exportGameObjects();
-                
-                // Проверяем доступность игровых объектов
-                console.log('Проверка игровых объектов:');
-                console.log('- slotsGame:', typeof window.slotsGame === 'object' ? 'доступен' : 'недоступен');
-                console.log('- rouletteGame:', typeof window.rouletteGame === 'object' ? 'доступен' : 'недоступен');
-                console.log('- guessNumberGame:', typeof window.guessNumberGame === 'object' ? 'доступен' : 'недоступен');
-                console.log('- minerGame:', typeof window.minerGame === 'object' ? 'доступен' : 'недоступен');
-                console.log('- crushGame:', typeof window.crushGame === 'object' ? 'доступен' : 'недоступен');
-                
                 // Показываем контент
                 const appContent = document.getElementById('app-content');
                 if (appContent) {
                     appContent.classList.add('loaded');
                 }
                 
-                // Инициализация приложения через таймаут
+                // Инициализация приложения с небольшой задержкой
                 // Это дает время для отрисовки DOM перед запуском логики
                 setTimeout(() => {
                     if (window.casinoApp && typeof window.casinoApp.init === 'function') {
@@ -544,6 +543,17 @@
             }
         }
         
+        // Глобальная функция для проверки готовности приложения
+        window.checkAppReady = function() {
+            // Проверка обязательных компонентов
+            if (!window.casinoApp) {
+                console.error('casinoApp не найден!');
+                return false;
+            }
+            
+            return true;
+        };
+        
         // Запускаем последовательную загрузку скриптов
         document.addEventListener('DOMContentLoaded', function() {
             try {
@@ -552,10 +562,11 @@
                 
                 // Определяем порядок загрузки скриптов
                 const scripts = [
-                    'https://telegram.org/js/telegram-web-app.js',  // Сначала загружаем Telegram WebApp API
+                    'https://telegram.org/js/telegram-web-app.js',
+                    'js/game-helper.js',
                     'js/loader.js',                                // Затем emergency loader
                     'js/main.js',                                  // Затем основной скрипт приложения
-                    'js/games/slots.js',                           // Затем игровые скрипты ПОСЛЕДОВАТЕЛЬНО
+                    'js/games/slots.js',                           // Затем игровые скрипты 
                     'js/games/roulette.js',
                     'js/games/guessnumber.js',
                     'js/games/miner.js',
@@ -601,3 +612,4 @@
                 }
             }, 5000); // 5 секунд максимальное время загрузки
         });
+    </script>

@@ -1,5 +1,5 @@
 // main.js - Основной файл приложения Greenlight Casino
-console.log('[Main] Запуск основного модуля приложения');
+console.log('[Main] Запуск основного модуля приложения (v1.0.2)');
 
 // Основная структура приложения
 const casinoApp = (() => {
@@ -36,21 +36,18 @@ const casinoApp = (() => {
     
     try {
       // Обновляем прогресс загрузки
-      if (window.appLoader && typeof window.appLoader.updateProgress === 'function') {
-        window.appLoader.updateProgress(15);
-      }
+      updateLoaderProgress(15);
       
       // Инициализация UI
       setupEventListeners();
       
       // Обновляем прогресс загрузки
-      if (window.appLoader && typeof window.appLoader.updateProgress === 'function') {
-        window.appLoader.updateProgress(30);
-      }
+      updateLoaderProgress(30);
       
       // Инициализация Telegram WebApp
       if (tgApp) {
         try {
+          // Расширяем окно приложения
           tgApp.expand();
           console.log('[Main] Telegram WebApp расширен');
           
@@ -81,14 +78,107 @@ const casinoApp = (() => {
       }
       
       // Обновляем прогресс загрузки
-      if (window.appLoader && typeof window.appLoader.updateProgress === 'function') {
-        window.appLoader.updateProgress(50);
-      }
+      updateLoaderProgress(50);
       
       // Обновление интерфейса
       updateBalance();
       
       // Показываем главный экран
+      activateWelcomeScreen();
+      
+      // Обновляем прогресс загрузки
+      updateLoaderProgress(70);
+      
+      // Отмечаем успешную инициализацию
+      appInitialized = true;
+      console.log('[Main] Приложение инициализировано');
+      
+      // Инициализируем игры
+      await initializeGames();
+      
+      // Обновляем прогресс загрузки до 100%
+      updateLoaderProgress(100);
+      
+      // Выполняем финальные проверки для диагностики
+      diagnoseGames();
+      
+      // Сообщаем загрузчику, что инициализация завершена
+      notifyLoaderReady();
+      
+      return true;
+    } catch (error) {
+      console.error('[Main] Критическая ошибка инициализации:', error);
+      showNotification('Ошибка при загрузке приложения');
+      
+      // Пытаемся показать приветственный экран в случае ошибки
+      activateWelcomeScreen();
+      
+      // Обновляем прогресс загрузки и уведомляем загрузчик о завершении
+      updateLoaderProgress(100); // Показываем 100% прогресса даже при ошибке
+      notifyLoaderReady(); // Уведомляем загрузчик о необходимости показать интерфейс
+      
+      return false;
+    }
+  };
+  
+  // Обновление прогресса загрузки в loader.js
+  const updateLoaderProgress = (percent) => {
+    try {
+      if (window.appLoader && typeof window.appLoader.updateProgress === 'function') {
+        window.appLoader.updateProgress(percent);
+      }
+    } catch (error) {
+      console.error('[Main] Ошибка обновления прогресса:', error);
+    }
+  };
+  
+  // Уведомляем загрузчик о готовности
+  const notifyLoaderReady = () => {
+    try {
+      if (window.appLoader && typeof window.appLoader.mainReady === 'function') {
+        window.appLoader.mainReady();
+        console.log('[Main] Уведомлен загрузчик о завершении инициализации');
+      } else {
+        console.warn('[Main] Функция appLoader.mainReady не найдена');
+        
+        // Резервное удаление экрана загрузки напрямую
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        if (loadingOverlay) {
+          loadingOverlay.style.opacity = '0';
+          setTimeout(() => {
+            loadingOverlay.style.display = 'none';
+            
+            // Показываем контент приложения 
+            const appContent = document.getElementById('app-content');
+            if (appContent) {
+              appContent.classList.add('loaded');
+            }
+          }, 500);
+        }
+      }
+    } catch (loaderError) {
+      console.error('[Main] Ошибка при взаимодействии с загрузчиком:', loaderError);
+      
+      // Резервное удаление экрана загрузки при ошибке
+      const loadingOverlay = document.getElementById('loadingOverlay');
+      if (loadingOverlay) {
+        loadingOverlay.style.opacity = '0';
+        setTimeout(() => {
+          loadingOverlay.style.display = 'none';
+          
+          // Показываем контент приложения
+          const appContent = document.getElementById('app-content');
+          if (appContent) {
+            appContent.classList.add('loaded');
+          }
+        }, 500);
+      }
+    }
+  };
+  
+  // Активация приветственного экрана
+  const activateWelcomeScreen = () => {
+    try {
       const welcomeScreen = document.getElementById('welcome-screen');
       if (welcomeScreen) {
         // Сначала скрываем все экраны
@@ -98,240 +188,77 @@ const casinoApp = (() => {
         
         // Затем показываем приветственный экран
         welcomeScreen.classList.add('active');
+        console.log('[Main] Приветственный экран активирован');
+      } else {
+        console.error('[Main] Элемент welcome-screen не найден!');
       }
-      
-      // Обновляем прогресс загрузки
-      if (window.appLoader && typeof window.appLoader.updateProgress === 'function') {
-        window.appLoader.updateProgress(70);
-      }
-      
-      // Отмечаем успешную инициализацию
-      appInitialized = true;
-      console.log('[Main] Приложение инициализировано');
-      
-      // Экспортируем игровые объекты в глобальное пространство, если они еще не экспортированы
-      exportGameObjects();
-      
-      // Инициализируем игры
-      initializeGames();
-      
-      // Обновляем прогресс загрузки до 100%
-      if (window.appLoader && typeof window.appLoader.updateProgress === 'function') {
-        window.appLoader.updateProgress(100);
-      }
-      
-      // Сообщаем загрузчику, что инициализация завершена
-      try {
-        if (window.appLoader && typeof window.appLoader.mainReady === 'function') {
-          window.appLoader.mainReady();
-          console.log('[Main] Уведомлен загрузчик о завершении инициализации');
-        } else {
-          // Для обратной совместимости, удаляем экран загрузки напрямую
-          const loadingOverlay = document.getElementById('loadingOverlay');
-          if (loadingOverlay) {
-            loadingOverlay.style.opacity = '0';
-            setTimeout(() => {
-              loadingOverlay.style.display = 'none';
-            }, 500);
-          }
-        }
-      } catch (loaderError) {
-        console.error('[Main] Ошибка при взаимодействии с загрузчиком:', loaderError);
-        // Удаляем экран загрузки напрямую при ошибке
-        const loadingOverlay = document.getElementById('loadingOverlay');
-        if (loadingOverlay) {
-          loadingOverlay.style.opacity = '0';
-          setTimeout(() => {
-            loadingOverlay.style.display = 'none';
-          }, 500);
-        }
-      }
-      
-      return true;
     } catch (error) {
-      console.error('[Main] Критическая ошибка инициализации:', error);
-      showNotification('Ошибка при загрузке приложения');
-      
-      // Пытаемся показать приветственный экран в случае ошибки
-      const welcomeScreen = document.getElementById('welcome-screen');
-      if (welcomeScreen) {
-        welcomeScreen.classList.add('active');
-      }
-      
-      // Обновляем прогресс загрузки и уведомляем загрузчик о завершении
-      try {
-        if (window.appLoader && typeof window.appLoader.updateProgress === 'function') {
-          window.appLoader.updateProgress(100); // Показываем 100% прогресса даже при ошибке
-        }
-        
-        if (window.appLoader && typeof window.appLoader.mainReady === 'function') {
-          window.appLoader.mainReady(); // Уведомляем загрузчик о необходимости показать интерфейс
-          console.log('[Main] Уведомлен загрузчик о завершении с ошибкой');
-        } else {
-          // Для обратной совместимости, удаляем экран загрузки напрямую
-          const loadingOverlay = document.getElementById('loadingOverlay');
-          if (loadingOverlay) {
-            loadingOverlay.style.opacity = '0';
-            setTimeout(() => {
-              loadingOverlay.style.display = 'none';
-            }, 500);
-          }
-        }
-      } catch (loaderError) {
-        console.error('[Main] Ошибка при взаимодействии с загрузчиком:', loaderError);
-        // Удаляем экран загрузки напрямую при ошибке
-        const loadingOverlay = document.getElementById('loadingOverlay');
-        if (loadingOverlay) {
-          loadingOverlay.style.opacity = '0';
-          setTimeout(() => {
-            loadingOverlay.style.display = 'none';
-          }, 500);
-        }
-      }
-      
-      return false;
+      console.error('[Main] Ошибка при активации welcome-screen:', error);
     }
-  };
-  
-  // Экспорт игровых объектов в глобальную область видимости
-  const exportGameObjects = () => {
-    console.log('[Main] Проверка и экспорт игровых объектов...');
-    
-    // Слоты
-    if (typeof slotsGame !== 'undefined' && !window.slotsGame) {
-      window.slotsGame = slotsGame;
-      console.log('[Main] slotsGame экспортирован глобально');
-    }
-      
-    // Рулетка
-    if (typeof rouletteGame !== 'undefined' && !window.rouletteGame) {
-      window.rouletteGame = rouletteGame;
-      console.log('[Main] rouletteGame экспортирован глобально');
-    }
-      
-    // Угадай число
-    if (typeof guessNumberGame !== 'undefined' && !window.guessNumberGame) {
-      window.guessNumberGame = guessNumberGame;
-      console.log('[Main] guessNumberGame экспортирован глобально');
-    }
-      
-    // Сапер
-    if (typeof minerGame !== 'undefined' && !window.minerGame) {
-      window.minerGame = minerGame;
-      console.log('[Main] minerGame экспортирован глобально');
-    }
-      
-    // Crush
-    if (typeof crushGame !== 'undefined' && !window.crushGame) {
-      window.crushGame = crushGame;
-      console.log('[Main] crushGame экспортирован глобально');
-    }
-    
-    // Диагностический вывод текущего состояния
-    console.log('[Main] Статус доступности игровых объектов:');
-    console.log('- slotsGame:', typeof window.slotsGame === 'object' ? 'доступен' : 'недоступен');
-    console.log('- rouletteGame:', typeof window.rouletteGame === 'object' ? 'доступен' : 'недоступен');
-    console.log('- guessNumberGame:', typeof window.guessNumberGame === 'object' ? 'доступен' : 'недоступен');
-    console.log('- minerGame:', typeof window.minerGame === 'object' ? 'доступен' : 'недоступен');
-    console.log('- crushGame:', typeof window.crushGame === 'object' ? 'доступен' : 'недоступен');
   };
   
   // Инициализация игр - УЛУЧШЕННАЯ ВЕРСИЯ
-  const initializeGames = () => {
+  const initializeGames = async () => {
     console.log('[Main] Инициализация игр');
     
     // Обновляем прогресс загрузки
-    if (window.appLoader && typeof window.appLoader.updateProgress === 'function') {
-      window.appLoader.updateProgress(75);
-    }
+    updateLoaderProgress(75);
     
-    // Инициализация игровых модулей
+    // Функция для безопасной инициализации игры
+    const safeInitGame = async (gameName, objectName) => {
+      try {
+        // Проверяем, существует ли объект в GreenLightGames (новый способ)
+        if (window.GreenLightGames && window.GreenLightGames[objectName]) {
+          const gameObject = window.GreenLightGames[objectName];
+          if (typeof gameObject.init === 'function') {
+            await gameObject.init();
+            console.log(`[Main] Игра ${gameName} инициализирована через GreenLightGames`);
+            gamesInitialized[gameName.toLowerCase()] = true;
+            return true;
+          }
+        }
+        
+        // Проверяем, существует ли объект в глобальном пространстве (старый способ)
+        if (window[objectName] && typeof window[objectName].init === 'function') {
+          await window[objectName].init();
+          console.log(`[Main] Игра ${gameName} инициализирована через глобальный объект`);
+          gamesInitialized[gameName.toLowerCase()] = true;
+          return true;
+        }
+        
+        console.warn(`[Main] Игра ${gameName} не доступна для инициализации`);
+        return false;
+      } catch (error) {
+        console.error(`[Main] Ошибка инициализации ${gameName}:`, error);
+        return false;
+      }
+    };
+    
+    // Инициализируем каждую игру безопасно (даже если одна игра вызовет ошибку, остальные будут работать)
     try {
-      // Логируем статус доступности игровых объектов перед инициализацией
-      console.log('[Main] Доступные игровые объекты:');
-      console.log('[Main] slotsGame:', typeof window.slotsGame);
-      console.log('[Main] rouletteGame:', typeof window.rouletteGame);
-      console.log('[Main] guessNumberGame:', typeof window.guessNumberGame);
-      console.log('[Main] minerGame:', typeof window.minerGame);
-      console.log('[Main] crushGame:', typeof window.crushGame);
-      
-      // Проверяем существование игровых объектов с дополнительной диагностикой
-      if (window.slotsGame && typeof window.slotsGame.init === 'function') {
-        try {
-          window.slotsGame.init();
-          gamesInitialized.slots = true;
-          console.log('[Main] Игра Slots инициализирована успешно');
-        } catch (slotError) {
-          console.error('[Main] Ошибка инициализации Slots:', slotError);
-        }
-      } else {
-        console.warn('[Main] Игра Slots не доступна:', window.slotsGame);
-      }
-      
-      if (window.rouletteGame && typeof window.rouletteGame.init === 'function') {
-        try {
-          window.rouletteGame.init();
-          gamesInitialized.roulette = true;
-          console.log('[Main] Игра Roulette инициализирована успешно');
-        } catch (rouletteError) {
-          console.error('[Main] Ошибка инициализации Roulette:', rouletteError);
-        }
-      } else {
-        console.warn('[Main] Игра Roulette не доступна:', window.rouletteGame);
-      }
-      
-      if (window.guessNumberGame && typeof window.guessNumberGame.init === 'function') {
-        try {
-          window.guessNumberGame.init();
-          gamesInitialized.guessnumber = true;
-          console.log('[Main] Игра Guess Number инициализирована успешно');
-        } catch (guessNumberError) {
-          console.error('[Main] Ошибка инициализации Guess Number:', guessNumberError);
-        }
-      } else {
-        console.warn('[Main] Игра Guess Number не доступна:', window.guessNumberGame);
-      }
-      
-      if (window.minerGame && typeof window.minerGame.init === 'function') {
-        try {
-          window.minerGame.init();
-          gamesInitialized.miner = true;
-          console.log('[Main] Игра Miner инициализирована успешно');
-        } catch (minerError) {
-          console.error('[Main] Ошибка инициализации Miner:', minerError);
-        }
-      } else {
-        console.warn('[Main] Игра Miner не доступна:', window.minerGame);
-      }
-      
-      if (window.crushGame && typeof window.crushGame.init === 'function') {
-        try {
-          window.crushGame.init();
-          gamesInitialized.crush = true;
-          console.log('[Main] Игра Crush инициализирована успешно');
-        } catch (crushError) {
-          console.error('[Main] Ошибка инициализации Crush:', crushError);
-        }
-      } else {
-        console.warn('[Main] Игра Crush не доступна:', window.crushGame);
-      }
+      // Используем Promise.allSettled для параллельной инициализации с обработкой ошибок
+      await Promise.allSettled([
+        safeInitGame('Slots', 'slotsGame'),
+        safeInitGame('Roulette', 'rouletteGame'),
+        safeInitGame('GuessNumber', 'guessNumberGame'),
+        safeInitGame('Miner', 'minerGame'),
+        safeInitGame('Crush', 'crushGame')
+      ]);
       
       // Обновляем прогресс загрузки
-      if (window.appLoader && typeof window.appLoader.updateProgress === 'function') {
-        window.appLoader.updateProgress(90);
-      }
+      updateLoaderProgress(90);
       
-      console.log('[Main] Статус инициализации игр:', gamesInitialized);
-      
-      // Если нет успешно инициализированных игр, выводим предупреждение
+      // Проверяем, инициализирована ли хотя бы одна игра
       const anyGameInitialized = Object.values(gamesInitialized).some(status => status === true);
+      
       if (!anyGameInitialized) {
         console.warn('[Main] Ни одна из игр не была успешно инициализирована!');
         console.warn('[Main] Это может быть связано с проблемами в загрузке скриптов или доступностью DOM-элементов');
+      } else {
+        console.log('[Main] Игры успешно инициализированы');
       }
-      
     } catch (error) {
-      console.error('[Main] Критическая ошибка при инициализации игр:', error);
+      console.error('[Main] Общая ошибка при инициализации игр:', error);
     }
   };
   
@@ -385,14 +312,7 @@ const casinoApp = (() => {
         }, 150);
         
         // Возвращаемся на главный экран
-        document.querySelectorAll('.screen').forEach(screen => {
-          screen.classList.remove('active');
-        });
-        
-        const welcomeScreen = document.getElementById('welcome-screen');
-        if (welcomeScreen) {
-          welcomeScreen.classList.add('active');
-        }
+        activateWelcomeScreen();
       });
     });
     
@@ -406,15 +326,7 @@ const casinoApp = (() => {
         console.log('[Main] Нажата кнопка "Home"');
         provideTactileFeedback('light');
         
-        document.querySelectorAll('.screen').forEach(screen => {
-          screen.classList.remove('active');
-        });
-        
-        const welcomeScreen = document.getElementById('welcome-screen');
-        if (welcomeScreen) {
-          welcomeScreen.classList.add('active');
-        }
-        
+        activateWelcomeScreen();
         updateActiveNavButton(homeBtn);
       });
     }
@@ -524,6 +436,36 @@ const casinoApp = (() => {
     }, 300);
   };
   
+  // Диагностика состояния игр
+  const diagnoseGames = () => {
+    console.log('[Main] Финальная диагностика инициализации игр:');
+    
+    // Проверяем доступность игр в глобальной области
+    const globalGames = {
+      slotsGame: typeof window.slotsGame,
+      rouletteGame: typeof window.rouletteGame,
+      guessNumberGame: typeof window.guessNumberGame,
+      minerGame: typeof window.minerGame,
+      crushGame: typeof window.crushGame
+    };
+    
+    console.log('[Main] Глобальные игровые объекты:', globalGames);
+    console.log('[Main] Статус инициализации игр:', gamesInitialized);
+    
+    // Проверяем новую систему регистрации игр
+    if (window.GreenLightGames) {
+      console.log('[Main] GreenLightGames:', {
+        slotsGame: typeof window.GreenLightGames.slotsGame,
+        rouletteGame: typeof window.GreenLightGames.rouletteGame,
+        guessNumberGame: typeof window.GreenLightGames.guessNumberGame,
+        minerGame: typeof window.GreenLightGames.minerGame,
+        crushGame: typeof window.GreenLightGames.crushGame
+      });
+    } else {
+      console.warn('[Main] GreenLightGames не определено!');
+    }
+  };
+  
   // Показ уведомления
   const showNotification = (message) => {
     console.log('[Main] Уведомление:', message);
@@ -605,6 +547,7 @@ const casinoApp = (() => {
     try {
       const balanceAmount = document.getElementById('balance-amount');
       const profileBalance = document.getElementById('profile-balance');
+      const userName = document.getElementById('user-name');
       
       if (balanceAmount) {
         balanceAmount.textContent = currentUser.balance;
@@ -618,6 +561,10 @@ const casinoApp = (() => {
       
       if (profileBalance) {
         profileBalance.textContent = currentUser.balance;
+      }
+      
+      if (userName) {
+        userName.textContent = currentUser.firstName;
       }
     } catch (error) {
       console.error('[Main] Ошибка обновления баланса:', error);
@@ -948,6 +895,9 @@ const casinoApp = (() => {
   };
 })();
 
+// Регистрируем casinoApp в глобальном пространстве имен
+window.casinoApp = casinoApp;
+
 // Запускаем инициализацию приложения при загрузке страницы
 document.addEventListener('DOMContentLoaded', function() {
   console.log('[Main] DOM полностью загружен');
@@ -957,21 +907,55 @@ document.addEventListener('DOMContentLoaded', function() {
     window.appLoader.updateProgress(5);
   }
   
-  // Делаем глобальный объект casinoApp
-  window.casinoApp = casinoApp;
-  
   // Инициализируем приложение
-  casinoApp.init();
+  casinoApp.init().catch(error => {
+    console.error('[Main] Ошибка при инициализации из DOMContentLoaded:', error);
+    
+    // В случае ошибки, принудительно удаляем экран загрузки через аварийный механизм
+    if (window.appLoader && typeof window.appLoader.forceRemoveLoading === 'function') {
+      window.appLoader.forceRemoveLoading();
+    }
+  });
 });
 
-// Дополнительный обработчик события загрузки
+// Дополнительный обработчик события загрузки для надежности
 window.addEventListener('load', function() {
   console.log('[Main] Страница полностью загружена');
   
   // Если приложение ещё не инициализировано, запускаем инициализацию
-  if (!window.casinoApp) {
+  if (!window.casinoApp || !window.casinoApp.init) {
+    console.error('[Main] casinoApp не найден к моменту загрузки страницы!');
+    
+    // Принудительно удаляем экран загрузки
+    if (window.appLoader && typeof window.appLoader.forceRemoveLoading === 'function') {
+      window.appLoader.forceRemoveLoading();
+    } else {
+      // Экстренное удаление экрана загрузки
+      const loadingOverlay = document.getElementById('loadingOverlay');
+      if (loadingOverlay) {
+        loadingOverlay.style.opacity = '0';
+        setTimeout(() => {
+          loadingOverlay.style.display = 'none';
+          
+          // Отображаем контент
+          const appContent = document.getElementById('app-content');
+          if (appContent) {
+            appContent.classList.add('loaded');
+          }
+        }, 300);
+      }
+    }
+  } else if (!window.casinoAppInitStarted) {
+    // Резервная инициализация, если по какой-то причине приложение не запустилось
     console.log('[Main] Инициализация через событие load');
-    window.casinoApp = casinoApp;
-    casinoApp.init();
+    window.casinoAppInitStarted = true;
+    casinoApp.init().catch(error => {
+      console.error('[Main] Ошибка при инициализации из window.load:', error);
+      
+      // В случае ошибки, принудительно удаляем экран загрузки через аварийный механизм
+      if (window.appLoader && typeof window.appLoader.forceRemoveLoading === 'function') {
+        window.appLoader.forceRemoveLoading();
+      }
+    });
   }
 });

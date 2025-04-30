@@ -1,11 +1,11 @@
-// Enhanced loader.js - надежная система удаления загрузочного экрана
-console.log('[Loader] Запущен улучшенный загрузчик');
+// Enhanced loader.js - улучшенная система удаления загрузочного экрана
+console.log('[Loader] Запущен улучшенный загрузчик v1.0.2');
 
 (function() {
   // Настройки загрузчика
   const CONFIG = {
     // Время до принудительного удаления экрана загрузки (мс)
-    EMERGENCY_TIMEOUT: 4000,
+    EMERGENCY_TIMEOUT: 6000,
     // Время анимации исчезновения (мс)
     FADE_DURATION: 300,
     // Минимальное время показа экрана загрузки (мс)
@@ -75,6 +75,10 @@ console.log('[Loader] Запущен улучшенный загрузчик');
       // Показываем 100% прогресс при любых обстоятельствах
       updateProgress(100);
       
+      // Проверяем готовность игровых объектов
+      const gamesReady = checkGamesReady();
+      console.log(`[Loader] Статус игровых объектов перед удалением: ${gamesReady ? 'готовы' : 'не готовы'}`);
+      
       // Ждем минимальное время перед скрытием
       setTimeout(() => {
         try {
@@ -106,6 +110,12 @@ console.log('[Loader] Запущен улучшенный загрузчик');
                 }
                 
                 console.log('[Loader] Загрузочный экран успешно удален, приложение отображено');
+                
+                // Дополнительная проверка инициализации игр
+                setTimeout(() => {
+                  const gamesReadyAfter = checkGamesReady();
+                  console.log(`[Loader] Статус игровых объектов после удаления: ${gamesReadyAfter ? 'готовы' : 'не готовы'}`);
+                }, 500);
               } catch (innerError) {
                 console.error('[Loader] Ошибка финальной обработки:', innerError);
               }
@@ -128,35 +138,96 @@ console.log('[Loader] Запущен улучшенный загрузчик');
     }
   }
   
-  // Экспортируем метод для вызова из main.js
+  // Проверка готовности игровых объектов
+  function checkGamesReady() {
+    // Проверяем наличие глобального хранилища игр
+    if (window.GreenLightGames) {
+      // Проверяем, зарегистрированы ли игры
+      let gamesCount = 0;
+      if (window.GreenLightGames.slotsGame) gamesCount++;
+      if (window.GreenLightGames.rouletteGame) gamesCount++;
+      if (window.GreenLightGames.guessNumberGame) gamesCount++;
+      if (window.GreenLightGames.minerGame) gamesCount++;
+      if (window.GreenLightGames.crushGame) gamesCount++;
+      
+      console.log(`[Loader] Зарегистрировано игр: ${gamesCount}/5`);
+      
+      // Если хотя бы одна игра зарегистрирована, считаем что всё в порядке
+      return gamesCount > 0;
+    }
+    
+    // Проверка старым способом (обратная совместимость)
+    const oldStyleGames = [
+      { name: 'slotsGame', obj: window.slotsGame },
+      { name: 'rouletteGame', obj: window.rouletteGame },
+      { name: 'guessNumberGame', obj: window.guessNumberGame },
+      { name: 'minerGame', obj: window.minerGame },
+      { name: 'crushGame', obj: window.crushGame }
+    ];
+    
+    const availableGames = oldStyleGames.filter(game => typeof game.obj === 'object' && game.obj !== null);
+    console.log(`[Loader] Доступно игр (старый стиль): ${availableGames.length}/5`);
+    
+    // Если хотя бы одна игра доступна, считаем что всё в порядке
+    return availableGames.length > 0;
+  }
+  
+  // Метод для вывода диагностики игр  
+  function logGamesDiagnostics() {
+    console.log('[Loader] Диагностика игровых объектов:');
+    
+    // Проверяем новый стиль
+    if (window.GreenLightGames) {
+      console.log('GreenLightGames:', {
+        slotsGame: !!window.GreenLightGames.slotsGame,
+        rouletteGame: !!window.GreenLightGames.rouletteGame,
+        guessNumberGame: !!window.GreenLightGames.guessNumberGame,
+        minerGame: !!window.GreenLightGames.minerGame,
+        crushGame: !!window.GreenLightGames.crushGame
+      });
+    } else {
+      console.log('GreenLightGames: не определено');
+    }
+    
+    // Проверяем старый стиль
+    console.log('Старый стиль:', {
+      slotsGame: typeof window.slotsGame,
+      rouletteGame: typeof window.rouletteGame,
+      guessNumberGame: typeof window.guessNumberGame,
+      minerGame: typeof window.minerGame,
+      crushGame: typeof window.crushGame
+    });
+  }
+  
+  // Экспортируем методы для вызова из main.js и других скриптов
   window.appLoader = {
     // Метод, который main.js может вызвать при успешной загрузке
     mainReady: function() {
       console.log('[Loader] Получено уведомление о готовности main.js');
       mainInitialized = true;
+      
+      // Выводим диагностику перед удалением экрана загрузки
+      logGamesDiagnostics();
+      
+      // Удаляем экран загрузки
       removeLoadingScreen();
     },
     
     // Метод для обновления прогресса из main.js
     updateProgress: updateProgress,
     
-    // Новый метод для проверки доступности игровых объектов
+    // Метод для ручной проверки игровых объектов
     checkGames: function() {
-      console.log('[Loader] Проверка доступности игровых объектов');
-      
-      // Диагностика игровых объектов
-      const games = {
-        slots: typeof window.slotsGame === 'object',
-        roulette: typeof window.rouletteGame === 'object',
-        guessnumber: typeof window.guessNumberGame === 'object',
-        miner: typeof window.minerGame === 'object',
-        crush: typeof window.crushGame === 'object'
-      };
-      
-      // Вывод результатов в консоль
-      console.log('[Loader] Результаты проверки:', games);
-      
-      return games;
+      console.log('[Loader] Запрошена проверка доступности игровых объектов');
+      const status = checkGamesReady();
+      logGamesDiagnostics();
+      return status;
+    },
+    
+    // Метод для принудительного удаления экрана загрузки
+    forceRemoveLoading: function() {
+      console.log('[Loader] Принудительное удаление экрана загрузки');
+      removeLoadingScreen();
     }
   };
   
@@ -165,6 +236,7 @@ console.log('[Loader] Запущен улучшенный загрузчик');
     setTimeout(() => {
       if (!loadingRemoved) {
         console.warn('[Loader] Сработал аварийный таймер! main.js не смог завершить загрузку');
+        logGamesDiagnostics(); // Выводим диагностику перед принудительным удалением
         removeLoadingScreen();
       }
     }, CONFIG.EMERGENCY_TIMEOUT);
@@ -184,6 +256,7 @@ console.log('[Loader] Запущен улучшенный загрузчик');
         setTimeout(() => {
           if (!loadingRemoved) {
             console.warn('[Loader] Экран загрузки все еще присутствует после window.load');
+            logGamesDiagnostics(); // Выводим диагностику перед удалением экрана
             removeLoadingScreen();
           }
         }, 1000); // Дополнительная секунда для main.js
