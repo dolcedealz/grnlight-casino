@@ -1,12 +1,13 @@
 /**
  * crush.js - Оптимизированная версия игры Crush
- * Версия 2.0.0
+ * Версия 2.0.1
  * 
  * Особенности:
  * - Неблокирующая инициализация
  * - Улучшенная обработка ошибок
  * - Таймауты для всех асинхронных операций
  * - Совместимость с новой системой регистрации игр
+ * - Динамическое создание необходимых DOM-элементов
  */
 
 // Предотвращаем возможные конфликты и обеспечиваем изолированную среду
@@ -23,7 +24,7 @@
   }
   
   const app = window.GreenLightApp;
-  app.log('Crush', 'Инициализация модуля игры Crush v2.0.0');
+  app.log('Crush', 'Инициализация модуля игры Crush v2.0.1');
   
   // Игровая логика в замыкании для изоляции
   const crushGame = (function() {
@@ -34,7 +35,8 @@
           crushBet: null,
           multiplierDisplay: null,
           crushGraph: null,
-          crushResult: null
+          crushResult: null,
+          container: null
       };
       
       // Элементы для графика
@@ -57,6 +59,267 @@
       // История игр
       let gameHistory = [];
       const MAX_HISTORY = 10;
+
+      /**
+       * Создание основного контейнера для игры
+       */
+      const createGameContainer = function() {
+          try {
+              // Проверяем, существует ли уже контейнер
+              let container = document.querySelector('.crush-container');
+              if (container) {
+                  elements.container = container;
+                  return container;
+              }
+              
+              // Ищем место для размещения контейнера
+              let gameArea = document.querySelector('.games-area');
+              if (!gameArea) {
+                  // Если игровой зоны нет, создаем её
+                  gameArea = document.createElement('div');
+                  gameArea.className = 'games-area';
+                  
+                  // Ищем основной контейнер приложения
+                  const appContainer = document.querySelector('.app-container');
+                  if (appContainer) {
+                      appContainer.appendChild(gameArea);
+                  } else {
+                      // Если нет специального контейнера, добавляем в body
+                      document.body.appendChild(gameArea);
+                  }
+                  
+                  app.log('Crush', 'Создана общая игровая зона');
+              }
+              
+              // Создаем контейнер для игры
+              container = document.createElement('div');
+              container.className = 'crush-container game-container';
+              gameArea.appendChild(container);
+              
+              elements.container = container;
+              app.log('Crush', 'Создан основной контейнер для игры');
+              
+              return container;
+          } catch (error) {
+              app.log('Crush', `Ошибка создания контейнера: ${error.message}`, true);
+              return null;
+          }
+      };
+      
+      /**
+       * Создание интерфейса игры
+       */
+      const createGameInterface = function() {
+          try {
+              const container = elements.container || createGameContainer();
+              if (!container) {
+                  app.log('Crush', 'Невозможно создать интерфейс: контейнер не найден', true);
+                  return false;
+              }
+              
+              // Проверяем, не создан ли уже интерфейс
+              if (container.querySelector('#crush-graph')) {
+                  app.log('Crush', 'Интерфейс уже создан');
+                  return true;
+              }
+              
+              // Создаем HTML разметку для игры
+              container.innerHTML = `
+                  <h2>Crush</h2>
+                  <div class="game-controls">
+                      <div class="bet-control">
+                          <label for="crush-bet">Ставка:</label>
+                          <input type="number" id="crush-bet" min="1" max="1000" value="10">
+                      </div>
+                      
+                      <div class="multiplier-container">
+                          <span>Множитель: <span id="multiplier">1.00</span>x</span>
+                      </div>
+                      
+                      <div class="crush-buttons">
+                          <button id="start-crush-btn" class="action-btn">СТАРТ</button>
+                          <button id="cash-crush-btn" class="action-btn" disabled>ЗАБРАТЬ</button>
+                      </div>
+                  </div>
+                  
+                  <div id="crush-graph" class="crush-graph">
+                      <!-- Canvas будет создан динамически -->
+                  </div>
+                  
+                  <div class="crush-history">
+                      <h3>История</h3>
+                      <div class="history-items"></div>
+                  </div>
+                  
+                  <div id="crush-result" class="result"></div>
+              `;
+              
+              // Создаем стили, если их еще нет
+              if (!document.getElementById('crush-styles')) {
+                  const styleElement = document.createElement('style');
+                  styleElement.id = 'crush-styles';
+                  styleElement.textContent = `
+                      .crush-container {
+                          padding: 15px;
+                          margin: 10px auto;
+                          border: 1px solid #ccc;
+                          border-radius: 8px;
+                          max-width: 500px;
+                          box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+                      }
+                      
+                      .game-controls {
+                          margin-bottom: 15px;
+                          display: flex;
+                          flex-direction: column;
+                          gap: 10px;
+                      }
+                      
+                      .action-btn {
+                          padding: 10px 15px;
+                          background-color: #4CAF50;
+                          color: white;
+                          border: none;
+                          border-radius: 4px;
+                          cursor: pointer;
+                          font-weight: bold;
+                      }
+                      
+                      .action-btn:disabled {
+                          background-color: #cccccc;
+                          cursor: not-allowed;
+                      }
+                      
+                      .action-btn.disabled {
+                          background-color: #cccccc;
+                          cursor: not-allowed;
+                      }
+                      
+                      .multiplier-container {
+                          font-size: 18px;
+                          font-weight: bold;
+                          text-align: center;
+                          margin: 10px 0;
+                      }
+                      
+                      #multiplier.active {
+                          color: #4CAF50;
+                      }
+                      
+                      #multiplier.crashed {
+                          color: #F44336;
+                      }
+                      
+                      #multiplier.cashed-out {
+                          color: #2196F3;
+                      }
+                      
+                      #multiplier.low {
+                          color: #4CAF50;
+                      }
+                      
+                      #multiplier.medium {
+                          color: #FFC107;
+                      }
+                      
+                      #multiplier.high {
+                          color: #FF9800;
+                      }
+                      
+                      #multiplier.extreme {
+                          color: #F44336;
+                      }
+                      
+                      .crush-graph {
+                          width: 100%;
+                          height: 200px;
+                          border: 1px solid #ccc;
+                          border-radius: 4px;
+                          margin: 15px 0;
+                          position: relative;
+                          background-color: #f9f9f9;
+                      }
+                      
+                      .crush-history {
+                          margin-top: 20px;
+                      }
+                      
+                      .history-items {
+                          display: flex;
+                          flex-wrap: wrap;
+                          gap: 5px;
+                          margin-top: 10px;
+                      }
+                      
+                      .history-item {
+                          width: 50px;
+                          height: 25px;
+                          border-radius: 4px;
+                          display: flex;
+                          align-items: center;
+                          justify-content: center;
+                          font-size: 12px;
+                          font-weight: bold;
+                          color: white;
+                      }
+                      
+                      .history-item.crashed {
+                          background-color: #ef5350;
+                      }
+                      
+                      .history-item.cashed-out {
+                          background-color: #66bb6a;
+                      }
+                      
+                      .history-item.low {
+                          opacity: 0.7;
+                      }
+                      
+                      .history-item.medium {
+                          opacity: 0.8;
+                      }
+                      
+                      .history-item.high {
+                          opacity: 0.9;
+                      }
+                      
+                      .history-item.extreme {
+                          opacity: 1;
+                      }
+                      
+                      .result {
+                          margin-top: 15px;
+                          padding: 10px;
+                          border-radius: 4px;
+                          text-align: center;
+                      }
+                      
+                      .result.win {
+                          background-color: rgba(76, 175, 80, 0.2);
+                          color: #4CAF50;
+                      }
+                      
+                      .result.lose {
+                          background-color: rgba(244, 67, 54, 0.2);
+                          color: #F44336;
+                      }
+                      
+                      .crash-info {
+                          margin-top: 10px;
+                          font-size: 14px;
+                          color: #757575;
+                      }
+                  `;
+                  document.head.appendChild(styleElement);
+              }
+              
+              app.log('Crush', 'Интерфейс игры успешно создан');
+              return true;
+          } catch (error) {
+              app.log('Crush', `Ошибка создания интерфейса: ${error.message}`, true);
+              return false;
+          }
+      };
       
       /**
        * Инициализация игры
@@ -76,7 +339,14 @@
               // Устанавливаем таймаут для инициализации
               const initPromise = new Promise(async (resolve) => {
                   try {
-                      // Получаем элементы DOM (с проверкой наличия)
+                      // Сначала создаем интерфейс
+                      if (!createGameInterface()) {
+                          app.log('Crush', 'Не удалось создать интерфейс игры', true);
+                          resolve(false);
+                          return;
+                      }
+                      
+                      // Затем получаем элементы DOM
                       await findDOMElements();
                       
                       // Создаем canvas для графика
@@ -143,13 +413,17 @@
                       elements.crushGraph = document.getElementById('crush-graph');
                       elements.crushResult = document.getElementById('crush-result');
                       
-                      // Проверяем критические элементы
+                      // Проверяем критические элементы и логируем их статус
                       if (!elements.startBtn) {
                           app.log('Crush', 'Предупреждение: элемент start-crush-btn не найден', true);
+                      } else {
+                          app.log('Crush', 'Элемент start-crush-btn найден успешно');
                       }
                       
                       if (!elements.crushGraph) {
                           app.log('Crush', 'Предупреждение: элемент crush-graph не найден', true);
+                      } else {
+                          app.log('Crush', 'Элемент crush-graph найден успешно');
                       }
                       
                       resolve();
@@ -167,7 +441,7 @@
       const setupCanvas = function() {
           try {
               if (!elements.crushGraph) {
-                  app.log('Crush', 'Элемент графика не найден', true);
+                  app.log('Crush', 'Элемент графика не найден, невозможно настроить canvas', true);
                   return;
               }
               
@@ -212,6 +486,9 @@
                   
                   // Добавляем обработчик
                   elements.startBtn.addEventListener('click', startGame);
+                  app.log('Crush', 'Обработчик для кнопки старта установлен');
+              } else {
+                  app.log('Crush', 'Невозможно установить обработчик: кнопка старта не найдена', true);
               }
               
               // Кнопка вывода
@@ -223,6 +500,9 @@
                   elements.cashoutBtn = newCashoutBtn;
                   
                   elements.cashoutBtn.addEventListener('click', cashout);
+                  app.log('Crush', 'Обработчик для кнопки вывода установлен');
+              } else {
+                  app.log('Crush', 'Невозможно установить обработчик: кнопка вывода не найдена', true);
               }
               
               // Обработчик изменения размера окна
@@ -260,7 +540,7 @@
       const createHistoryUI = function() {
           try {
               // Проверяем, существует ли контейнер игры
-              const crushContainer = document.querySelector('.crush-container');
+              const crushContainer = elements.container || document.querySelector('.crush-container');
               if (!crushContainer) {
                   app.log('Crush', 'Контейнер игры не найден', true);
                   return;
@@ -431,6 +711,30 @@
       };
       
       /**
+       * Проверка и создание объекта casinoApp, если он отсутствует
+       */
+      const ensureCasinoApp = function() {
+          if (window.casinoApp) return true;
+          
+          // Создаем минимальную реализацию casinoApp, если объект отсутствует
+          app.log('Crush', 'casinoApp не найден, создаем временную реализацию', true);
+          window.casinoApp = {
+              showNotification: function(message) {
+                  alert(message);
+              },
+              provideTactileFeedback: function() {
+                  // Заглушка для вибрации
+              },
+              processGameResult: function(gameType, bet, result, win, data) {
+                  app.log('Crush', `Игра: ${gameType}, Ставка: ${bet}, Результат: ${result}, Выигрыш: ${win}`, false);
+                  return Promise.resolve({success: true});
+              }
+          };
+          
+          return true;
+      };
+      
+      /**
        * Начало игры
        */
       const startGame = async function() {
@@ -450,9 +754,7 @@
           
           try {
               // Проверка наличия casinoApp
-              if (!window.casinoApp) {
-                  app.log('Crush', 'casinoApp не найден', true);
-                  alert('Ошибка инициализации приложения');
+              if (!ensureCasinoApp()) {
                   return;
               }
               
@@ -477,8 +779,9 @@
                   return;
               }
               
-              // Проверяем, достаточно ли средств
-              if (state.betAmount > window.GreenLightApp.user.balance) {
+              // Проверяем, достаточно ли средств (если есть информация о балансе)
+              if (window.GreenLightApp && window.GreenLightApp.user && 
+                  state.betAmount > window.GreenLightApp.user.balance) {
                   window.casinoApp.showNotification('Недостаточно средств для ставки');
                   return;
               }
@@ -500,6 +803,7 @@
               // Обновляем интерфейс
               if (elements.startBtn) {
                   elements.startBtn.disabled = true;
+                  elementselements.startBtn.disabled = true;
                   elements.startBtn.classList.add('disabled');
               }
               
@@ -803,8 +1107,7 @@
               if (!state.isPlaying) return;
               
               // Проверяем наличие casinoApp
-              if (!window.casinoApp) {
-                  app.log('Crush', 'casinoApp не найден', true);
+              if (!ensureCasinoApp()) {
                   return;
               }
               
@@ -948,8 +1251,7 @@
               if (!state.isPlaying) return;
               
               // Проверяем наличие casinoApp
-              if (!window.casinoApp) {
-                  app.log('Crush', 'casinoApp не найден', true);
+              if (!ensureCasinoApp()) {
                   return;
               }
               
@@ -1199,6 +1501,26 @@
       
       // 3. Сообщаем в лог о завершении загрузки модуля
       app.log('Crush', 'Модуль успешно загружен и готов к инициализации');
+      
+      // 4. Автоматическая инициализация при загрузке страницы
+      document.addEventListener('DOMContentLoaded', function() {
+          setTimeout(() => {
+              if (!crushGame.getStatus().initialized && !crushGame.getStatus().initializationStarted) {
+                  app.log('Crush', 'Запускаем автоматическую инициализацию');
+                  crushGame.init();
+              }
+          }, 500);
+      });
+      
+      // 5. Если DOM уже загружен, запускаем инициализацию сразу
+      if (document.readyState === 'complete' || document.readyState === 'interactive') {
+          setTimeout(() => {
+              if (!crushGame.getStatus().initialized && !crushGame.getStatus().initializationStarted) {
+                  app.log('Crush', 'Запускаем автоматическую инициализацию (DOM уже загружен)');
+                  crushGame.init();
+              }
+          }, 500);
+      }
       
   } catch (error) {
       app.log('Crush', `Ошибка регистрации игры: ${error.message}`, true);
