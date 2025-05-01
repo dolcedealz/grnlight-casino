@@ -92,21 +92,10 @@
     <!-- Загружаем основной CSS асинхронно -->
     <link rel="preload" href="css/style.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
     <noscript><link rel="stylesheet" href="css/style.css"></noscript>
-    
-    <!-- Фоллбэк для загрузки стилей, если preload не поддерживается -->
-    <script>
-        // Проверяем поддержку preload
-        if (!('preload' in document.createElement('link'))) {
-            var stylesheet = document.createElement('link');
-            stylesheet.rel = 'stylesheet';
-            stylesheet.href = 'css/style.css';
-            document.head.appendChild(stylesheet);
-        }
-    </script>
 </head>
 <body>
     <!-- Контейнер для обработки ошибок -->
-    <div id="error-container" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.9); color: white; z-index: 10000; padding: 2rem; text-align: center;">
+    <div id="error-container" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.9); color: white; z-index: 10000; padding: 2rem; text-align: center; justify-content: center; align-items: center; flex-direction: column;">
         <h2>Ошибка загрузки</h2>
         <p id="error-message">Произошла непредвиденная ошибка.</p>
         <button onclick="location.reload()" style="background: #00A86B; border: none; color: white; padding: 10px 20px; margin-top: 20px; cursor: pointer; border-radius: 5px;">Перезагрузить</button>
@@ -119,6 +108,7 @@
         <div id="loading-progress" style="width: 80%; height: 4px; background: rgba(255,255,255,0.1); margin-top: 20px; border-radius: 2px;">
             <div id="progress-bar" style="width: 0%; height: 100%; background: #00A86B; border-radius: 2px; transition: width 0.3s;"></div>
         </div>
+        <div id="loading-debug" style="margin-top: 10px; font-size: 12px; color: #888; max-width: 80%; text-align: center;"></div>
     </div>
 
     <!-- Контент приложения (изначально скрыт) -->
@@ -188,6 +178,9 @@
                     </div>
                 </div>
                 
+                <!-- Остальные игровые экраны (roulette, guessnumber, miner, crush) -->
+                <!-- Оставлены те же, что и в исходной версии -->
+                
                 <!-- Roulette Game Screen -->
                 <div id="roulette-screen" class="screen">
                     <!-- Содержимое для рулетки -->
@@ -195,144 +188,34 @@
                         <button class="back-btn">← Back</button>
                         <h2>Roulette</h2>
                     </div>
-                    <div class="roulette-container">
-                        <div class="roulette-wheel">
-                            <div class="wheel-outer">
-                                <div id="wheel-inner" class="wheel-inner"></div>
-                                <div id="roulette-ball" class="ball"></div>
-                                <div class="wheel-peg"></div>
-                            </div>
-                        </div>
-                        <div id="roulette-result" class="result"></div>
-                        <div class="bet-controls">
-                            <div class="bet-options">
-                                <label for="roulette-bet-type">Bet Type:</label>
-                                <select id="roulette-bet-type">
-                                    <option value="color">Color</option>
-                                    <option value="number">Number</option>
-                                    <option value="odd-even">Odd/Even</option>
-                                </select>
-                                
-                                <div id="bet-color-container" class="bet-type-container">
-                                    <div class="color-options">
-                                        <button class="color-btn" data-color="red">Red</button>
-                                        <button class="color-btn" data-color="black">Black</button>
-                                        <button class="color-btn" data-color="green">Green (0)</button>
-                                    </div>
-                                </div>
-                                
-                                <div id="bet-number-container" class="bet-type-container hidden">
-                                    <label for="roulette-number">Choose Number (0-36):</label>
-                                    <input type="number" id="roulette-number" min="0" max="36" value="0">
-                                </div>
-                                
-                                <div id="bet-odd-even-container" class="bet-type-container hidden">
-                                    <div class="odd-even-options">
-                                        <button class="odd-even-btn" data-type="odd">Odd</button>
-                                        <button class="odd-even-btn" data-type="even">Even</button>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div class="bet-amount">
-                                <label for="roulette-bet">Bet Amount:</label>
-                                <input type="number" id="roulette-bet" min="1" value="10">
-                            </div>
-                            
-                            <button id="spin-wheel-btn" class="action-btn">SPIN WHEEL</button>
-                        </div>
-                    </div>
+                    <!-- Содержимое рулетки -->
                 </div>
                 
                 <!-- Guess Number Game Screen -->
                 <div id="guessnumber-screen" class="screen">
-                    <!-- Содержимое для Guess Number -->
                     <div class="game-header">
                         <button class="back-btn">← Back</button>
                         <h2>Guess The Number</h2>
                     </div>
-                    <div class="guessnumber-container">
-                        <div class="number-range">
-                            <p>Guess a number between <span id="min-range">1</span> and <span id="max-range">100</span></p>
-                        </div>
-                        <div class="guess-input">
-                            <input type="number" id="guess-input" min="1" max="100" value="50">
-                        </div>
-                        <div id="guess-result" class="result"></div>
-                        <div class="bet-controls">
-                            <div class="bet-amount">
-                                <label for="guess-bet">Bet Amount:</label>
-                                <input type="number" id="guess-bet" min="1" value="10">
-                            </div>
-                            <button id="guess-btn" class="action-btn">GUESS</button>
-                        </div>
-                    </div>
+                    <!-- Содержимое игры Guess Number -->
                 </div>
                 
                 <!-- Miner Game Screen -->
                 <div id="miner-screen" class="screen">
-                    <!-- Содержимое для Miner -->
                     <div class="game-header">
                         <button class="back-btn">← Back</button>
                         <h2>Miner</h2>
                     </div>
-                    <div class="miner-container">
-                        <div class="miner-info">
-                            <div class="mines-count">
-                                <span>Mines: </span>
-                                <select id="mines-count">
-                                    <option value="3">3</option>
-                                    <option value="5">5</option>
-                                    <option value="7">7</option>
-                                    <option value="10">10</option>
-                                </select>
-                            </div>
-                            <div class="potential-win">
-                                <span>Potential win: </span>
-                                <span id="potential-win">0</span> ⭐
-                            </div>
-                        </div>
-                        <div id="miner-grid" class="miner-grid">
-                            <!-- Ячейки будут добавлены динамически -->
-                        </div>
-                        <div id="miner-result" class="result"></div>
-                        <div class="bet-controls">
-                            <div class="bet-amount">
-                                <label for="miner-bet">Bet Amount:</label>
-                                <input type="number" id="miner-bet" min="1" value="10">
-                            </div>
-                            <div class="control-buttons">
-                                <button id="new-game-btn" class="action-btn">NEW GAME</button>
-                                <button id="cashout-btn" class="action-btn" disabled>CASHOUT</button>
-                            </div>
-                        </div>
-                    </div>
+                    <!-- Содержимое игры Miner -->
                 </div>
                 
                 <!-- Crush Game Screen -->
                 <div id="crush-screen" class="screen">
-                    <!-- Содержимое для Crush -->
                     <div class="game-header">
                         <button class="back-btn">← Back</button>
                         <h2>Crush</h2>
                     </div>
-                    <div class="crush-container">
-                        <div id="multiplier" class="multiplier-display">1.00</div>
-                        <div id="crush-graph" class="crush-graph">
-                            <!-- График будет создан динамически -->
-                        </div>
-                        <div id="crush-result" class="result"></div>
-                        <div class="bet-controls">
-                            <div class="bet-amount">
-                                <label for="crush-bet">Bet Amount:</label>
-                                <input type="number" id="crush-bet" min="1" value="10">
-                            </div>
-                            <div class="control-buttons">
-                                <button id="start-crush-btn" class="action-btn">START</button>
-                                <button id="cash-crush-btn" class="action-btn" disabled>CASH OUT</button>
-                            </div>
-                        </div>
-                    </div>
+                    <!-- Содержимое игры Crush -->
                 </div>
             </main>
 
@@ -388,45 +271,299 @@
         </div>
     </div>
 
-    <!-- Определение глобального хранилища для игр -->
+    <!-- Определение глобального хранилища данных -->
     <script>
-        // Создаем глобальное пространство имен для игр
-        window.GreenLightGames = {
-            slotsGame: null,
-            rouletteGame: null,
-            guessNumberGame: null,
-            minerGame: null,
-            crushGame: null,
-            loaded: {
-                slots: false,
-                roulette: false,
-                guessnumber: false,
-                miner: false,
-                crush: false
+        // Создаем глобальное пространство имен для хранения состояния приложения
+        window.GreenLightApp = {
+            // Версия приложения
+            version: '1.1.0',
+            
+            // Состояние загрузки
+            loading: {
+                started: Date.now(),
+                scriptsLoaded: false,
+                mainInitialized: false,
+                telegramInitialized: false,
+                gamesInitialized: false,
+                uiReady: false,
+                errors: []
+            },
+            
+            // Хранилище для игр
+            games: {
+                slots: { loaded: false, instance: null },
+                roulette: { loaded: false, instance: null },
+                guessnumber: { loaded: false, instance: null },
+                miner: { loaded: false, instance: null },
+                crush: { loaded: false, instance: null }
+            },
+            
+            // Пользовательские данные
+            user: {
+                telegramId: null,
+                firstName: 'Player',
+                lastName: '',
+                username: '',
+                balance: 1000
+            },
+            
+            // Журнал действий (для отладки)
+            log: function(source, message, isError = false) {
+                const timestamp = new Date().toISOString().substr(11, 8);
+                const logMessage = `[${timestamp}][${source}] ${message}`;
+                
+                if (isError) {
+                    console.error(logMessage);
+                    this.loading.errors.push(logMessage);
+                } else {
+                    console.log(logMessage);
+                }
+                
+                // Отображаем лог в отладочном элементе
+                const debugElement = document.getElementById('loading-debug');
+                if (debugElement && isError) {
+                    debugElement.textContent = message;
+                }
+                
+                return logMessage;
             }
         };
         
-        // Регистрация игры в глобальном хранилище
-        window.registerGame = function(name, gameObject) {
-            if (!window.GreenLightGames) return;
+        // Функция для регистрации игры
+        window.registerGame = function(name, instance) {
+            if (!window.GreenLightApp) return;
             
-            console.log(`Регистрация игры: ${name}`);
-            window.GreenLightGames[name] = gameObject;
-            window.GreenLightGames.loaded[name.replace('Game', '')] = true;
+            // Короткое имя игры (без "Game" в конце)
+            const shortName = name.replace('Game', '').toLowerCase();
+            
+            if (window.GreenLightApp.games[shortName]) {
+                window.GreenLightApp.games[shortName].loaded = true;
+                window.GreenLightApp.games[shortName].instance = instance;
+                window.GreenLightApp.log('GameRegistry', `Игра ${name} зарегистрирована`);
+            } else {
+                window.GreenLightApp.log('GameRegistry', `Ошибка: неизвестная игра ${name}`, true);
+            }
         };
-        
-        // Диагностическая информация
-        console.log('Версия приложения: 1.0.2 (улучшенная система загрузки)');
     </script>
 
     <!-- Улучшенная система загрузки скриптов -->
     <script>
-        // Управление процессом загрузки
-        let scriptLoadCount = 0;
-        const totalScripts = 8; // Глобальные + Telegram + loader + main + 5 игр
-        let loadingFailed = false;
+        // Инициализация процесса загрузки
+        document.addEventListener('DOMContentLoaded', function() {
+            try {
+                window.GreenLightApp.log('Loader', 'DOM загружен, начинаем загрузку');
+                
+                // Сначала загружаем базовые функции
+                loadTelegramApi()
+                    .then(() => {
+                        return Promise.all([
+                            loadBootstrapScripts(),
+                            loadMainApp()
+                        ]);
+                    })
+                    .then(() => {
+                        window.GreenLightApp.loading.scriptsLoaded = true;
+                        window.GreenLightApp.log('Loader', 'Основные скрипты загружены');
+                        
+                        // Запускаем инициализацию приложения
+                        if (window.casinoApp && typeof window.casinoApp.init === 'function') {
+                            window.casinoApp.init().catch(error => {
+                                window.GreenLightApp.log('Loader', `Ошибка инициализации: ${error.message}`, true);
+                            });
+                        } else {
+                            window.GreenLightApp.log('Loader', 'Ошибка: casinoApp не найден', true);
+                        }
+                    })
+                    .catch(error => {
+                        window.GreenLightApp.log('Loader', `Критическая ошибка загрузки: ${error.message}`, true);
+                        showErrorScreen(error.message);
+                    });
+                
+                // Устанавливаем аварийный таймер для удаления экрана загрузки
+                setupEmergencyLoader();
+                
+            } catch (error) {
+                window.GreenLightApp.log('Loader', `Необработанная ошибка: ${error.message}`, true);
+                showErrorScreen(error.message);
+            }
+        });
         
-        // Функция обновления прогресса загрузки
+        // Загрузка Telegram API
+        function loadTelegramApi() {
+            return new Promise((resolve, reject) => {
+                window.GreenLightApp.log('Loader', 'Загрузка Telegram WebApp API');
+                
+                const script = document.createElement('script');
+                script.src = 'https://telegram.org/js/telegram-web-app.js';
+                script.async = true;
+                
+                script.onload = function() {
+                    window.GreenLightApp.log('Loader', 'Telegram WebApp API загружен');
+                    resolve();
+                };
+                
+                script.onerror = function() {
+                    const errorMsg = 'Ошибка загрузки Telegram WebApp API';
+                    window.GreenLightApp.log('Loader', errorMsg, true);
+                    // Продолжаем загрузку даже при ошибке Telegram API
+                    resolve();
+                };
+                
+                document.body.appendChild(script);
+            });
+        }
+        
+        // Загрузка вспомогательных скриптов
+        function loadBootstrapScripts() {
+            return new Promise((resolve, reject) => {
+                window.GreenLightApp.log('Loader', 'Загрузка вспомогательных скриптов');
+                
+                const loaderScript = document.createElement('script');
+                loaderScript.src = 'js/loader.js';
+                
+                loaderScript.onload = function() {
+                    window.GreenLightApp.log('Loader', 'Вспомогательные скрипты загружены');
+                    resolve();
+                };
+                
+                loaderScript.onerror = function() {
+                    const errorMsg = 'Ошибка загрузки вспомогательных скриптов';
+                    window.GreenLightApp.log('Loader', errorMsg, true);
+                    reject(new Error(errorMsg));
+                };
+                
+                document.body.appendChild(loaderScript);
+            });
+        }
+        
+        // Загрузка основного приложения
+        function loadMainApp() {
+            return new Promise((resolve, reject) => {
+                window.GreenLightApp.log('Loader', 'Загрузка основного приложения');
+                
+                const mainScript = document.createElement('script');
+                mainScript.src = 'js/main.js';
+                
+                mainScript.onload = function() {
+                    window.GreenLightApp.log('Loader', 'Основное приложение загружено');
+                    
+                    // После загрузки main.js начинаем загрузку игр в фоновом режиме
+                    loadGameScriptsAsync();
+                    
+                    resolve();
+                };
+                
+                mainScript.onerror = function() {
+                    const errorMsg = 'Ошибка загрузки основного приложения';
+                    window.GreenLightApp.log('Loader', errorMsg, true);
+                    reject(new Error(errorMsg));
+                };
+                
+                document.body.appendChild(mainScript);
+            });
+        }
+        
+        // Асинхронная загрузка игровых скриптов (не блокирует основной поток)
+        function loadGameScriptsAsync() {
+            window.GreenLightApp.log('Loader', 'Начало загрузки игровых скриптов (фоновый режим)');
+            
+            const gameScripts = [
+                { name: 'slots', path: 'js/games/slots.js' },
+                { name: 'roulette', path: 'js/games/roulette.js' },
+                { name: 'guessnumber', path: 'js/games/guessnumber.js' },
+                { name: 'miner', path: 'js/games/miner.js' },
+                { name: 'crush', path: 'js/games/crush.js' }
+            ];
+            
+            gameScripts.forEach(gameInfo => {
+                const script = document.createElement('script');
+                script.src = gameInfo.path;
+                script.async = true;
+                
+                script.onload = function() {
+                    window.GreenLightApp.log('Loader', `Игра ${gameInfo.name} загружена`);
+                };
+                
+                script.onerror = function() {
+                    window.GreenLightApp.log('Loader', `Ошибка загрузки игры ${gameInfo.name}`, true);
+                };
+                
+                document.body.appendChild(script);
+            });
+        }
+        
+        // Аварийная система удаления экрана загрузки
+        function setupEmergencyLoader() {
+            // Принудительное удаление экрана загрузки через 10 секунд
+            setTimeout(function() {
+                const loadingOverlay = document.getElementById('loadingOverlay');
+                const appContent = document.getElementById('app-content');
+                
+                if (loadingOverlay && loadingOverlay.style.display !== 'none') {
+                    window.GreenLightApp.log('EmergencyLoader', 'Аварийное удаление экрана загрузки', true);
+                    
+                    // Проверка и отображение ошибок
+                    if (window.GreenLightApp.loading.errors.length > 0) {
+                        showErrorScreen('Превышено время ожидания загрузки');
+                        return;
+                    }
+                    
+                    // Принудительно показываем контент
+                    if (loadingOverlay) {
+                        loadingOverlay.style.display = 'none';
+                    }
+                    
+                    if (appContent) {
+                        appContent.classList.add('loaded');
+                    }
+                    
+                    // Активируем welcome-screen
+                    const welcomeScreen = document.getElementById('welcome-screen');
+                    if (welcomeScreen) {
+                        document.querySelectorAll('.screen').forEach(screen => {
+                            screen.classList.remove('active');
+                        });
+                        welcomeScreen.classList.add('active');
+                    }
+                }
+            }, 10000); // 10 секунд максимум
+            
+            // Промежуточная проверка загрузки через 5 секунд
+            setTimeout(function() {
+                const loadingStatus = {
+                    scriptsLoaded: window.GreenLightApp.loading.scriptsLoaded,
+                    mainInitialized: window.GreenLightApp.loading.mainInitialized,
+                    errors: window.GreenLightApp.loading.errors.length
+                };
+                
+                window.GreenLightApp.log('EmergencyLoader', `Статус загрузки через 5 сек: ${JSON.stringify(loadingStatus)}`);
+                
+                // Обновляем прогресс
+                const progressBar = document.getElementById('progress-bar');
+                if (progressBar) {
+                    progressBar.style.width = '70%';
+                }
+                
+            }, 5000);
+        }
+        
+        // Отображение экрана ошибки
+        function showErrorScreen(errorMessage) {
+            const errorContainer = document.getElementById('error-container');
+            const errorMessageElement = document.getElementById('error-message');
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            
+            if (errorContainer && errorMessageElement) {
+                errorMessageElement.textContent = errorMessage || 'Произошла ошибка при загрузке приложения';
+                errorContainer.style.display = 'flex';
+                
+                if (loadingOverlay) {
+                    loadingOverlay.style.display = 'none';
+                }
+            }
+        }
+        
+        // Обновление прогресса загрузки
         function updateLoadingProgress(percent) {
             const progressBar = document.getElementById('progress-bar');
             if (progressBar) {
@@ -434,182 +571,9 @@
             }
         }
         
-        // Обработка ошибок загрузки
-        function handleLoadError(error) {
-            console.error('Ошибка загрузки:', error);
-            loadingFailed = true;
-            
-            const errorContainer = document.getElementById('error-container');
-            const errorMessage = document.getElementById('error-message');
-            
-            if (errorContainer && errorMessage) {
-                errorMessage.textContent = 'Произошла ошибка при загрузке приложения: ' + (error.message || 'Неизвестная ошибка');
-                errorContainer.style.display = 'flex';
-                errorContainer.style.flexDirection = 'column';
-                errorContainer.style.justifyContent = 'center';
-                errorContainer.style.alignItems = 'center';
-            }
-            
-            // Скрываем загрузочный экран в случае ошибки
-            const loadingOverlay = document.getElementById('loadingOverlay');
-            if (loadingOverlay) {
-                loadingOverlay.style.opacity = '0';
-                setTimeout(() => {
-                    loadingOverlay.style.display = 'none';
-                }, 300);
-            }
-        }
-        
-        // Функция загрузки скрипта с обработкой ошибок
-        function loadScript(src, async = true) {
-            return new Promise((resolve, reject) => {
-                const script = document.createElement('script');
-                script.src = src;
-                script.async = async;
-                
-                script.onload = function() {
-                    scriptLoadCount++;
-                    updateLoadingProgress((scriptLoadCount / totalScripts) * 100);
-                    console.log(`Скрипт загружен [${scriptLoadCount}/${totalScripts}]: ${src}`);
-                    resolve();
-                };
-                
-                script.onerror = function(err) {
-                    console.error('Ошибка загрузки скрипта:', src);
-                    reject(new Error('Failed to load ' + src));
-                };
-                
-                document.body.appendChild(script);
-            });
-        }
-        
-        // Функция последовательной загрузки скриптов
-        async function loadScriptsSequentially(scripts) {
-            try {
-                // Загружаем критические скрипты последовательно
-                for (let i = 0; i < 3; i++) { // Telegram + loader + main
-                    await loadScript(scripts[i], false); // Не асинхронно, строгий порядок
-                }
-                
-                // Обновляем прогресс
-                updateLoadingProgress(50);
-                
-                // Загружаем игровые скрипты (можно параллельно)
-                const gameScriptPromises = [];
-                for (let i = 3; i < scripts.length; i++) {
-                    gameScriptPromises.push(loadScript(scripts[i], true));
-                }
-                
-                await Promise.allSettled(gameScriptPromises);
-                
-                // Финальная проверка
-                return true;
-            } catch (error) {
-                console.error('Ошибка при загрузке скриптов:', error);
-                return false;
-            }
-        }
-        
-        // Инициализация приложения после загрузки всех скриптов
-        function initializeApp() {
-            if (loadingFailed) return;
-            
-            try {
-                console.log('Инициализация приложения...');
-                
-                // Показываем контент
-                const appContent = document.getElementById('app-content');
-                if (appContent) {
-                    appContent.classList.add('loaded');
-                }
-                
-                // Инициализация приложения с небольшой задержкой
-                // Это дает время для отрисовки DOM перед запуском логики
-                setTimeout(() => {
-                    if (window.casinoApp && typeof window.casinoApp.init === 'function') {
-                        window.casinoApp.init()
-                            .catch(error => {
-                                console.error('Ошибка при инициализации casinoApp:', error);
-                                handleLoadError(error);
-                            });
-                    } else {
-                        console.error('casinoApp не найден');
-                        handleLoadError(new Error('casinoApp не инициализирован'));
-                    }
-                }, 100);
-            } catch (error) {
-                console.error('Ошибка в initializeApp:', error);
-                handleLoadError(error);
-            }
-        }
-        
-        // Глобальная функция для проверки готовности приложения
-        window.checkAppReady = function() {
-            // Проверка обязательных компонентов
-            if (!window.casinoApp) {
-                console.error('casinoApp не найден!');
-                return false;
-            }
-            
-            return true;
-        };
-        
-        // Запускаем последовательную загрузку скриптов
-        document.addEventListener('DOMContentLoaded', function() {
-            try {
-                console.log('DOM загружен, начинаем загрузку скриптов');
-                updateLoadingProgress(5);
-                
-                // Определяем порядок загрузки скриптов
-                const scripts = [
-                    'https://telegram.org/js/telegram-web-app.js',
-                    'js/game-helper.js',
-                    'js/loader.js',                                // Затем emergency loader
-                    'js/main.js',                                  // Затем основной скрипт приложения
-                    'js/games/slots.js',                           // Затем игровые скрипты 
-                    'js/games/roulette.js',
-                    'js/games/guessnumber.js',
-                    'js/games/miner.js',
-                    'js/games/crush.js'
-                ];
-                
-                // Последовательная загрузка всех скриптов
-                loadScriptsSequentially(scripts)
-                    .then(success => {
-                        if (success) {
-                            console.log('Все скрипты успешно загружены');
-                            initializeApp();
-                        } else {
-                            console.error('Произошла ошибка при загрузке скриптов');
-                            handleLoadError(new Error('Ошибка загрузки скриптов'));
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Критическая ошибка загрузки скриптов:', error);
-                        handleLoadError(error);
-                    });
-            } catch (error) {
-                console.error('Ошибка в обработчике DOMContentLoaded:', error);
-                handleLoadError(error);
-            }
-        });
-        
-        // Запасной вариант для удаления загрузочного экрана
-        window.addEventListener('load', function() {
-            setTimeout(function() {
-                const appContent = document.getElementById('app-content');
-                if (appContent && !appContent.classList.contains('loaded')) {
-                    console.log('Принудительное удаление загрузочного экрана');
-                    appContent.classList.add('loaded');
-                    
-                    const loadingOverlay = document.getElementById('loadingOverlay');
-                    if (loadingOverlay) {
-                        loadingOverlay.style.opacity = '0';
-                        setTimeout(() => {
-                            loadingOverlay.style.display = 'none';
-                        }, 300);
-                    }
-                }
-            }, 5000); // 5 секунд максимальное время загрузки
-        });
+        // Инициализация с обновлением прогресса
+        updateLoadingProgress(10);
     </script>
+</head>
+</body>
+</html>

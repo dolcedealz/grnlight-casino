@@ -1,273 +1,334 @@
-// Enhanced loader.js - улучшенная система удаления загрузочного экрана
-console.log('[Loader] Запущен улучшенный загрузчик v1.0.2');
+/**
+ * loader.js - Улучшенная система управления экраном загрузки 
+ * Версия 2.0.0
+ */
 
 (function() {
-  // Настройки загрузчика
-  const CONFIG = {
-    // Время до принудительного удаления экрана загрузки (мс)
-    EMERGENCY_TIMEOUT: 6000,
-    // Время анимации исчезновения (мс)
-    FADE_DURATION: 300,
-    // Минимальное время показа экрана загрузки (мс)
-    MIN_DISPLAY_TIME: 1000,
-    // Промежуточный прогресс, который показываем в любом случае
-    INITIAL_PROGRESS: 30
-  };
-
-  // Флаги состояния
-  let loadingRemoved = false;
-  let mainInitialized = false;
-  let startTime = Date.now();
+  // Проверяем наличие основного объекта приложения
+  if (!window.GreenLightApp) {
+      console.error('GreenLightApp не инициализирован!');
+      window.GreenLightApp = {
+          log: function(source, message, isError) {
+              if (isError) console.error(`[${source}] ${message}`);
+              else console.log(`[${source}] ${message}`);
+          }
+      };
+  }
   
-  // Элементы, с которыми будем работать
-  let loadingOverlay, progressBar, appContent, welcomeScreen;
-
-  // Инициализируем loader
-  function initLoader() {
-    try {
-      console.log('[Loader] Инициализация загрузчика');
+  const app = window.GreenLightApp;
+  app.log('Loader', 'Инициализация улучшенной системы загрузки v2.0.0');
+  
+  // Конфигурация загрузчика
+  const CONFIG = {
+      // Максимальное время загрузки (мс)
+      MAX_LOADING_TIME: 10000,
       
-      // Получаем ссылки на элементы
-      loadingOverlay = document.getElementById('loadingOverlay');
-      progressBar = document.getElementById('progress-bar');
-      appContent = document.getElementById('app-content');
-      welcomeScreen = document.getElementById('welcome-screen');
+      // Интервал проверки состояния (мс)
+      CHECK_INTERVAL: 1000,
       
-      // Проверяем наличие необходимых элементов
-      if (!loadingOverlay) {
-        console.error('[Loader] Не найден элемент loadingOverlay');
-        return false;
+      // Время анимации скрытия (мс)
+      FADE_DURATION: 300,
+      
+      // Минимальное время показа экрана загрузки (мс)
+      MIN_DISPLAY_TIME: 1000
+  };
+  
+  // Элементы DOM
+  let elements = {
+      loadingOverlay: null,
+      progressBar: null,
+      appContent: null,
+      welcomeScreen: null,
+      loadingDebug: null
+  };
+  
+  // Состояние загрузчика
+  let state = {
+      loadingRemoved: false,
+      startTime: Date.now(),
+      lastPercent: 0,
+      checkInterval: null,
+      emergencyTimeout: null
+  };
+  
+  // Инициализация загрузчика
+  function init() {
+      try {
+          app.log('Loader', 'Инициализация компонентов загрузчика');
+          
+          // Получаем ссылки на DOM элементы
+          elements.loadingOverlay = document.getElementById('loadingOverlay');
+          elements.progressBar = document.getElementById('progress-bar');
+          elements.appContent = document.getElementById('app-content');
+          elements.welcomeScreen = document.getElementById('welcome-screen');
+          elements.loadingDebug = document.getElementById('loading-debug');
+          
+          // Проверяем наличие критических элементов
+          if (!elements.loadingOverlay) {
+              app.log('Loader', 'Критическая ошибка: элемент loadingOverlay не найден', true);
+              return false;
+          }
+          
+          if (!elements.progressBar) {
+              app.log('Loader', 'Предупреждение: элемент progress-bar не найден');
+          }
+          
+          // Устанавливаем начальную позицию прогресса
+          updateProgress(20);
+          
+          // Устанавливаем интервал для проверки состояния загрузки
+          setupStatusChecker();
+          
+          // Устанавливаем аварийный таймер
+          setupEmergencyRemoval();
+          
+          return true;
+          
+      } catch (error) {
+          app.log('Loader', `Ошибка инициализации загрузчика: ${error.message}`, true);
+          // Аварийное удаление загрузочного экрана
+          forceRemoveLoadingScreen();
+          return false;
       }
+  }
+  
+  // Установка интервала проверки состояния
+  function setupStatusChecker() {
+      state.checkInterval = setInterval(() => {
+          try {
+              const elapsedTime = Date.now() - state.startTime;
+              
+              // Обновляем отладочную информацию
+              if (elements.loadingDebug) {
+                  const loadingStatus = {
+                      time: Math.round(elapsedTime / 1000) + 'c',
+                      scripts: app.loading.scriptsLoaded ? 'OK' : 'Loading',
+                      main: app.loading.mainInitialized ? 'OK' : 'Pending',
+                      tg: app.loading.telegramInitialized ? 'OK' : 'Pending'
+                  };
+                  
+                  elements.loadingDebug.textContent = 
+                      `Время: ${loadingStatus.time} | ` +
+                      `Скрипты: ${loadingStatus.scripts} | ` +
+                      `Осн. модуль: ${loadingStatus.main} | ` +
+                      `Telegram: ${loadingStatus.tg}`;
+              }
+              
+              // Автоматическое обновление прогресса на основе состояния
+              autoUpdateProgress();
+              
+              // Проверяем, пора ли удалить экран загрузки
+              if (app.loading.mainInitialized && app.loading.uiReady) {
+                  app.log('Loader', 'Основной модуль и UI готовы, удаляем экран загрузки');
+                  clearInterval(state.checkInterval);
+                  hideLoadingScreen();
+              }
+              
+              // Проверяем, не истекло ли максимальное время
+              if (elapsedTime > CONFIG.MAX_LOADING_TIME) {
+                  app.log('Loader', 'Превышено максимальное время загрузки', true);
+                  clearInterval(state.checkInterval);
+                  forceRemoveLoadingScreen();
+              }
+          } catch (error) {
+              app.log('Loader', `Ошибка в интервале проверки: ${error.message}`, true);
+              clearInterval(state.checkInterval);
+          }
+      }, CONFIG.CHECK_INTERVAL);
+  }
+  
+  // Установка аварийного таймера
+  function setupEmergencyRemoval() {
+      state.emergencyTimeout = setTimeout(() => {
+          if (!state.loadingRemoved) {
+              app.log('Loader', 'Сработал аварийный таймер удаления', true);
+              forceRemoveLoadingScreen();
+          }
+      }, CONFIG.MAX_LOADING_TIME);
+  }
+  
+  // Автоматическое обновление прогресса
+  function autoUpdateProgress() {
+      let percent = 0;
       
-      // Устанавливаем начальный прогресс
-      updateProgress(CONFIG.INITIAL_PROGRESS);
+      // Добавляем прогресс за счет времени (максимум 50%)
+      const elapsedTime = Date.now() - state.startTime;
+      const timePercent = Math.min(50, Math.floor((elapsedTime / CONFIG.MAX_LOADING_TIME) * 100));
+      percent += timePercent;
       
-      return true;
-    } catch (error) {
-      console.error('[Loader] Ошибка инициализации:', error);
-      return false;
-    }
+      // Добавляем прогресс за этапы загрузки
+      if (app.loading.scriptsLoaded) percent += 10;
+      if (app.loading.telegramInitialized) percent += 10;
+      if (app.loading.mainInitialized) percent += 20;
+      if (app.loading.uiReady) percent += 10;
+      
+      // Не уменьшаем процент
+      percent = Math.max(state.lastPercent, percent);
+      state.lastPercent = percent;
+      
+      // Обновляем индикатор прогресса
+      updateProgress(percent);
   }
   
   // Обновление индикатора прогресса
   function updateProgress(percent) {
-    try {
-      if (progressBar) {
-        progressBar.style.width = percent + '%';
+      if (!elements.progressBar) return;
+      
+      try {
+          elements.progressBar.style.width = Math.min(100, percent) + '%';
+      } catch (error) {
+          app.log('Loader', `Ошибка обновления прогресса: ${error.message}`, true);
       }
-    } catch (error) {
-      console.error('[Loader] Ошибка обновления прогресса:', error);
-    }
   }
   
   // Плавное скрытие экрана загрузки
-  function removeLoadingScreen() {
-    try {
-      if (loadingRemoved) return; // Предотвращаем повторное выполнение
+  function hideLoadingScreen() {
+      if (state.loadingRemoved) return;
       
-      loadingRemoved = true;
-      console.log('[Loader] Удаление экрана загрузки');
-      
-      // Убедимся, что прошло минимальное время отображения
-      const elapsedTime = Date.now() - startTime;
-      const remainingTime = Math.max(0, CONFIG.MIN_DISPLAY_TIME - elapsedTime);
-      
-      // Показываем 100% прогресс при любых обстоятельствах
-      updateProgress(100);
-      
-      // Проверяем готовность игровых объектов
-      const gamesReady = checkGamesReady();
-      console.log(`[Loader] Статус игровых объектов перед удалением: ${gamesReady ? 'готовы' : 'не готовы'}`);
-      
-      // Ждем минимальное время перед скрытием
-      setTimeout(() => {
-        try {
-          // Плавно скрываем загрузочный экран
-          if (loadingOverlay) {
-            loadingOverlay.style.opacity = '0';
-            
-            setTimeout(() => {
-              try {
-                // Полностью скрываем после завершения анимации
-                if (loadingOverlay) {
-                  loadingOverlay.style.display = 'none';
-                }
-                
-                // Показываем контент приложения
-                if (appContent) {
-                  appContent.classList.add('loaded');
-                }
-                
-                // Проверяем, нужно ли активировать welcome-screen
-                if (welcomeScreen && !welcomeScreen.classList.contains('active')) {
-                  // Сначала скрываем все экраны
-                  document.querySelectorAll('.screen').forEach(screen => {
-                    screen.classList.remove('active');
-                  });
-                  
-                  // Затем показываем приветственный экран
-                  welcomeScreen.classList.add('active');
-                }
-                
-                console.log('[Loader] Загрузочный экран успешно удален, приложение отображено');
-                
-                // Дополнительная проверка инициализации игр
-                setTimeout(() => {
-                  const gamesReadyAfter = checkGamesReady();
-                  console.log(`[Loader] Статус игровых объектов после удаления: ${gamesReadyAfter ? 'готовы' : 'не готовы'}`);
-                }, 500);
-              } catch (innerError) {
-                console.error('[Loader] Ошибка финальной обработки:', innerError);
-              }
-            }, CONFIG.FADE_DURATION);
-          }
-        } catch (timeoutError) {
-          console.error('[Loader] Ошибка в таймауте удаления:', timeoutError);
+      try {
+          app.log('Loader', 'Начинаем плавное удаление экрана загрузки');
           
-          // Аварийное удаление загрузочного экрана при ошибке
-          if (loadingOverlay) loadingOverlay.style.display = 'none';
-          if (appContent) appContent.classList.add('loaded');
-        }
-      }, remainingTime);
-    } catch (error) {
-      console.error('[Loader] Ошибка удаления экрана загрузки:', error);
-      
-      // Аварийное удаление при любой ошибке
-      if (loadingOverlay) loadingOverlay.style.display = 'none';
-      if (appContent) appContent.classList.add('loaded');
-    }
+          state.loadingRemoved = true;
+          clearTimeout(state.emergencyTimeout);
+          
+          // Проверяем минимальное время отображения
+          const elapsedTime = Date.now() - state.startTime;
+          const remainingTime = Math.max(0, CONFIG.MIN_DISPLAY_TIME - elapsedTime);
+          
+          // Показываем 100% прогресс
+          updateProgress(100);
+          
+          setTimeout(() => {
+              try {
+                  // Запускаем анимацию скрытия
+                  if (elements.loadingOverlay) {
+                      elements.loadingOverlay.style.opacity = '0';
+                      
+                      setTimeout(() => {
+                          try {
+                              // Полностью скрываем элемент
+                              if (elements.loadingOverlay) {
+                                  elements.loadingOverlay.style.display = 'none';
+                              }
+                              
+                              // Показываем содержимое приложения
+                              if (elements.appContent) {
+                                  elements.appContent.classList.add('loaded');
+                              }
+                              
+                              app.log('Loader', 'Экран загрузки успешно удален');
+                              
+                          } catch (fadeError) {
+                              app.log('Loader', `Ошибка финальной фазы скрытия: ${fadeError.message}`, true);
+                              forceRemoveLoadingScreen();
+                          }
+                      }, CONFIG.FADE_DURATION);
+                  }
+              } catch (error) {
+                  app.log('Loader', `Ошибка анимации скрытия: ${error.message}`, true);
+                  forceRemoveLoadingScreen();
+              }
+          }, remainingTime);
+          
+      } catch (error) {
+          app.log('Loader', `Общая ошибка скрытия экрана загрузки: ${error.message}`, true);
+          forceRemoveLoadingScreen();
+      }
   }
   
-  // Проверка готовности игровых объектов
-  function checkGamesReady() {
-    // Проверяем наличие глобального хранилища игр
-    if (window.GreenLightGames) {
-      // Проверяем, зарегистрированы ли игры
-      let gamesCount = 0;
-      if (window.GreenLightGames.slotsGame) gamesCount++;
-      if (window.GreenLightGames.rouletteGame) gamesCount++;
-      if (window.GreenLightGames.guessNumberGame) gamesCount++;
-      if (window.GreenLightGames.minerGame) gamesCount++;
-      if (window.GreenLightGames.crushGame) gamesCount++;
-      
-      console.log(`[Loader] Зарегистрировано игр: ${gamesCount}/5`);
-      
-      // Если хотя бы одна игра зарегистрирована, считаем что всё в порядке
-      return gamesCount > 0;
-    }
-    
-    // Проверка старым способом (обратная совместимость)
-    const oldStyleGames = [
-      { name: 'slotsGame', obj: window.slotsGame },
-      { name: 'rouletteGame', obj: window.rouletteGame },
-      { name: 'guessNumberGame', obj: window.guessNumberGame },
-      { name: 'minerGame', obj: window.minerGame },
-      { name: 'crushGame', obj: window.crushGame }
-    ];
-    
-    const availableGames = oldStyleGames.filter(game => typeof game.obj === 'object' && game.obj !== null);
-    console.log(`[Loader] Доступно игр (старый стиль): ${availableGames.length}/5`);
-    
-    // Если хотя бы одна игра доступна, считаем что всё в порядке
-    return availableGames.length > 0;
+  // Принудительное удаление экрана загрузки
+  function forceRemoveLoadingScreen() {
+      try {
+          app.log('Loader', 'Принудительное удаление экрана загрузки');
+          
+          // Предотвращаем повторное выполнение
+          if (state.loadingRemoved) return;
+          state.loadingRemoved = true;
+          
+          // Очищаем все таймеры
+          clearInterval(state.checkInterval);
+          clearTimeout(state.emergencyTimeout);
+          
+          // Скрываем загрузочный экран без анимации
+          if (elements.loadingOverlay) {
+              elements.loadingOverlay.style.display = 'none';
+          }
+          
+          // Показываем контент приложения
+          if (elements.appContent) {
+              elements.appContent.classList.add('loaded');
+          }
+          
+          // Активируем welcome-screen
+          if (elements.welcomeScreen) {
+              document.querySelectorAll('.screen').forEach(screen => {
+                  screen.classList.remove('active');
+              });
+              elements.welcomeScreen.classList.add('active');
+          }
+          
+          app.log('Loader', 'Загрузочный экран принудительно удален');
+          
+      } catch (error) {
+          app.log('Loader', `Ошибка в принудительном удалении: ${error.message}`, true);
+          
+          // Крайнее аварийное удаление без обработки ошибок
+          const loadingEl = document.getElementById('loadingOverlay');
+          const contentEl = document.getElementById('app-content');
+          
+          if (loadingEl) loadingEl.style.display = 'none';
+          if (contentEl) contentEl.classList.add('loaded');
+      }
   }
   
-  // Метод для вывода диагностики игр  
-  function logGamesDiagnostics() {
-    console.log('[Loader] Диагностика игровых объектов:');
-    
-    // Проверяем новый стиль
-    if (window.GreenLightGames) {
-      console.log('GreenLightGames:', {
-        slotsGame: !!window.GreenLightGames.slotsGame,
-        rouletteGame: !!window.GreenLightGames.rouletteGame,
-        guessNumberGame: !!window.GreenLightGames.guessNumberGame,
-        minerGame: !!window.GreenLightGames.minerGame,
-        crushGame: !!window.GreenLightGames.crushGame
-      });
-    } else {
-      console.log('GreenLightGames: не определено');
-    }
-    
-    // Проверяем старый стиль
-    console.log('Старый стиль:', {
-      slotsGame: typeof window.slotsGame,
-      rouletteGame: typeof window.rouletteGame,
-      guessNumberGame: typeof window.guessNumberGame,
-      minerGame: typeof window.minerGame,
-      crushGame: typeof window.crushGame
-    });
-  }
-  
-  // Экспортируем методы для вызова из main.js и других скриптов
+  // Публичные методы
   window.appLoader = {
-    // Метод, который main.js может вызвать при успешной загрузке
-    mainReady: function() {
-      console.log('[Loader] Получено уведомление о готовности main.js');
-      mainInitialized = true;
+      // Уведомление о готовности основного модуля
+      mainReady: function() {
+          app.log('Loader', 'Получено уведомление о готовности основного модуля');
+          app.loading.mainInitialized = true;
+          
+          updateProgress(70);
+          
+          // Проверяем, готовы ли все компоненты
+          if (app.loading.uiReady) {
+              hideLoadingScreen();
+          }
+      },
       
-      // Выводим диагностику перед удалением экрана загрузки
-      logGamesDiagnostics();
+      // Уведомление о готовности UI
+      uiReady: function() {
+          app.log('Loader', 'Получено уведомление о готовности UI');
+          app.loading.uiReady = true;
+          
+          updateProgress(80);
+          
+          // Проверяем, готовы ли все компоненты
+          if (app.loading.mainInitialized) {
+              hideLoadingScreen();
+          }
+      },
       
-      // Удаляем экран загрузки
-      removeLoadingScreen();
-    },
-    
-    // Метод для обновления прогресса из main.js
-    updateProgress: updateProgress,
-    
-    // Метод для ручной проверки игровых объектов
-    checkGames: function() {
-      console.log('[Loader] Запрошена проверка доступности игровых объектов');
-      const status = checkGamesReady();
-      logGamesDiagnostics();
-      return status;
-    },
-    
-    // Метод для принудительного удаления экрана загрузки
-    forceRemoveLoading: function() {
-      console.log('[Loader] Принудительное удаление экрана загрузки');
-      removeLoadingScreen();
-    }
+      // Обновление прогресса из других модулей
+      updateProgress: updateProgress,
+      
+      // Принудительное скрытие экрана загрузки
+      forceRemoveLoading: forceRemoveLoadingScreen,
+      
+      // Статус загрузчика
+      getStatus: function() {
+          return {
+              initialized: !!elements.loadingOverlay,
+              loadingRemoved: state.loadingRemoved,
+              elapsedTime: Date.now() - state.startTime
+          };
+      }
   };
   
-  // Резервный таймер для удаления экрана загрузки
-  function setupEmergencyTimer() {
-    setTimeout(() => {
-      if (!loadingRemoved) {
-        console.warn('[Loader] Сработал аварийный таймер! main.js не смог завершить загрузку');
-        logGamesDiagnostics(); // Выводим диагностику перед принудительным удалением
-        removeLoadingScreen();
-      }
-    }, CONFIG.EMERGENCY_TIMEOUT);
+  // Запускаем инициализацию загрузчика
+  if (!init()) {
+      app.log('Loader', 'Ошибка инициализации, принудительное удаление через 1 секунду', true);
+      setTimeout(forceRemoveLoadingScreen, 1000);
   }
   
-  // Начинаем процесс загрузки
-  function startLoading() {
-    if (initLoader()) {
-      console.log('[Loader] Запуск контрольного таймера:', CONFIG.EMERGENCY_TIMEOUT + 'мс');
-      setupEmergencyTimer();
-      
-      // Обработка события полной загрузки страницы
-      window.addEventListener('load', function() {
-        console.log('[Loader] Событие window.load получено');
-        
-        // Даем дополнительное время для работы main.js
-        setTimeout(() => {
-          if (!loadingRemoved) {
-            console.warn('[Loader] Экран загрузки все еще присутствует после window.load');
-            logGamesDiagnostics(); // Выводим диагностику перед удалением экрана
-            removeLoadingScreen();
-          }
-        }, 1000); // Дополнительная секунда для main.js
-      });
-    } else {
-      // Если не получилось инициализировать, просто запускаем таймер
-      console.error('[Loader] Аварийная инициализация');
-      setupEmergencyTimer();
-    }
-  }
-  
-  // Запускаем загрузчик
-  startLoading();
 })();
