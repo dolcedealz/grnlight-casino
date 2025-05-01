@@ -1,6 +1,6 @@
 /**
- * miner.js - Optimized version of the Miner game
- * Version 2.0.3
+ * miner.js - Optimized version of the Miner game with proper tab isolation
+ * Version 2.1.0
  */
 
 // Create a safer scope
@@ -17,7 +17,7 @@
   }
   
   const app = window.GreenLightApp;
-  app.log('Miner', 'Initializing Miner game module v2.0.3');
+  app.log('Miner', 'Initializing Miner game module v2.1.0');
   
   // Game logic
   const minerGame = (function() {
@@ -51,40 +51,39 @@
     };
     
     /**
-     * Create game container
+     * Check if the miner tab is currently active
+     */
+    function isMinerTabActive() {
+      const minerScreen = document.getElementById('miner-screen');
+      return minerScreen && minerScreen.classList.contains('active');
+    }
+    
+    /**
+     * Create game container - FIXED to only work on miner screen
      */
     function createGameContainer() {
       try {
-        // Check if container already exists
-        let container = document.querySelector('.miner-container');
+        // IMPORTANT: Only create the container if we're on the miner screen
+        const minerScreen = document.getElementById('miner-screen');
+        if (!minerScreen || !minerScreen.classList.contains('active')) {
+          app.log('Miner', 'Not on miner screen, skipping container creation');
+          return null;
+        }
+        
+        // Check if container already exists within the miner screen
+        let container = minerScreen.querySelector('.miner-container');
         if (container) {
           elements.container = container;
           return container;
         }
         
-        // Look for game area
-        let gameArea = document.querySelector('.games-area');
-        if (!gameArea) {
-          gameArea = document.createElement('div');
-          gameArea.className = 'games-area';
-          
-          const appContainer = document.querySelector('.app-container');
-          if (appContainer) {
-            appContainer.appendChild(gameArea);
-          } else {
-            document.body.appendChild(gameArea);
-          }
-          
-          app.log('Miner', 'Created general game area');
-        }
-        
-        // Create container
+        // Create container directly inside the miner screen
         container = document.createElement('div');
         container.className = 'miner-container game-container';
-        gameArea.appendChild(container);
+        minerScreen.appendChild(container);
         
         elements.container = container;
-        app.log('Miner', 'Created main game container');
+        app.log('Miner', 'Created main game container within miner screen');
         
         return container;
       } catch (error) {
@@ -98,6 +97,12 @@
      */
     function createGameInterface() {
       try {
+        // First ensure we're on the miner tab
+        if (!isMinerTabActive()) {
+          app.log('Miner', 'Not on miner tab, skipping interface creation');
+          return false;
+        }
+        
         const container = elements.container || createGameContainer();
         if (!container) {
           app.log('Miner', 'Cannot create interface: container not found', true);
@@ -112,7 +117,6 @@
         
         // Create HTML markup
         container.innerHTML = `
-          <h2>Miner</h2>
           <div class="game-controls">
             <div class="bet-control">
               <label for="miner-bet">Bet:</label>
@@ -154,10 +158,10 @@
             .miner-container {
               padding: 15px;
               margin: 10px auto;
-              border: 1px solid #ccc;
+              border: 1px solid var(--primary-green);
               border-radius: 8px;
               max-width: 500px;
-              box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+              background: var(--medium-gray);
             }
             
             .game-controls {
@@ -165,21 +169,6 @@
               display: flex;
               flex-direction: column;
               gap: 10px;
-            }
-            
-            .action-btn {
-              padding: 10px 15px;
-              background-color: #4CAF50;
-              color: white;
-              border: none;
-              border-radius: 4px;
-              cursor: pointer;
-              font-weight: bold;
-            }
-            
-            .action-btn:disabled {
-              background-color: #cccccc;
-              cursor: not-allowed;
             }
             
             .miner-grid {
@@ -191,9 +180,9 @@
             }
             
             .grid-cell {
-              width: 60px;
-              height: 60px;
-              background-color: #f1f1f1;
+              aspect-ratio: 1;
+              background-color: var(--medium-gray);
+              border: 1px solid rgba(255, 255, 255, 0.1);
               border-radius: 5px;
               display: flex;
               align-items: center;
@@ -204,38 +193,23 @@
             }
             
             .active-cell:hover {
-              background-color: #e0e0e0;
+              background-color: #444;
+              border-color: var(--primary-green);
               transform: scale(1.05);
             }
             
             .grid-cell.revealed {
-              background-color: #c8e6c9;
+              background-color: var(--primary-green);
+              color: var(--white);
             }
             
             .grid-cell.mine {
-              background-color: #ffcdd2;
+              background-color: var(--medium-gray);
             }
             
             .grid-cell.exploded {
-              background-color: #ef5350;
+              background-color: var(--lose-color);
               animation: explode 0.5s;
-            }
-            
-            .result {
-              margin-top: 15px;
-              padding: 10px;
-              border-radius: 4px;
-              text-align: center;
-            }
-            
-            .result.win {
-              background-color: rgba(76, 175, 80, 0.2);
-              color: #4CAF50;
-            }
-            
-            .result.lose {
-              background-color: rgba(244, 67, 54, 0.2);
-              color: #F44336;
             }
             
             @keyframes explode {
@@ -261,6 +235,13 @@
     async function findDOMElements() {
       return new Promise((resolve, reject) => {
         try {
+          // Only search for elements if on the miner tab
+          if (!isMinerTabActive()) {
+            app.log('Miner', 'Not on miner tab, skipping DOM element search');
+            resolve(false);
+            return;
+          }
+          
           setTimeout(() => {
             elements.newGameBtn = document.getElementById('new-game-btn');
             elements.cashoutBtn = document.getElementById('cashout-btn');
@@ -278,7 +259,7 @@
               app.log('Miner', 'Warning: element miner-grid not found', true);
             }
             
-            resolve();
+            resolve(true);
           }, 100);
         } catch (error) {
           app.log('Miner', `Error finding DOM elements: ${error.message}`, true);
@@ -320,9 +301,45 @@
           elements.minesCount.addEventListener('change', updateMineCount);
         }
         
+        // Add observer for tab changes to reinitialize if needed
+        setupTabChangeObserver();
+        
         app.log('Miner', 'Event handlers set up');
       } catch (error) {
         app.log('Miner', `Error setting up event handlers: ${error.message}`, true);
+      }
+    }
+    
+    /**
+     * Setup observer to watch for tab changes
+     */
+    function setupTabChangeObserver() {
+      try {
+        // Find miner screen element
+        const minerScreen = document.getElementById('miner-screen');
+        if (!minerScreen) return;
+        
+        // Create a mutation observer to watch for class changes
+        const observer = new MutationObserver((mutations) => {
+          mutations.forEach((mutation) => {
+            if (mutation.attributeName === 'class') {
+              const isActive = minerScreen.classList.contains('active');
+              app.log('Miner', `Miner tab active state changed to: ${isActive}`);
+              
+              // If tab became active and game not initialized, initialize it
+              if (isActive && !state.initialized && !state.initializationStarted) {
+                app.log('Miner', 'Tab became active, initializing game');
+                init();
+              }
+            }
+          });
+        });
+        
+        // Start observing
+        observer.observe(minerScreen, { attributes: true });
+        app.log('Miner', 'Tab change observer set up');
+      } catch (error) {
+        app.log('Miner', `Error setting up tab observer: ${error.message}`, true);
       }
     }
     
@@ -520,6 +537,13 @@
      * Initialize game
      */
     async function init() {
+      // First check if we're on the miner tab
+      if (!isMinerTabActive()) {
+        app.log('Miner', 'Not on miner tab, postponing initialization');
+        return false;
+      }
+      
+      // Prevent duplicate initialization
       if (state.initialized || state.initializationStarted) {
         return true;
       }
@@ -535,7 +559,12 @@
               return;
             }
             
-            await findDOMElements();
+            const elementsFound = await findDOMElements();
+            if (!elementsFound) {
+              resolve(false);
+              return;
+            }
+            
             createGrid();
             updatePotentialWin();
             setupEventListeners();
@@ -885,26 +914,62 @@
     // 3. Log completion
     app.log('Miner', 'Module successfully loaded and ready for initialization');
     
-    // 4. Automatic initialization when page loads
+    // 4. Set up tab activation listeners instead of automatic initialization
     document.addEventListener('DOMContentLoaded', function() {
-      setTimeout(() => {
-        if (!minerGame.getStatus().initialized && !minerGame.getStatus().initializationStarted) {
-          app.log('Miner', 'Starting automatic initialization');
-          minerGame.init();
-        }
-      }, 500);
+      // Only initialize if we're on the right tab
+      const minerScreen = document.getElementById('miner-screen');
+      if (minerScreen && minerScreen.classList.contains('active')) {
+        app.log('Miner', 'Miner tab is active, initializing game');
+        setTimeout(() => minerGame.init(), 500);
+      } else {
+        app.log('Miner', 'Miner tab is not active, waiting for activation');
+        // Set up a one-time check for tab changes
+        setupInitialTabCheck();
+      }
     });
     
-    // 5. If DOM is already loaded, start initialization immediately
-    if (document.readyState === 'complete' || document.readyState === 'interactive') {
-      setTimeout(() => {
-        if (!minerGame.getStatus().initialized && !minerGame.getStatus().initializationStarted) {
-          app.log('Miner', 'Starting automatic initialization (DOM already loaded)');
-          minerGame.init();
-        }
-      }, 500);
-    }
   } catch (error) {
     app.log('Miner', `Error registering game: ${error.message}`, true);
+  }
+  
+  /**
+   * Set up a one-time check for tab activation
+   */
+  function setupInitialTabCheck() {
+    // Find all back buttons that might lead to different screens
+    const backButtons = document.querySelectorAll('.back-btn');
+    const gameCards = document.querySelectorAll('.game-card');
+    
+    // Add listeners to back buttons
+    backButtons.forEach(btn => {
+      btn.addEventListener('click', function checkMinerTab() {
+        setTimeout(() => {
+          const minerScreen = document.getElementById('miner-screen');
+          if (minerScreen && minerScreen.classList.contains('active') && 
+              !minerGame.getStatus().initialized && 
+              !minerGame.getStatus().initializationStarted) {
+            app.log('Miner', 'Miner tab activated, initializing game');
+            minerGame.init();
+          }
+        }, 100);
+      });
+    });
+    
+    // Add listeners to game cards that might activate the miner tab
+    gameCards.forEach(card => {
+      if (card.getAttribute('data-game') === 'miner') {
+        card.addEventListener('click', function() {
+          app.log('Miner', 'Miner card clicked, initializing game after delay');
+          setTimeout(() => {
+            const minerScreen = document.getElementById('miner-screen');
+            if (minerScreen && minerScreen.classList.contains('active') && 
+                !minerGame.getStatus().initialized && 
+                !minerGame.getStatus().initializationStarted) {
+              minerGame.init();
+            }
+          }, 100);
+        });
+      }
+    });
   }
 })();
