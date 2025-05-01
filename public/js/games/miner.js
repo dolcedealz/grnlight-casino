@@ -1,6 +1,6 @@
 /**
  * miner.js - Оптимизированная версия игры Miner
- * Версия 2.0.1
+ * Версия 2.0.2
  * 
  * Особенности:
  * - Неблокирующая инициализация
@@ -24,7 +24,7 @@
   }
   
   const app = window.GreenLightApp;
-  app.log('Miner', 'Инициализация модуля игры Miner v2.0.1');
+  app.log('Miner', 'Инициализация модуля игры Miner v2.0.2');
   
   // Игровая логика в замыкании для изоляции
   const minerGame = (function() {
@@ -38,6 +38,144 @@
           potentialWin: null,
           minerResult: null,
           container: null
+      };
+      
+      // Возвращаем публичный интерфейс
+      return {
+          // Основные методы
+          init: init,
+          startNewGame: startNewGame,
+          cashout: cashout,
+          updateMineCount: updateMineCount,
+          
+          // Метод для проверки состояния
+          getStatus: function() {
+              return {
+                  initialized: state.initialized,
+                  initializationStarted: state.initializationStarted,
+                  isPlaying: state.isPlaying,
+                  elementsFound: {
+                      newGameBtn: !!elements.newGameBtn,
+                      cashoutBtn: !!elements.cashoutBtn,
+                      minerBet: !!elements.minerBet,
+                      minerGrid: !!elements.minerGrid
+                  },
+                  gameState: {
+                      minesCount: state.gameData.minesCount,
+                      revealedCells: state.gameData.revealedCells.length,
+                      currentMultiplier: state.gameData.currentMultiplier
+                  }
+              };
+          }
+      };
+  })();
+  
+  // Регистрируем игру во всех форматах для максимальной совместимости
+  try {
+      // 1. Регистрация через новую систему
+      if (window.registerGame) {
+          window.registerGame('minerGame', minerGame);
+          app.log('Miner', 'Игра зарегистрирована через новую систему registerGame');
+      }
+      
+      // 2. Экспорт в глобальное пространство имен (обратная совместимость)
+      window.minerGame = minerGame;
+      app.log('Miner', 'Игра экспортирована в глобальное пространство имен');
+      
+      // 3. Сообщаем в лог о завершении загрузки модуля
+      app.log('Miner', 'Модуль успешно загружен и готов к инициализации');
+      
+      // 4. Автоматическая инициализация при загрузке страницы
+      document.addEventListener('DOMContentLoaded', function() {
+          setTimeout(() => {
+              if (!minerGame.getStatus().initialized && !minerGame.getStatus().initializationStarted) {
+                  app.log('Miner', 'Запускаем автоматическую инициализацию');
+                  minerGame.init();
+              }
+          }, 500);
+      });
+      
+      // 5. Если DOM уже загружен, запускаем инициализацию сразу
+      if (document.readyState === 'complete' || document.readyState === 'interactive') {
+          setTimeout(() => {
+              if (!minerGame.getStatus().initialized && !minerGame.getStatus().initializationStarted) {
+                  app.log('Miner', 'Запускаем автоматическую инициализацию (DOM уже загружен)');
+                  minerGame.init();
+              }
+          }, 500);
+      }
+      
+  } catch (error) {
+      app.log('Miner', `Ошибка регистрации игры: ${error.message}`, true);
+  }
+})();
+      /**
+       * Автоматический вывод при открытии всех безопасных ячеек
+       */
+      const automaticCashout = async function() {
+          try {
+              // Проверяем состояние игры
+              if (!state.isPlaying) {
+                  return;
+              }
+              
+              // Проверяем наличие casinoApp
+              if (!ensureCasinoApp()) {
+                  return;
+              }
+              
+              // Рассчитываем выигрыш
+              const winAmount = Math.floor(state.gameData.betAmount * state.gameData.currentMultiplier);
+              
+              // Тактильная обратная связь - большой выигрыш
+              if (window.casinoApp.provideTactileFeedback) {
+                  window.casinoApp.provideTactileFeedback('success');
+                  setTimeout(() => window.casinoApp.provideTactileFeedback('success'), 300);
+              }
+              
+              // Обновляем интерфейс
+              if (elements.minerResult) {
+                  elements.minerResult.innerHTML = `
+                      <div class="win-icon">🏆</div>
+                      <div class="win-title">Идеально! Вы открыли все безопасные ячейки!</div>
+                      <div class="win-amount">Выигрыш: ${winAmount} ⭐</div>
+                      <div class="win-multiplier">Множитель: x${state.gameData.currentMultiplier.toFixed(2)}</div>
+                  `;
+                  elements.minerResult.classList.add('win', 'big-win');
+              }
+              
+              // Сбрасываем игровое состояние
+              state.isPlaying = false;
+              
+              if (elements.cashoutBtn) {
+                  elements.cashoutBtn.disabled = true;
+              }
+              
+              if (elements.newGameBtn) {
+                  elements.newGameBtn.disabled = false;
+              }
+              
+              // Показываем все мины
+              revealAllMines();
+              
+              // Обрабатываем выигрыш
+              await window.casinoApp.processGameResult(
+                  'miner',
+                  0, // Нет дополнительной ставки
+                  'win',
+                  winAmount,
+                  {
+                      revealedCells: state.gameData.revealedCells,
+                      multiplier: state.gameData.currentMultiplier,
+                      mines: state.gameData.mines,
+                      perfectGame: true
+                  }
+              );
+              
+              app.log('Miner', `Идеальная игра завершена с выигрышем ${winAmount}`);
+          } catch (error) {
+              app.log('Miner', `Ошибка автоматического вывода: ${error.message}`, true);
+          }
       };
       
       // Состояние игры
@@ -698,6 +836,8 @@
           try {
               // Очищаем существующие мины
               state.gameData.mines = [];
+              // Сначала очищаем сетку
+              state.gameData.grid = Array(state.gameData.totalCells).fill('empty');
               
               // Размещаем новые мины
               while (state.gameData.mines.length < state.gameData.minesCount) {
@@ -744,7 +884,7 @@
               }
               
               // Проверяем, является ли ячейка миной
-              if (state.gameData.grid[index] === 'mine') {
+              if (state.gameData.mines.includes(index)) {
                   // Игра окончена - нашли мину
                   revealAllMines();
                   
@@ -801,7 +941,8 @@
                   updatePotentialWin();
                   
                   // Проверяем, все ли безопасные ячейки открыты (условие победы)
-                  if (state.gameData.revealedCells.length === state.gameData.totalCells - state.gameData.minesCount) {
+                  const safeCellsCount = state.gameData.totalCells - state.gameData.mines.length;
+                  if (state.gameData.revealedCells.length === safeCellsCount) {
                       // Игрок открыл все безопасные ячейки
                       await automaticCashout();
                   }
@@ -899,142 +1040,3 @@
               app.log('Miner', `Ошибка вывода выигрыша: ${error.message}`, true);
           }
       };
-      
-      /**
-       * Автоматический вывод при открытии всех безопасных ячеек
-       */
-      const automaticCashout = async function() {
-          try {
-              // Проверяем состояние игры
-              if (!state.isPlaying) {
-                  return;
-              }
-              
-              // Проверяем наличие casinoApp
-              if (!ensureCasinoApp()) {
-                  return;
-              }
-              
-              // Рассчитываем выигрыш
-              const winAmount = Math.floor(state.gameData.betAmount * state.gameData.currentMultiplier);
-              
-              // Тактильная обратная связь - большой выигрыш
-              if (window.casinoApp.provideTactileFeedback) {
-                  window.casinoApp.provideTactileFeedback('success');
-                  setTimeout(() => window.casinoApp.provideTactileFeedback('success'), 300);
-              }
-              
-              // Обновляем интерфейс
-              if (elements.minerResult) {
-                  elements.minerResult.innerHTML = `
-                      <div class="win-icon">🏆</div>
-                      <div class="win-title">Идеально! Вы открыли все безопасные ячейки!</div>
-                      <div class="win-amount">Выигрыш: ${winAmount} ⭐</div>
-                      <div class="win-multiplier">Множитель: x${state.gameData.currentMultiplier.toFixed(2)}</div>
-                  `;
-                  elements.minerResult.classList.add('win', 'big-win');
-              }
-              
-              // Сбрасываем игровое состояние
-              state.isPlaying = false;
-              
-              if (elements.cashoutBtn) {
-                  elements.cashoutBtn.disabled = true;
-              }
-              
-              if (elements.newGameBtn) {
-                  elements.newGameBtn.disabled = false;
-              }
-              
-              // Показываем все мины
-              revealAllMines();
-              
-              // Обрабатываем выигрыш
-              await window.casinoApp.processGameResult(
-                  'miner',
-                  0, // Нет дополнительной ставки
-                  'win',
-                  winAmount,
-                  {
-                      revealedCells: state.gameData.revealedCells,
-                      multiplier: state.gameData.currentMultiplier,
-                      mines: state.gameData.mines,
-                      perfectGame: true
-                  }
-              );
-              
-              app.log('Miner', `Идеальная игра завершена с выигрышем ${winAmount}`);
-          } catch (error) {
-              app.log('Miner', `Ошибка автоматического вывода: ${error.message}`, true);
-          }
-      };
-      
-      // Возвращаем публичный интерфейс
-      return {
-          // Основные методы
-          init: init,
-          startNewGame: startNewGame,
-          cashout: cashout,
-          updateMineCount: updateMineCount,
-          
-          // Метод для проверки состояния
-          getStatus: function() {
-              return {
-                  initialized: state.initialized,
-                  initializationStarted: state.initializationStarted,
-                  isPlaying: state.isPlaying,
-                  elementsFound: {
-                      newGameBtn: !!elements.newGameBtn,
-                      cashoutBtn: !!elements.cashoutBtn,
-                      minerBet: !!elements.minerBet,
-                      minerGrid: !!elements.minerGrid
-                  },
-                  gameState: {
-                      minesCount: state.gameData.minesCount,
-                      revealedCells: state.gameData.revealedCells.length,
-                      currentMultiplier: state.gameData.currentMultiplier
-                  }
-              };
-          }
-      };
-  })();
-  
-  // Регистрируем игру во всех форматах для максимальной совместимости
-  try {
-      // 1. Регистрация через новую систему
-      if (window.registerGame) {
-          window.registerGame('minerGame', minerGame);
-          app.log('Miner', 'Игра зарегистрирована через новую систему registerGame');
-      }
-      
-      // 2. Экспорт в глобальное пространство имен (обратная совместимость)
-      window.minerGame = minerGame;
-      app.log('Miner', 'Игра экспортирована в глобальное пространство имен');
-      
-      // 3. Сообщаем в лог о завершении загрузки модуля
-      app.log('Miner', 'Модуль успешно загружен и готов к инициализации');
-      
-      // 4. Автоматическая инициализация при загрузке страницы
-      document.addEventListener('DOMContentLoaded', function() {
-          setTimeout(() => {
-              if (!minerGame.getStatus().initialized && !minerGame.getStatus().initializationStarted) {
-                  app.log('Miner', 'Запускаем автоматическую инициализацию');
-                  minerGame.init();
-              }
-          }, 500);
-      });
-      
-      // 5. Если DOM уже загружен, запускаем инициализацию сразу
-      if (document.readyState === 'complete' || document.readyState === 'interactive') {
-          setTimeout(() => {
-              if (!minerGame.getStatus().initialized && !minerGame.getStatus().initializationStarted) {
-                  app.log('Miner', 'Запускаем автоматическую инициализацию (DOM уже загружен)');
-                  minerGame.init();
-              }
-          }, 500);
-      }
-      
-  } catch (error) {
-      app.log('Miner', `Ошибка регистрации игры: ${error.message}`, true);
-  }
-})();
