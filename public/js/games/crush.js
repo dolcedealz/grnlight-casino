@@ -2,13 +2,13 @@
 
 // Улучшенная версия игры Crash с качественным графиком и лучшим интерфейсом
 const crushGame = (() => {
-  // Элементы игры
-  const startBtn = document.getElementById('start-crush-btn');
-  const cashoutBtn = document.getElementById('cash-crush-btn');
-  const crushBet = document.getElementById('crush-bet');
-  const multiplierDisplay = document.getElementById('multiplier');
-  const crushGraph = document.getElementById('crush-graph');
-  const crushResult = document.getElementById('crush-result');
+  // Элементы игры - объявляем как переменные, а не константы
+  let startBtn;
+  let cashoutBtn;
+  let crushBet;
+  let multiplierDisplay;
+  let crushGraph;
+  let crushResult;
   
   // Элементы для графика
   let graphCanvas;
@@ -32,7 +32,21 @@ const crushGame = (() => {
   
   // Инициализация
   function init() {
-    console.log('Инициализация игры Crash');
+    console.log('[Crush] Инициализация игры Crash');
+    
+    // Получаем DOM-элементы с проверкой наличия
+    startBtn = document.getElementById('start-crush-btn');
+    cashoutBtn = document.getElementById('cash-crush-btn');
+    crushBet = document.getElementById('crush-bet');
+    multiplierDisplay = document.getElementById('multiplier');
+    crushGraph = document.getElementById('crush-graph');
+    crushResult = document.getElementById('crush-result');
+    
+    // Проверяем наличие критически важных элементов
+    if (!startBtn || !cashoutBtn || !crushBet || !crushGraph) {
+      console.error('[Crush] Критические элементы игры не найдены в DOM');
+      return false;
+    }
     
     // Создаем canvas для графика, если его еще нет
     if (!graphCanvas && crushGraph) {
@@ -46,12 +60,15 @@ const crushGame = (() => {
       graphCtx = graphCanvas.getContext('2d');
     }
     
-    // Добавляем обработчики событий
+    // Добавляем обработчики событий (с проверкой)
     if (startBtn) {
       startBtn.addEventListener('click', startGame);
+      console.log('[Crush] Установлен обработчик для кнопки старта');
     }
+    
     if (cashoutBtn) {
       cashoutBtn.addEventListener('click', cashout);
+      console.log('[Crush] Установлен обработчик для кнопки кешаута');
     }
     
     // Обработчик изменения размера окна
@@ -73,6 +90,9 @@ const crushGame = (() => {
     if (crushResult) {
       crushResult.style.display = 'none';
     }
+    
+    console.log('[Crush] Инициализация завершена успешно');
+    return true;
   }
   
   // Обработка изменения размера окна
@@ -98,13 +118,13 @@ const crushGame = (() => {
         const audioCtx = new AudioContext();
         
         // Заглушка для локальной разработки
-        startSound = { play: () => console.log('Звук старта') };
-        tickSound = { play: () => console.log('Звук тика') };
-        cashoutSound = { play: () => console.log('Звук кешаута') };
-        crashSound = { play: () => console.log('Звук краша') };
+        startSound = { play: () => console.log('[Crush] Звук старта') };
+        tickSound = { play: () => console.log('[Crush] Звук тика') };
+        cashoutSound = { play: () => console.log('[Crush] Звук кешаута') };
+        crashSound = { play: () => console.log('[Crush] Звук краша') };
       }
     } catch (e) {
-      console.log('Аудио не поддерживается', e);
+      console.log('[Crush] Аудио не поддерживается', e);
     }
   }
   
@@ -112,7 +132,10 @@ const crushGame = (() => {
   function createHistoryUI() {
     // Проверяем, существует ли контейнер игры
     const crushContainer = document.querySelector('.crush-container');
-    if (!crushContainer) return;
+    if (!crushContainer) {
+      console.warn('[Crush] Контейнер игры не найден');
+      return;
+    }
     
     // Проверяем, существует ли уже контейнер истории
     let historyContainer = document.querySelector('.crush-history');
@@ -140,7 +163,10 @@ const crushGame = (() => {
   
   // Сброс графика
   function resetGraph() {
-    if (!graphCtx) return;
+    if (!graphCtx) {
+      console.warn('[Crush] graphCtx не доступен, невозможно сбросить график');
+      return;
+    }
     
     // Очищаем холст
     graphCtx.clearRect(0, 0, graphCanvas.width, graphCanvas.height);
@@ -154,7 +180,10 @@ const crushGame = (() => {
   
   // Рисование сетки графика
   function drawGrid() {
-    if (!graphCtx) return;
+    if (!graphCtx) {
+      console.warn('[Crush] graphCtx не доступен, невозможно нарисовать сетку');
+      return;
+    }
     
     const width = graphCanvas.width;
     const height = graphCanvas.height;
@@ -206,7 +235,10 @@ const crushGame = (() => {
   // Обновление отображения истории
   function updateHistoryDisplay() {
     const historyItems = document.querySelector('.history-items');
-    if (!historyItems) return;
+    if (!historyItems) {
+      console.warn('[Crush] Элемент history-items не найден');
+      return;
+    }
     
     historyItems.innerHTML = '';
     
@@ -242,6 +274,19 @@ const crushGame = (() => {
   
   // Старт игры
   async function startGame() {
+    // Проверяем наличие элементов
+    if (!crushBet) {
+      console.error('[Crush] Элемент crushBet не найден');
+      return;
+    }
+    
+    // Проверяем наличие casinoApp
+    if (!window.casinoApp) {
+      console.error('[Crush] casinoApp не найден');
+      alert('Ошибка инициализации приложения');
+      return;
+    }
+    
     // Получаем размер ставки
     betAmount = parseInt(crushBet.value);
     
@@ -269,7 +314,7 @@ const crushGame = (() => {
     
     // Вычисляем точку краша
     crashPoint = generateCrashPoint();
-    console.log('Игра закончится на:', crashPoint.toFixed(2));
+    console.log('[Crush] Игра закончится на:', crashPoint.toFixed(2));
     
     // Обновляем интерфейс
     if (startBtn) {
@@ -318,6 +363,8 @@ const crushGame = (() => {
     
     // Запускаем интервал игры
     gameInterval = setInterval(updateGame, 50); // Более частое обновление для плавности
+    
+    console.log('[Crush] Игра запущена успешно');
   }
   
   // Генерация точки краша
@@ -418,7 +465,10 @@ const crushGame = (() => {
   
   // Перерисовка всего графика
   function redrawGraph() {
-    if (!graphCtx || !graphCanvas) return;
+    if (!graphCtx || !graphCanvas) {
+      console.warn('[Crush] Невозможно перерисовать график - графический контекст не доступен');
+      return;
+    }
     
     // Очищаем холст
     graphCtx.clearRect(0, 0, graphCanvas.width, graphCanvas.height);
@@ -464,10 +514,6 @@ const crushGame = (() => {
       } else {
         graphCtx.lineTo(x, y);
       }
-      
-      // Запоминаем текущую точку для следующей итерации
-      x0 = x;
-      y0 = y;
     }
     
     // Настройки линии
@@ -478,7 +524,8 @@ const crushGame = (() => {
     graphCtx.stroke();
     
     // Добавляем заливку под линией графика
-    graphCtx.lineTo(x0, height);
+    const lastX = (graphPoints[graphPoints.length - 1].time / maxTime) * width;
+    graphCtx.lineTo(lastX, height);
     graphCtx.lineTo(0, height);
     graphCtx.closePath();
     
@@ -491,7 +538,6 @@ const crushGame = (() => {
     
     // Текущее значение множителя
     const lastPoint = graphPoints[graphPoints.length - 1];
-    const lastX = (lastPoint.time / maxTime) * width;
     const lastY = height - (lastPoint.multiplier / maxMult) * height;
     
     // Рисуем точку на конце линии
@@ -506,6 +552,15 @@ const crushGame = (() => {
   
   // Обработка краша игры
   async function gameCrash() {
+    // Проверяем состояние игры
+    if (!isPlaying) return;
+    
+    // Проверяем наличие casinoApp
+    if (!window.casinoApp) {
+      console.error('[Crush] casinoApp не найден');
+      return;
+    }
+    
     // Останавливаем игру
     clearInterval(gameInterval);
     isPlaying = false;
@@ -577,11 +632,16 @@ const crushGame = (() => {
         finalMultiplier: multiplier
       }
     );
+    
+    console.log(`[Crush] Игра завершена крашем на множителе ${multiplier.toFixed(2)}`);
   }
   
   // Анимация краша
   function animateCrash() {
-    if (!graphCanvas || !graphCtx) return;
+    if (!graphCanvas || !graphCtx) {
+      console.warn('[Crush] Невозможно анимировать краш - графический контекст не доступен');
+      return;
+    }
     
     // Добавляем визуальный эффект взрыва
     const lastPoint = graphPoints[graphPoints.length - 1];
@@ -622,7 +682,14 @@ const crushGame = (() => {
   
   // Кешаут (досрочный выход)
   async function cashout() {
+    // Проверяем состояние игры
     if (!isPlaying) return;
+    
+    // Проверяем наличие casinoApp
+    if (!window.casinoApp) {
+      console.error('[Crush] casinoApp не найден');
+      return;
+    }
     
     // Останавливаем игру
     clearInterval(gameInterval);
@@ -702,11 +769,16 @@ const crushGame = (() => {
     
     // Продолжаем показывать симуляцию графика до краша
     simulateContinuation();
+    
+    console.log(`[Crush] Успешный кешаут на множителе ${multiplier.toFixed(2)}, выигрыш: ${winAmount}`);
   }
   
   // Анимация кешаута
   function animateCashout() {
-    if (!graphCanvas || !graphCtx) return;
+    if (!graphCanvas || !graphCtx) {
+      console.warn('[Crush] Невозможно анимировать кешаут - графический контекст не доступен');
+      return;
+    }
     
     // Добавляем визуальный эффект успешного кешаута
     const lastPoint = graphPoints[graphPoints.length - 1];
@@ -806,9 +878,6 @@ const crushGame = (() => {
     cashout
   };
 })();
-// Добавить в конец файла crush.js
-// После строки: })();
-
 // Глобальный экспорт объекта игры
 window.crushGame = crushGame;
 console.log('[Crush] Экспорт игрового объекта в глобальную область видимости');

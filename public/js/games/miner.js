@@ -2,14 +2,14 @@
 
 // Улучшенная игра Miner с динамическим изменением коэффициента
 const minerGame = (() => {
-  // Элементы игры
-  const newGameBtn = document.getElementById('new-game-btn');
-  const cashoutBtn = document.getElementById('cashout-btn');
-  const minerBet = document.getElementById('miner-bet');
-  const minesCount = document.getElementById('mines-count');
-  const minerGrid = document.getElementById('miner-grid');
-  const potentialWin = document.getElementById('potential-win');
-  const minerResult = document.getElementById('miner-result');
+  // Элементы игры - объявим как переменные, а не константы
+  let newGameBtn;
+  let cashoutBtn;
+  let minerBet;
+  let minesCount;
+  let minerGrid;
+  let potentialWin;
+  let minerResult;
   
   // Состояние игры
   let isPlaying = false;
@@ -29,21 +29,54 @@ const minerGame = (() => {
   
   // Инициализация
   function init() {
-    console.log('Инициализация игры Miner');
+    console.log('[Miner] Инициализация игры Miner');
     
-    // Добавляем обработчики событий
-    newGameBtn.addEventListener('click', startNewGame);
-    cashoutBtn.addEventListener('click', cashout);
-    minesCount.addEventListener('change', updateMineCount);
+    // Получаем элементы DOM с проверкой
+    newGameBtn = document.getElementById('new-game-btn');
+    cashoutBtn = document.getElementById('cashout-btn');
+    minerBet = document.getElementById('miner-bet');
+    minesCount = document.getElementById('mines-count');
+    minerGrid = document.getElementById('miner-grid');
+    potentialWin = document.getElementById('potential-win');
+    minerResult = document.getElementById('miner-result');
+    
+    // Проверка наличия критических элементов
+    if (!newGameBtn || !cashoutBtn || !minerBet || !minerGrid) {
+      console.error('[Miner] Критические элементы игры не найдены в DOM');
+      return false;
+    }
+    
+    // Добавляем обработчики событий (с проверкой)
+    if (newGameBtn) {
+      newGameBtn.addEventListener('click', startNewGame);
+      console.log('[Miner] Установлен обработчик для кнопки новой игры');
+    }
+    
+    if (cashoutBtn) {
+      cashoutBtn.addEventListener('click', cashout);
+      console.log('[Miner] Установлен обработчик для кнопки кешаута');
+    }
+    
+    if (minesCount) {
+      minesCount.addEventListener('change', updateMineCount);
+      console.log('[Miner] Установлен обработчик для выбора количества мин');
+    }
     
     // Настраиваем звуки
     setupSounds();
     
-    // Создаем сетку
-    createGrid();
+    // Создаем сетку только если элемент существует
+    if (minerGrid) {
+      createGrid();
+    }
     
     // Обновляем потенциальный выигрыш
-    updatePotentialWin();
+    if (potentialWin) {
+      updatePotentialWin();
+    }
+    
+    console.log('[Miner] Инициализация завершена успешно');
+    return true;
   }
   
   // Настройка звуков
@@ -55,18 +88,24 @@ const minerGame = (() => {
         const audioCtx = new AudioContext();
         
         // Заглушка для локальной разработки
-        clickSound = { play: () => console.log('Звук клика') };
-        revealSound = { play: () => console.log('Звук открытия клетки') };
-        explodeSound = { play: () => console.log('Звук взрыва') };
-        cashoutSound = { play: () => console.log('Звук выигрыша') };
+        clickSound = { play: () => console.log('[Miner] Звук клика') };
+        revealSound = { play: () => console.log('[Miner] Звук открытия клетки') };
+        explodeSound = { play: () => console.log('[Miner] Звук взрыва') };
+        cashoutSound = { play: () => console.log('[Miner] Звук выигрыша') };
       }
     } catch (e) {
-      console.log('Аудио не поддерживается', e);
+      console.log('[Miner] Аудио не поддерживается', e);
     }
   }
   
   // Создание игровой сетки
   function createGrid() {
+    // Проверяем, что элемент существует
+    if (!minerGrid) {
+      console.error('[Miner] Элемент minerGrid не найден в DOM');
+      return;
+    }
+    
     // Очищаем текущую сетку
     minerGrid.innerHTML = '';
     
@@ -90,10 +129,18 @@ const minerGame = (() => {
         minerGrid.appendChild(cell);
       }
     }
+    
+    console.log('[Miner] Игровая сетка создана успешно');
   }
   
   // Обновление количества мин и соответствующего коэффициента
   function updateMineCount() {
+    // Проверяем наличие элемента
+    if (!minesCount) {
+      console.error('[Miner] Элемент minesCount не найден в DOM');
+      return;
+    }
+    
     gameData.minesCount = parseInt(minesCount.value);
     
     // Устанавливаем базовый множитель в зависимости от количества мин
@@ -115,17 +162,25 @@ const minerGame = (() => {
         gameData.baseMultiplier = 1.2;
     }
     
-    // Обновляем отображение
-    updatePotentialWin();
+    // Обновляем отображение только если элемент существует
+    if (potentialWin) {
+      updatePotentialWin();
+    }
     
     // Добавляем тактильную обратную связь
-    if (window.casinoApp.provideTactileFeedback) {
+    if (window.casinoApp && window.casinoApp.provideTactileFeedback) {
       window.casinoApp.provideTactileFeedback('light');
     }
   }
   
   // Обновление отображения потенциального выигрыша
   function updatePotentialWin() {
+    // Проверяем наличие элементов
+    if (!potentialWin || !minerBet) {
+      console.error('[Miner] Элементы potentialWin или minerBet не найдены в DOM');
+      return;
+    }
+    
     const betAmt = parseInt(minerBet.value) || 0;
     
     // Используем улучшенную формулу для расчета множителя
@@ -168,6 +223,19 @@ const minerGame = (() => {
   
   // Старт новой игры
   function startNewGame() {
+    // Проверка наличия элементов
+    if (!minerBet) {
+      console.error('[Miner] Элемент ставки не найден');
+      return;
+    }
+    
+    // Проверка доступности casinoApp
+    if (!window.casinoApp) {
+      console.error('[Miner] casinoApp не найден');
+      alert('Ошибка инициализации приложения');
+      return;
+    }
+    
     // Получаем размер ставки
     const betAmount = parseInt(minerBet.value);
     
@@ -190,7 +258,7 @@ const minerGame = (() => {
       mines: [],
       revealedCells: [],
       totalCells: 25,
-      minesCount: parseInt(minesCount.value),
+      minesCount: parseInt(minesCount ? minesCount.value : 3),
       currentMultiplier: gameData.baseMultiplier,
       betAmount: betAmount,
       baseMultiplier: gameData.baseMultiplier
@@ -201,10 +269,19 @@ const minerGame = (() => {
     
     // Обновляем интерфейс
     createGrid();
-    cashoutBtn.disabled = false;
-    newGameBtn.disabled = true;
-    minerResult.textContent = '';
-    minerResult.className = 'result';
+    
+    if (cashoutBtn) {
+      cashoutBtn.disabled = false;
+    }
+    
+    if (newGameBtn) {
+      newGameBtn.disabled = true;
+    }
+    
+    if (minerResult) {
+      minerResult.textContent = '';
+      minerResult.className = 'result';
+    }
     
     // Тактильная обратная связь
     if (window.casinoApp.provideTactileFeedback) {
@@ -224,7 +301,11 @@ const minerGame = (() => {
     );
     
     // Обновляем отображение потенциального выигрыша
-    updatePotentialWin();
+    if (potentialWin) {
+      updatePotentialWin();
+    }
+    
+    console.log('[Miner] Новая игра начата');
   }
   
   // Размещение мин
@@ -243,7 +324,7 @@ const minerGame = (() => {
       }
     }
     
-    console.log('Мины размещены на позициях:', gameData.mines);
+    console.log('[Miner] Мины размещены на позициях:', gameData.mines);
   }
   
   // Открытие ячейки
@@ -260,9 +341,13 @@ const minerGame = (() => {
     
     // Получаем элемент ячейки
     const cell = document.querySelector(`.grid-cell[data-index="${index}"]`);
+    if (!cell) {
+      console.error(`[Miner] Ячейка с индексом ${index} не найдена`);
+      return;
+    }
     
     // Тактильная обратная связь
-    if (window.casinoApp.provideTactileFeedback) {
+    if (window.casinoApp && window.casinoApp.provideTactileFeedback) {
       window.casinoApp.provideTactileFeedback('light');
     }
     
@@ -282,32 +367,42 @@ const minerGame = (() => {
       animateExplosion(cell);
       
       // Вибрация при взрыве
-      if (window.casinoApp.provideTactileFeedback) {
+      if (window.casinoApp && window.casinoApp.provideTactileFeedback) {
         window.casinoApp.provideTactileFeedback('error');
       }
       
       // Устанавливаем игровое состояние
       isPlaying = false;
-      cashoutBtn.disabled = true;
-      newGameBtn.disabled = false;
+      
+      if (cashoutBtn) {
+        cashoutBtn.disabled = true;
+      }
+      
+      if (newGameBtn) {
+        newGameBtn.disabled = false;
+      }
       
       // Показываем результат
-      minerResult.textContent = 'Бум! Вы наткнулись на мину. Игра окончена!';
-      minerResult.classList.add('lose');
+      if (minerResult) {
+        minerResult.textContent = 'Бум! Вы наткнулись на мину. Игра окончена!';
+        minerResult.classList.add('lose');
+      }
       
       // Обрабатываем проигрыш
-      await window.casinoApp.processGameResult(
-        'miner',
-        0, // Нет дополнительной ставки
-        'lose',
-        0,
-        {
-          revealedCells: gameData.revealedCells,
-          hitMine: index,
-          mines: gameData.mines,
-          finalMultiplier: gameData.currentMultiplier
-        }
-      );
+      if (window.casinoApp) {
+        await window.casinoApp.processGameResult(
+          'miner',
+          0, // Нет дополнительной ставки
+          'lose',
+          0,
+          {
+            revealedCells: gameData.revealedCells,
+            hitMine: index,
+            mines: gameData.mines,
+            finalMultiplier: gameData.currentMultiplier
+          }
+        );
+      }
     } else {
       // Безопасная ячейка
       gameData.revealedCells.push(index);
@@ -323,7 +418,9 @@ const minerGame = (() => {
       animateReveal(cell);
       
       // Обновляем множитель и потенциальный выигрыш
-      updatePotentialWin();
+      if (potentialWin) {
+        updatePotentialWin();
+      }
       
       // Проверяем, все ли безопасные ячейки открыты (условие победы)
       if (gameData.revealedCells.length === gameData.totalCells - gameData.minesCount) {
@@ -335,6 +432,8 @@ const minerGame = (() => {
   
   // Анимация взрыва
   function animateExplosion(cell) {
+    if (!cell) return;
+    
     // Добавляем класс анимации
     cell.classList.add('explosion');
     
@@ -366,6 +465,8 @@ const minerGame = (() => {
   
   // Анимация открытия ячейки
   function animateReveal(cell) {
+    if (!cell) return;
+    
     // Добавляем класс анимации
     cell.classList.add('reveal-animation');
     
@@ -394,7 +495,14 @@ const minerGame = (() => {
   
   // Функция для вывода выигрыша
   async function cashout() {
+    // Проверяем состояние игры
     if (!isPlaying || gameData.revealedCells.length === 0) {
+      return;
+    }
+    
+    // Проверяем наличие casinoApp
+    if (!window.casinoApp) {
+      console.error('[Miner] casinoApp не найден');
       return;
     }
     
@@ -410,17 +518,25 @@ const minerGame = (() => {
     }
     
     // Обновляем интерфейс
-    minerResult.innerHTML = `
-      <div class="win-icon">🎉</div>
-      <div class="win-title">Вы выиграли ${winAmount} Stars!</div>
-      <div class="win-multiplier">Множитель: x${gameData.currentMultiplier.toFixed(2)}</div>
-    `;
-    minerResult.classList.add('win');
+    if (minerResult) {
+      minerResult.innerHTML = `
+        <div class="win-icon">🎉</div>
+        <div class="win-title">Вы выиграли ${winAmount} Stars!</div>
+        <div class="win-multiplier">Множитель: x${gameData.currentMultiplier.toFixed(2)}</div>
+      `;
+      minerResult.classList.add('win');
+    }
     
     // Сбрасываем игровое состояние
     isPlaying = false;
-    cashoutBtn.disabled = true;
-    newGameBtn.disabled = false;
+    
+    if (cashoutBtn) {
+      cashoutBtn.disabled = true;
+    }
+    
+    if (newGameBtn) {
+      newGameBtn.disabled = false;
+    }
     
     // Показываем все мины
     revealAllMines();
@@ -440,6 +556,8 @@ const minerGame = (() => {
         mines: gameData.mines
       }
     );
+    
+    console.log(`[Miner] Игра завершена - получен выигрыш ${winAmount} с множителем ${gameData.currentMultiplier.toFixed(2)}`);
   }
   
   // Анимация выигрыша
@@ -458,8 +576,19 @@ const minerGame = (() => {
   
   // Автоматический вывод при открытии всех безопасных ячеек
   async function automaticCashout() {
+    // Проверяем состояние игры
+    if (!isPlaying) {
+      return;
+    }
+    
+    // Проверяем наличие casinoApp
+    if (!window.casinoApp) {
+      console.error('[Miner] casinoApp не найден');
+      return;
+    }
+    
     // Рассчитываем максимальный выигрыш
-    const winAmount = gameData.betAmount * gameData.currentMultiplier;
+    const winAmount = Math.floor(gameData.betAmount * gameData.currentMultiplier);
     
     // Воспроизводим звук большого выигрыша
     if (cashoutSound) {
@@ -475,18 +604,26 @@ const minerGame = (() => {
     }
     
     // Обновляем интерфейс
-    minerResult.innerHTML = `
-      <div class="win-icon">🏆</div>
-      <div class="win-title">Идеально! Вы открыли все безопасные ячейки!</div>
-      <div class="win-amount">Выигрыш: ${winAmount} ⭐</div>
-      <div class="win-multiplier">Множитель: x${gameData.currentMultiplier.toFixed(2)}</div>
-    `;
-    minerResult.classList.add('win', 'big-win');
+    if (minerResult) {
+      minerResult.innerHTML = `
+        <div class="win-icon">🏆</div>
+        <div class="win-title">Идеально! Вы открыли все безопасные ячейки!</div>
+        <div class="win-amount">Выигрыш: ${winAmount} ⭐</div>
+        <div class="win-multiplier">Множитель: x${gameData.currentMultiplier.toFixed(2)}</div>
+      `;
+      minerResult.classList.add('win', 'big-win');
+    }
     
     // Сбрасываем игровое состояние
     isPlaying = false;
-    cashoutBtn.disabled = true;
-    newGameBtn.disabled = false;
+    
+    if (cashoutBtn) {
+      cashoutBtn.disabled = true;
+    }
+    
+    if (newGameBtn) {
+      newGameBtn.disabled = false;
+    }
     
     // Показываем все мины с анимацией
     revealAllMines();
@@ -507,6 +644,8 @@ const minerGame = (() => {
         perfectGame: true
       }
     );
+    
+    console.log(`[Miner] Идеальная игра завершена - получен выигрыш ${winAmount} с множителем ${gameData.currentMultiplier.toFixed(2)}`);
   }
   
   // Анимация большого выигрыша
@@ -561,9 +700,6 @@ const minerGame = (() => {
     updateMineCount
   };
 })();
-// Добавить в конец файла miner.js
-// После строки: })();
-
 // Глобальный экспорт объекта игры
 window.minerGame = minerGame;
 console.log('[Miner] Экспорт игрового объекта в глобальную область видимости');
