@@ -1,883 +1,1206 @@
-// public/js/games/crush.js
+/**
+ * crush.js - Оптимизированная версия игры Crush
+ * Версия 2.0.0
+ * 
+ * Особенности:
+ * - Неблокирующая инициализация
+ * - Улучшенная обработка ошибок
+ * - Таймауты для всех асинхронных операций
+ * - Совместимость с новой системой регистрации игр
+ */
 
-// Улучшенная версия игры Crash с качественным графиком и лучшим интерфейсом
-const crushGame = (() => {
-  // Элементы игры - объявляем как переменные, а не константы
-  let startBtn;
-  let cashoutBtn;
-  let crushBet;
-  let multiplierDisplay;
-  let crushGraph;
-  let crushResult;
-  
-  // Элементы для графика
-  let graphCanvas;
-  let graphCtx;
-  
-  // Состояние игры
-  let isPlaying = false;
-  let multiplier = 1.00;
-  let gameInterval = null;
-  let crashPoint = 1.00;
-  let betAmount = 0;
-  let gameStartTime = 0;
-  let graphPoints = [];
-  
-  // История игр
-  let gameHistory = [];
-  const MAX_HISTORY = 10;
-  
-  // Звуки
-  let startSound, tickSound, cashoutSound, crashSound;
-  
-  // Инициализация
-  function init() {
-    console.log('[Crush] Инициализация игры Crash');
-    
-    // Получаем DOM-элементы с проверкой наличия
-    startBtn = document.getElementById('start-crush-btn');
-    cashoutBtn = document.getElementById('cash-crush-btn');
-    crushBet = document.getElementById('crush-bet');
-    multiplierDisplay = document.getElementById('multiplier');
-    crushGraph = document.getElementById('crush-graph');
-    crushResult = document.getElementById('crush-result');
-    
-    // Проверяем наличие критически важных элементов
-    if (!startBtn || !cashoutBtn || !crushBet || !crushGraph) {
-      console.error('[Crush] Критические элементы игры не найдены в DOM');
-      return false;
-    }
-    
-    // Создаем canvas для графика, если его еще нет
-    if (!graphCanvas && crushGraph) {
-      graphCanvas = document.createElement('canvas');
-      graphCanvas.id = 'crush-canvas';
-      graphCanvas.width = crushGraph.clientWidth;
-      graphCanvas.height = crushGraph.clientHeight;
-      crushGraph.appendChild(graphCanvas);
-      
-      // Получаем контекст
-      graphCtx = graphCanvas.getContext('2d');
-    }
-    
-    // Добавляем обработчики событий (с проверкой)
-    if (startBtn) {
-      startBtn.addEventListener('click', startGame);
-      console.log('[Crush] Установлен обработчик для кнопки старта');
-    }
-    
-    if (cashoutBtn) {
-      cashoutBtn.addEventListener('click', cashout);
-      console.log('[Crush] Установлен обработчик для кнопки кешаута');
-    }
-    
-    // Обработчик изменения размера окна
-    window.addEventListener('resize', handleResize);
-    
-    // Настраиваем звуки
-    setupSounds();
-    
-    // Сбрасываем график
-    resetGraph();
-    
-    // Загружаем историю
-    loadHistory();
-    
-    // Создаем интерфейс истории
-    createHistoryUI();
-    
-    // Скрываем результат
-    if (crushResult) {
-      crushResult.style.display = 'none';
-    }
-    
-    console.log('[Crush] Инициализация завершена успешно');
-    return true;
+// Предотвращаем возможные конфликты и обеспечиваем изолированную среду
+(function() {
+  // Проверяем наличие основного объекта приложения
+  if (!window.GreenLightApp) {
+      console.error('[Crush] GreenLightApp не инициализирован!');
+      window.GreenLightApp = {
+          log: function(source, message, isError) {
+              if (isError) console.error(`[${source}] ${message}`);
+              else console.log(`[${source}] ${message}`);
+          }
+      };
   }
   
-  // Обработка изменения размера окна
-  function handleResize() {
-    if (graphCanvas && crushGraph) {
-      graphCanvas.width = crushGraph.clientWidth;
-      graphCanvas.height = crushGraph.clientHeight;
-      resetGraph();
+  const app = window.GreenLightApp;
+  app.log('Crush', 'Инициализация модуля игры Crush v2.0.0');
+  
+  // Игровая логика в замыкании для изоляции
+  const crushGame = (function() {
+      // Элементы игры
+      let elements = {
+          startBtn: null,
+          cashoutBtn: null,
+          crushBet: null,
+          multiplierDisplay: null,
+          crushGraph: null,
+          crushResult: null
+      };
       
-      // Перерисовываем текущий график, если игра активна
-      if (isPlaying && graphPoints.length > 0) {
-        redrawGraph();
+      // Элементы для графика
+      let graphCanvas = null;
+      let graphCtx = null;
+      
+      // Состояние игры
+      let state = {
+          isPlaying: false,
+          initialized: false,
+          initializationStarted: false,
+          multiplier: 1.00,
+          gameInterval: null,
+          crashPoint: 1.00,
+          betAmount: 0,
+          gameStartTime: 0,
+          graphPoints: []
+      };
+      
+      // История игр
+      let gameHistory = [];
+      const MAX_HISTORY = 10;
+      
+      /**
+       * Инициализация игры
+       * С защитой от повторной инициализации и таймаутом
+       */
+      const init = async function() {
+          // Предотвращаем повторную инициализацию
+          if (state.initialized || state.initializationStarted) {
+              app.log('Crush', 'Инициализация уже выполнена или выполняется');
+              return true;
+          }
+          
+          state.initializationStarted = true;
+          app.log('Crush', 'Начало инициализации игры');
+          
+          try {
+              // Устанавливаем таймаут для инициализации
+              const initPromise = new Promise(async (resolve) => {
+                  try {
+                      // Получаем элементы DOM (с проверкой наличия)
+                      await findDOMElements();
+                      
+                      // Создаем canvas для графика
+                      setupCanvas();
+                      
+                      // Добавляем обработчики событий
+                      setupEventListeners();
+                      
+                      // Сбрасываем график
+                      resetGraph();
+                      
+                      // Загружаем историю
+                      loadHistory();
+                      
+                      // Создаем интерфейс истории
+                      createHistoryUI();
+                      
+                      // Скрываем результат
+                      if (elements.crushResult) {
+                          elements.crushResult.style.display = 'none';
+                      }
+                      
+                      state.initialized = true;
+                      app.log('Crush', 'Инициализация успешно завершена');
+                      resolve(true);
+                  } catch (innerError) {
+                      app.log('Crush', `Ошибка в процессе инициализации: ${innerError.message}`, true);
+                      resolve(false);
+                  }
+              });
+              
+              // Устанавливаем таймаут (3 секунды)
+              const timeoutPromise = new Promise((resolve) => {
+                  setTimeout(() => {
+                      app.log('Crush', 'Таймаут инициализации', true);
+                      resolve(false);
+                  }, 3000);
+              });
+              
+              // Используем Promise.race для предотвращения зависания
+              const result = await Promise.race([initPromise, timeoutPromise]);
+              
+              return result;
+              
+          } catch (error) {
+              app.log('Crush', `Критическая ошибка инициализации: ${error.message}`, true);
+              return false;
+          }
+      };
+      
+      /**
+       * Поиск DOM элементов с защитой от null
+       */
+      const findDOMElements = async function() {
+          // Используем Promise для асинхронности
+          return new Promise((resolve, reject) => {
+              try {
+                  // Таймаут для ожидания готовности DOM
+                  setTimeout(() => {
+                      elements.startBtn = document.getElementById('start-crush-btn');
+                      elements.cashoutBtn = document.getElementById('cash-crush-btn');
+                      elements.crushBet = document.getElementById('crush-bet');
+                      elements.multiplierDisplay = document.getElementById('multiplier');
+                      elements.crushGraph = document.getElementById('crush-graph');
+                      elements.crushResult = document.getElementById('crush-result');
+                      
+                      // Проверяем критические элементы
+                      if (!elements.startBtn) {
+                          app.log('Crush', 'Предупреждение: элемент start-crush-btn не найден', true);
+                      }
+                      
+                      if (!elements.crushGraph) {
+                          app.log('Crush', 'Предупреждение: элемент crush-graph не найден', true);
+                      }
+                      
+                      resolve();
+                  }, 100);
+              } catch (error) {
+                  app.log('Crush', `Ошибка при поиске DOM элементов: ${error.message}`, true);
+                  reject(error);
+              }
+          });
+      };
+      
+      /**
+       * Настройка canvas для графика
+       */
+      const setupCanvas = function() {
+          try {
+              if (!elements.crushGraph) {
+                  app.log('Crush', 'Элемент графика не найден', true);
+                  return;
+              }
+              
+              // Проверяем, существует ли уже canvas
+              let existingCanvas = elements.crushGraph.querySelector('canvas');
+              if (existingCanvas) {
+                  graphCanvas = existingCanvas;
+                  graphCtx = graphCanvas.getContext('2d');
+                  app.log('Crush', 'Использован существующий canvas');
+                  return;
+              }
+              
+              // Создаем новый canvas
+              graphCanvas = document.createElement('canvas');
+              graphCanvas.id = 'crush-canvas';
+              graphCanvas.width = elements.crushGraph.clientWidth || 300;
+              graphCanvas.height = elements.crushGraph.clientHeight || 200;
+              elements.crushGraph.appendChild(graphCanvas);
+              
+              // Получаем контекст
+              graphCtx = graphCanvas.getContext('2d');
+              
+              app.log('Crush', 'Canvas для графика успешно создан');
+          } catch (error) {
+              app.log('Crush', `Ошибка создания canvas: ${error.message}`, true);
+          }
+      };
+      
+      /**
+       * Настройка обработчиков событий
+       */
+      const setupEventListeners = function() {
+          try {
+              // Кнопка старта
+              if (elements.startBtn) {
+                  // Очищаем текущие обработчики (предотвращаем дублирование)
+                  const newStartBtn = elements.startBtn.cloneNode(true);
+                  if (elements.startBtn.parentNode) {
+                      elements.startBtn.parentNode.replaceChild(newStartBtn, elements.startBtn);
+                  }
+                  elements.startBtn = newStartBtn;
+                  
+                  // Добавляем обработчик
+                  elements.startBtn.addEventListener('click', startGame);
+              }
+              
+              // Кнопка вывода
+              if (elements.cashoutBtn) {
+                  const newCashoutBtn = elements.cashoutBtn.cloneNode(true);
+                  if (elements.cashoutBtn.parentNode) {
+                      elements.cashoutBtn.parentNode.replaceChild(newCashoutBtn, elements.cashoutBtn);
+                  }
+                  elements.cashoutBtn = newCashoutBtn;
+                  
+                  elements.cashoutBtn.addEventListener('click', cashout);
+              }
+              
+              // Обработчик изменения размера окна
+              window.addEventListener('resize', handleResize);
+              
+              app.log('Crush', 'Обработчики событий установлены');
+          } catch (error) {
+              app.log('Crush', `Ошибка установки обработчиков: ${error.message}`, true);
+          }
+      };
+      
+      /**
+       * Обработка изменения размера окна
+       */
+      const handleResize = function() {
+          try {
+              if (graphCanvas && elements.crushGraph) {
+                  graphCanvas.width = elements.crushGraph.clientWidth || 300;
+                  graphCanvas.height = elements.crushGraph.clientHeight || 200;
+                  resetGraph();
+                  
+                  // Перерисовываем текущий график, если игра активна
+                  if (state.isPlaying && state.graphPoints.length > 0) {
+                      redrawGraph();
+                  }
+              }
+          } catch (error) {
+              app.log('Crush', `Ошибка обработки изменения размера: ${error.message}`, true);
+          }
+      };
+      
+      /**
+       * Создание интерфейса истории
+       */
+      const createHistoryUI = function() {
+          try {
+              // Проверяем, существует ли контейнер игры
+              const crushContainer = document.querySelector('.crush-container');
+              if (!crushContainer) {
+                  app.log('Crush', 'Контейнер игры не найден', true);
+                  return;
+              }
+              
+              // Проверяем, существует ли уже контейнер истории
+              let historyContainer = document.querySelector('.crush-history');
+              
+              if (!historyContainer) {
+                  // Создаем контейнер для истории
+                  historyContainer = document.createElement('div');
+                  historyContainer.className = 'crush-history';
+                  historyContainer.innerHTML = `
+                      <h3>История</h3>
+                      <div class="history-items"></div>
+                  `;
+                  
+                  // Добавляем после графика
+                  if (elements.crushGraph) {
+                      elements.crushGraph.after(historyContainer);
+                  } else {
+                      crushContainer.appendChild(historyContainer);
+                  }
+              }
+              
+              // Обновляем содержимое истории
+              updateHistoryDisplay();
+              
+              app.log('Crush', 'Интерфейс истории создан успешно');
+          } catch (error) {
+              app.log('Crush', `Ошибка создания интерфейса истории: ${error.message}`, true);
+          }
+      };
+      
+      /**
+       * Сброс графика
+       */
+      const resetGraph = function() {
+          try {
+              if (!graphCtx) {
+                  app.log('Crush', 'graphCtx не доступен, невозможно сбросить график', true);
+                  return;
+              }
+              
+              // Очищаем холст
+              graphCtx.clearRect(0, 0, graphCanvas.width, graphCanvas.height);
+              
+              // Рисуем сетку
+              drawGrid();
+              
+              // Сбрасываем точки
+              state.graphPoints = [];
+              
+              app.log('Crush', 'График сброшен успешно');
+          } catch (error) {
+              app.log('Crush', `Ошибка сброса графика: ${error.message}`, true);
+          }
+      };
+      
+      /**
+       * Рисование сетки графика
+       */
+      const drawGrid = function() {
+          try {
+              if (!graphCtx) {
+                  app.log('Crush', 'graphCtx не доступен, невозможно нарисовать сетку', true);
+                  return;
+              }
+              
+              const width = graphCanvas.width;
+              const height = graphCanvas.height;
+              
+              // Стиль сетки
+              graphCtx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+              graphCtx.lineWidth = 1;
+              
+              // Горизонтальные линии
+              for (let y = height; y >= 0; y -= height / 4) {
+                  graphCtx.beginPath();
+                  graphCtx.moveTo(0, y);
+                  graphCtx.lineTo(width, y);
+                  graphCtx.stroke();
+              }
+              
+              // Вертикальные линии
+              for (let x = 0; x < width; x += width / 5) {
+                  graphCtx.beginPath();
+                  graphCtx.moveTo(x, 0);
+                  graphCtx.lineTo(x, height);
+                  graphCtx.stroke();
+              }
+          } catch (error) {
+              app.log('Crush', `Ошибка рисования сетки: ${error.message}`, true);
+          }
+      };
+      
+      /**
+       * Загрузка истории
+       */
+      const loadHistory = function() {
+          try {
+              // В реальном приложении здесь был бы запрос к API
+              // Для демонстрации генерируем случайную историю
+              gameHistory = [];
+              
+              for (let i = 0; i < 10; i++) {
+                  const isCrash = Math.random() > 0.3; // 70% вероятность краша
+                  const crashMultiplier = isCrash ? 
+                      (1 + Math.random() * Math.random() * 4).toFixed(2) : 
+                      (1 + Math.random() * Math.random() * 8).toFixed(2);
+                  
+                  gameHistory.push({
+                      multiplier: parseFloat(crashMultiplier),
+                      timestamp: new Date(Date.now() - i * 60000).toISOString(),
+                      isCashedOut: !isCrash
+                  });
+              }
+              
+              // Обновляем отображение истории
+              updateHistoryDisplay();
+              
+              app.log('Crush', `История загружена: ${gameHistory.length} записей`);
+          } catch (error) {
+              app.log('Crush', `Ошибка загрузки истории: ${error.message}`, true);
+          }
+      };
+      
+      /**
+       * Обновление отображения истории
+       */
+      const updateHistoryDisplay = function() {
+          try {
+              const historyItems = document.querySelector('.history-items');
+              if (!historyItems) {
+                  app.log('Crush', 'Элемент history-items не найден', true);
+                  return;
+              }
+              
+              historyItems.innerHTML = '';
+              
+              // Добавляем элементы истории
+              gameHistory.forEach(item => {
+                  const historyItem = document.createElement('div');
+                  historyItem.className = `history-item ${item.isCashedOut ? 'cashed-out' : 'crashed'}`;
+                  
+                  // Определяем цвет в зависимости от множителя
+                  let colorClass = '';
+                  if (item.multiplier <= 1.5) {
+                      colorClass = 'low';
+                  } else if (item.multiplier <= 3) {
+                      colorClass = 'medium';
+                  } else if (item.multiplier <= 5) {
+                      colorClass = 'high';
+                  } else {
+                      colorClass = 'extreme';
+                  }
+                  
+                  historyItem.classList.add(colorClass);
+                  historyItem.innerHTML = `
+                      <div class="history-multiplier">${item.multiplier.toFixed(2)}x</div>
+                  `;
+                  
+                  historyItems.appendChild(historyItem);
+              });
+          } catch (error) {
+              app.log('Crush', `Ошибка обновления отображения истории: ${error.message}`, true);
+          }
+      };
+      
+      /**
+       * Начало игры
+       */
+      const startGame = async function() {
+          app.log('Crush', 'Запуск игры');
+          
+          // Проверяем инициализацию
+          if (!state.initialized) {
+              app.log('Crush', 'Игра не инициализирована, запускаем инициализацию', true);
+              await init();
+              
+              // Если инициализация не удалась, выходим
+              if (!state.initialized) {
+                  app.log('Crush', 'Не удалось запустить игру: ошибка инициализации', true);
+                  return;
+              }
+          }
+          
+          try {
+              // Проверка наличия casinoApp
+              if (!window.casinoApp) {
+                  app.log('Crush', 'casinoApp не найден', true);
+                  alert('Ошибка инициализации приложения');
+                  return;
+              }
+              
+              // Проверка наличия элементов
+              if (!elements.crushBet) {
+                  app.log('Crush', 'Элемент ставки не найден', true);
+                  return;
+              }
+              
+              // Проверяем, не запущена ли уже игра
+              if (state.isPlaying) {
+                  app.log('Crush', 'Игра уже запущена');
+                  return;
+              }
+              
+              // Получаем размер ставки
+              state.betAmount = parseInt(elements.crushBet.value);
+              
+              // Проверяем ставку
+              if (isNaN(state.betAmount) || state.betAmount <= 0) {
+                  window.casinoApp.showNotification('Пожалуйста, введите корректную ставку');
+                  return;
+              }
+              
+              // Проверяем, достаточно ли средств
+              if (state.betAmount > window.GreenLightApp.user.balance) {
+                  window.casinoApp.showNotification('Недостаточно средств для ставки');
+                  return;
+              }
+              
+              // Сбрасываем состояние игры
+              state.multiplier = 1.00;
+              if (elements.multiplierDisplay) {
+                  elements.multiplierDisplay.textContent = state.multiplier.toFixed(2);
+                  elements.multiplierDisplay.classList.remove('crashed', 'cashed-out');
+                  elements.multiplierDisplay.classList.add('active');
+              }
+              
+              state.isPlaying = true;
+              
+              // Вычисляем точку краша
+              state.crashPoint = generateCrashPoint();
+              app.log('Crush', `Игра закончится на: ${state.crashPoint.toFixed(2)}`);
+              
+              // Обновляем интерфейс
+              if (elements.startBtn) {
+                  elements.startBtn.disabled = true;
+                  elements.startBtn.classList.add('disabled');
+              }
+              
+              if (elements.cashoutBtn) {
+                  elements.cashoutBtn.disabled = false;
+                  elements.cashoutBtn.classList.remove('disabled');
+                  elements.cashoutBtn.classList.add('active');
+              }
+              
+              // Скрываем предыдущий результат
+              if (elements.crushResult) {
+                  elements.crushResult.style.opacity = '0';
+                  elements.crushResult.style.transform = 'translateY(20px)';
+                  setTimeout(() => {
+                      elements.crushResult.textContent = '';
+                      elements.crushResult.className = 'result';
+                      elements.crushResult.style.display = 'none';
+                  }, 300);
+              }
+              
+              // Тактильная обратная связь
+              if (window.casinoApp.provideTactileFeedback) {
+                  window.casinoApp.provideTactileFeedback('medium');
+              }
+              
+              // Сбрасываем график
+              resetGraph();
+              state.gameStartTime = Date.now();
+              addGraphPoint(1.00); // Начальная точка
+              
+              // Отправляем начальную ставку на сервер
+              await window.casinoApp.processGameResult(
+                  'crush',
+                  state.betAmount,
+                  'bet',
+                  0,
+                  { startMultiplier: state.multiplier }
+              );
+              
+              // Запускаем интервал игры с защитой от зависания
+              startGameInterval();
+              
+              app.log('Crush', 'Игра запущена успешно');
+          } catch (error) {
+              app.log('Crush', `Ошибка запуска игры: ${error.message}`, true);
+              
+              // Сбрасываем состояние в случае ошибки
+              state.isPlaying = false;
+              if (elements.startBtn) {
+                  elements.startBtn.disabled = false;
+                  elements.startBtn.classList.remove('disabled');
+              }
+          }
+      };
+      
+      /**
+       * Запуск игрового интервала с защитой от зависания
+       */
+      const startGameInterval = function() {
+          try {
+              // Устанавливаем максимальное время игры
+              const maxGameTime = 60000; // 60 секунд максимум
+              const gameStartMs = Date.now();
+              
+              // Запускаем интервал
+              state.gameInterval = setInterval(() => {
+                  // Проверяем, не превышено ли максимальное время
+                  if (Date.now() - gameStartMs > maxGameTime) {
+                      app.log('Crush', 'Превышено максимальное время игры', true);
+                      clearInterval(state.gameInterval);
+                      gameCrash(); // Принудительный крах
+                      return;
+                  }
+                  
+                  // Обновляем игру
+                  updateGame();
+              }, 50);
+              
+              app.log('Crush', 'Игровой интервал запущен успешно');
+          } catch (error) {
+              app.log('Crush', `Ошибка запуска игрового интервала: ${error.message}`, true);
+              
+              // В случае ошибки, принудительно останавливаем игру
+              state.isPlaying = false;
+              if (state.gameInterval) {
+                  clearInterval(state.gameInterval);
+              }
+          }
+      };
+      
+      /**
+       * Генерация точки краша
+       */
+      const generateCrashPoint = function() {
+          try {
+              // Используем распределение с большей вероятностью малых значений
+              // и редкой вероятностью больших значений
+              
+              // Базовое случайное число от 0 до 1
+              const r = Math.random();
+              
+              // Формула для распределения
+              let crash = 1.0;
+              
+              if (r < 0.5) {
+                  // 50% шанс краша между 1.0 и 2.0
+                  crash = 1.0 + r;
+              } else if (r < 0.8) {
+                  // 30% шанс краша между 2.0 и 4.0
+                  crash = 2.0 + (r - 0.5) * 6.67;
+              } else if (r < 0.95) {
+                  // 15% шанс краша между 4.0 и 8.0
+                  crash = 4.0 + (r - 0.8) * 26.67;
+              } else {
+                  // 5% шанс краша между 8.0 и 100.0 (редкие крупные множители)
+                  crash = 8.0 + (r - 0.95) * 1840;
+              }
+              
+              // Ограничиваем максимальное значение для безопасности
+              return Math.min(crash, 100.0);
+          } catch (error) {
+              app.log('Crush', `Ошибка генерации точки краша: ${error.message}`, true);
+              return 2.0; // Безопасное значение по умолчанию
+          }
+      };
+      
+      /**
+       * Обновление состояния игры
+       */
+      const updateGame = function() {
+          try {
+              if (!state.isPlaying) return;
+              
+              const elapsedTime = (Date.now() - state.gameStartTime) / 1000;
+              
+              // Обновляем множитель
+              const growthFactor = 0.5;
+              state.multiplier = Math.exp(elapsedTime * growthFactor);
+              
+              // Округляем до 2 знаков после запятой для отображения
+              const displayMultiplier = Math.floor(state.multiplier * 100) / 100;
+              
+              // Обновляем отображение
+              if (elements.multiplierDisplay) {
+                  elements.multiplierDisplay.textContent = displayMultiplier.toFixed(2);
+                  
+                  // Добавляем визуальный эффект для больших множителей
+                  elements.multiplierDisplay.classList.remove('low', 'medium', 'high', 'extreme');
+                  
+                  if (displayMultiplier <= 1.5) {
+                      elements.multiplierDisplay.classList.add('low');
+                  } else if (displayMultiplier <= 3) {
+                      elements.multiplierDisplay.classList.add('medium');
+                  } else if (displayMultiplier <= 5) {
+                      elements.multiplierDisplay.classList.add('high');
+                  } else {
+                      elements.multiplierDisplay.classList.add('extreme');
+                  }
+              }
+              
+              // Добавляем точку на график каждые 100мс для плавности
+              if (Date.now() % 100 < 50) {
+                  addGraphPoint(displayMultiplier);
+              }
+              
+              // Проверяем, должна ли игра завершиться
+              if (state.multiplier >= state.crashPoint) {
+                  gameCrash();
+              }
+          } catch (error) {
+              app.log('Crush', `Ошибка обновления игры: ${error.message}`, true);
+              
+              // В случае ошибки, прекращаем игру
+              if (state.gameInterval) {
+                  clearInterval(state.gameInterval);
+              }
+              gameCrash();
+          }
+      };
+      
+      /**
+       * Добавление точки на график
+       */
+      const addGraphPoint = function(mult) {
+          try {
+              const elapsedTimeMs = Date.now() - state.gameStartTime;
+              const elapsedTimeSec = elapsedTimeMs / 1000;
+              
+              // Сохраняем точку для возможного перерисовывания при ресайзе
+              state.graphPoints.push({
+                  time: elapsedTimeSec,
+                  multiplier: mult
+              });
+              
+              // Перерисовываем график
+              redrawGraph();
+          } catch (error) {
+              app.log('Crush', `Ошибка добавления точки на график: ${error.message}`, true);
+          }
+      };
+      
+      /**
+       * Перерисовка всего графика
+       */
+      const redrawGraph = function() {
+          try {
+              if (!graphCtx || !graphCanvas) {
+                  app.log('Crush', 'Невозможно перерисовать график - графический контекст не доступен', true);
+                  return;
+              }
+              
+              // Очищаем холст
+              graphCtx.clearRect(0, 0, graphCanvas.width, graphCanvas.height);
+              
+              // Рисуем сетку
+              drawGrid();
+              
+              // Если нет точек или всего одна точка, выходим
+              if (state.graphPoints.length < 2) return;
+              
+              const width = graphCanvas.width;
+              const height = graphCanvas.height;
+              
+              // Находим максимальные значения для масштабирования
+              const maxTime = Math.max(5, state.graphPoints[state.graphPoints.length - 1].time);
+              const maxMult = Math.max(5, ...state.graphPoints.map(p => p.multiplier));
+              
+              // Начинаем рисовать линию
+              graphCtx.beginPath();
+              
+              // Перемещаемся к первой точке
+              const x0 = (state.graphPoints[0].time / maxTime) * width;
+              const y0 = height - (state.graphPoints[0].multiplier / maxMult) * height;
+              graphCtx.moveTo(x0, y0);
+              
+              // Добавляем остальные точки
+              for (let i = 1; i < state.graphPoints.length; i++) {
+                  const x = (state.graphPoints[i].time / maxTime) * width;
+                  const y = height - (state.graphPoints[i].multiplier / maxMult) * height;
+                  
+                  // Используем кривую Безье для сглаживания
+                  if (i < state.graphPoints.length - 1) {
+                      // Контрольные точки для сглаживания
+                      const nextX = (state.graphPoints[i + 1].time / maxTime) * width;
+                      const nextY = height - (state.graphPoints[i + 1].multiplier / maxMult) * height;
+                      
+                      const cpx1 = x - (x - x0) / 2;
+                      const cpy1 = y;
+                      const cpx2 = x + (nextX - x) / 2;
+                      const cpy2 = y;
+                      
+                      graphCtx.bezierCurveTo(cpx1, cpy1, cpx2, cpy2, x, y);
+                  } else {
+                      graphCtx.lineTo(x, y);
+                  }
+              }
+              
+              // Настройки линии
+              graphCtx.strokeStyle = 'rgba(0, 168, 107, 0.8)';
+              graphCtx.lineWidth = 3;
+              graphCtx.shadowColor = 'rgba(0, 168, 107, 0.5)';
+              graphCtx.shadowBlur = 10;
+              graphCtx.stroke();
+              
+              // Добавляем заливку под линией графика
+              const lastX = (state.graphPoints[state.graphPoints.length - 1].time / maxTime) * width;
+              graphCtx.lineTo(lastX, height);
+              graphCtx.lineTo(0, height);
+              graphCtx.closePath();
+              
+              // Градиентная заливка
+              const gradient = graphCtx.createLinearGradient(0, 0, 0, height);
+              gradient.addColorStop(0, 'rgba(0, 168, 107, 0.5)');
+              gradient.addColorStop(1, 'rgba(0, 168, 107, 0)');
+              graphCtx.fillStyle = gradient;
+              graphCtx.fill();
+              
+              // Текущее значение множителя
+              const lastPoint = state.graphPoints[state.graphPoints.length - 1];
+              const lastY = height - (lastPoint.multiplier / maxMult) * height;
+              
+              // Рисуем точку на конце линии
+              graphCtx.beginPath();
+              graphCtx.arc(lastX, lastY, 6, 0, Math.PI * 2);
+              graphCtx.fillStyle = 'rgba(0, 168, 107, 1)';
+              graphCtx.fill();
+              graphCtx.strokeStyle = 'white';
+              graphCtx.lineWidth = 2;
+              graphCtx.stroke();
+          } catch (error) {
+              app.log('Crush', `Ошибка перерисовки графика: ${error.message}`, true);
+          }
+      };
+      
+      /**
+       * Обработка краша игры
+       */
+      const gameCrash = async function() {
+          try {
+              // Проверяем состояние игры
+              if (!state.isPlaying) return;
+              
+              // Проверяем наличие casinoApp
+              if (!window.casinoApp) {
+                  app.log('Crush', 'casinoApp не найден', true);
+                  return;
+              }
+              
+              // Останавливаем игру
+              clearInterval(state.gameInterval);
+              state.isPlaying = false;
+              
+              // Тактильная обратная связь
+              if (window.casinoApp.provideTactileFeedback) {
+                  window.casinoApp.provideTactileFeedback('error');
+              }
+              
+              // Обновляем интерфейс
+              if (elements.crushResult) {
+                  elements.crushResult.innerHTML = `
+                      <div class="crash-icon">💥</div>
+                      <div class="crash-text">Crash at ${state.multiplier.toFixed(2)}x!</div>
+                  `;
+                  elements.crushResult.classList.add('lose');
+                  elements.crushResult.style.display = 'block';
+                  setTimeout(() => {
+                      elements.crushResult.style.opacity = '1';
+                      elements.crushResult.style.transform = 'translateY(0)';
+                  }, 50);
+              }
+              
+              if (elements.multiplierDisplay) {
+                  elements.multiplierDisplay.classList.remove('active', 'low', 'medium', 'high', 'extreme');
+                  elements.multiplierDisplay.classList.add('crashed');
+              }
+              
+              if (elements.startBtn) {
+                  elements.startBtn.disabled = false;
+                  elements.startBtn.classList.remove('disabled');
+              }
+              
+              if (elements.cashoutBtn) {
+                  elements.cashoutBtn.disabled = true;
+                  elements.cashoutBtn.classList.remove('active');
+                  elements.cashoutBtn.classList.add('disabled');
+              }
+              
+              // Анимация краша на графике
+              animateCrash();
+              
+              // Обновляем историю
+              gameHistory.unshift({
+                  multiplier: state.multiplier,
+                  timestamp: new Date().toISOString(),
+                  isCashedOut: false
+              });
+              
+              // Обрезаем историю до максимального размера
+              if (gameHistory.length > MAX_HISTORY) {
+                  gameHistory = gameHistory.slice(0, MAX_HISTORY);
+              }
+              
+              // Обновляем отображение истории
+              updateHistoryDisplay();
+              
+              // Отправляем проигрыш на сервер
+              await window.casinoApp.processGameResult(
+                  'crush',
+                  0, // Нет дополнительной ставки
+                  'lose',
+                  0,
+                  {
+                      crashPoint: state.multiplier,
+                      finalMultiplier: state.multiplier
+                  }
+              );
+              
+              app.log('Crush', `Игра завершена крашем на множителе ${state.multiplier.toFixed(2)}`);
+          } catch (error) {
+              app.log('Crush', `Ошибка обработки краша: ${error.message}`, true);
+              
+              // Сбрасываем состояние в любом случае
+              state.isPlaying = false;
+              if (state.gameInterval) {
+                  clearInterval(state.gameInterval);
+              }
+          }
+      };
+      
+      /**
+       * Анимация краша
+       */
+      const animateCrash = function() {
+          try {
+              if (!graphCanvas || !graphCtx) {
+                  app.log('Crush', 'Невозможно анимировать краш - графический контекст не доступен', true);
+                  return;
+              }
+              
+              // Добавляем визуальный эффект взрыва
+              const lastPoint = state.graphPoints[state.graphPoints.length - 1];
+              
+              // Находим позицию последней точки на графике
+              const width = graphCanvas.width;
+              const height = graphCanvas.height;
+              
+              // Максимальные значения для масштабирования
+              const maxTime = Math.max(5, lastPoint.time);
+              const maxMult = Math.max(5, lastPoint.multiplier);
+              
+              const crashX = (lastPoint.time / maxTime) * width;
+              const crashY = height - (lastPoint.multiplier / maxMult) * height;
+              
+              // Рисуем взрыв
+              const explosionRadius = 20;
+              const explosionColors = [
+                  'rgba(255, 0, 0, 0.8)',
+                  'rgba(255, 165, 0, 0.8)',
+                  'rgba(255, 255, 0, 0.8)'
+              ];
+              
+              for (let i = 0; i < 3; i++) {
+                  setTimeout(() => {
+                      if (!graphCtx) return;
+                      
+                      graphCtx.beginPath();
+                      graphCtx.arc(crashX, crashY, explosionRadius * (i + 1), 0, Math.PI * 2);
+                      graphCtx.fillStyle = explosionColors[i];
+                      graphCtx.fill();
+                      
+                      // Перерисовываем через небольшую задержку
+                      setTimeout(redrawGraph, 150);
+                  }, i * 100);
+              }
+          } catch (error) {
+              app.log('Crush', `Ошибка анимации краша: ${error.message}`, true);
+          }
+      };
+      
+      /**
+       * Вывод выигрыша
+       */
+      const cashout = async function() {
+          try {
+              // Проверяем состояние игры
+              if (!state.isPlaying) return;
+              
+              // Проверяем наличие casinoApp
+              if (!window.casinoApp) {
+                  app.log('Crush', 'casinoApp не найден', true);
+                  return;
+              }
+              
+              // Останавливаем игру
+              clearInterval(state.gameInterval);
+              state.isPlaying = false;
+              
+              // Тактильная обратная связь
+              if (window.casinoApp.provideTactileFeedback) {
+                  window.casinoApp.provideTactileFeedback('success');
+              }
+              
+              // Вычисляем выигрыш
+              const winAmount = Math.floor(state.betAmount * state.multiplier);
+              
+              // Обновляем интерфейс
+              if (elements.crushResult) {
+                  elements.crushResult.innerHTML = `
+                      <div class="cashout-icon">💰</div>
+                      <div class="cashout-text">Cashed out at ${state.multiplier.toFixed(2)}x!</div>
+                      <div class="win-amount">+${winAmount} ⭐</div>
+                  `;
+                  elements.crushResult.classList.add('win');
+                  elements.crushResult.style.display = 'block';
+                  setTimeout(() => {
+                      elements.crushResult.style.opacity = '1';
+                      elements.crushResult.style.transform = 'translateY(0)';
+                  }, 50);
+              }
+              
+              if (elements.multiplierDisplay) {
+                  elements.multiplierDisplay.classList.remove('active', 'low', 'medium', 'high', 'extreme');
+                  elements.multiplierDisplay.classList.add('cashed-out');
+              }
+              
+              if (elements.startBtn) {
+                  elements.startBtn.disabled = false;
+                  elements.startBtn.classList.remove('disabled');
+              }
+              
+              if (elements.cashoutBtn) {
+                  elements.cashoutBtn.disabled = true;
+                  elements.cashoutBtn.classList.remove('active');
+                  elements.cashoutBtn.classList.add('disabled');
+              }
+              
+              // Анимация кешаута на графике
+              animateCashout();
+              
+              // Обновляем историю
+              gameHistory.unshift({
+                  multiplier: state.multiplier,
+                  timestamp: new Date().toISOString(),
+                  isCashedOut: true
+              });
+              
+              // Обрезаем историю до максимального размера
+              if (gameHistory.length > MAX_HISTORY) {
+                  gameHistory = gameHistory.slice(0, MAX_HISTORY);
+              }
+              
+              // Обновляем отображение истории
+              updateHistoryDisplay();
+              
+              // Отправляем выигрыш на сервер
+              await window.casinoApp.processGameResult(
+                  'crush',
+                  0, // Нет дополнительной ставки
+                  'win',
+                  winAmount,
+                  {
+                      cashoutMultiplier: state.multiplier,
+                      crashPoint: state.crashPoint
+                  }
+              );
+              
+              // Продолжаем показывать симуляцию графика до краша
+              simulateContinuation();
+              
+              app.log('Crush', `Успешный кешаут на множителе ${state.multiplier.toFixed(2)}, выигрыш: ${winAmount}`);
+          } catch (error) {
+              app.log('Crush', `Ошибка кешаута: ${error.message}`, true);
+              
+              // Сбрасываем состояние в любом случае
+              state.isPlaying = false;
+              if (state.gameInterval) {
+                  clearInterval(state.gameInterval);
+              }
+          }
+      };
+      
+      /**
+       * Анимация кешаута
+       */
+      const animateCashout = function() {
+          try {
+              if (!graphCanvas || !graphCtx) {
+                  app.log('Crush', 'Невозможно анимировать кешаут - графический контекст не доступен', true);
+                  return;
+              }
+              
+              // Добавляем визуальный эффект успешного кешаута
+              const lastPoint = state.graphPoints[state.graphPoints.length - 1];
+              
+              // Находим позицию последней точки на графике
+              const width = graphCanvas.width;
+              const height = graphCanvas.height;
+              
+              // Максимальные значения для масштабирования
+              const maxTime = Math.max(5, lastPoint.time);
+              const maxMult = Math.max(5, lastPoint.multiplier);
+              
+              const cashoutX = (lastPoint.time / maxTime) * width;
+              const cashoutY = height - (lastPoint.multiplier / maxMult) * height;
+              
+              // Рисуем эффект успешного кешаута
+              for (let i = 0; i < 3; i++) {
+                  setTimeout(() => {
+                      if (!graphCtx) return;
+                      
+                      graphCtx.beginPath();
+                      graphCtx.arc(cashoutX, cashoutY, 15 - i * 3, 0, Math.PI * 2);
+                      graphCtx.strokeStyle = 'rgba(0, 255, 0, ' + (0.8 - i * 0.2) + ')';
+                      graphCtx.lineWidth = 3;
+                      graphCtx.stroke();
+                      
+                      // Отмечаем точку кешаута на графике
+                      graphCtx.beginPath();
+                      graphCtx.arc(cashoutX, cashoutY, 8, 0, Math.PI * 2);
+                      graphCtx.fillStyle = 'rgba(0, 255, 0, 0.8)';
+                      graphCtx.fill();
+                      graphCtx.strokeStyle = 'white';
+                      graphCtx.lineWidth = 2;
+                      graphCtx.stroke();
+                  }, i * 100);
+              }
+          } catch (error) {
+              app.log('Crush', `Ошибка анимации кешаута: ${error.message}`, true);
+          }
+      };
+      
+      /**
+       * Симуляция продолжения графика после кешаута
+       */
+      const simulateContinuation = function() {
+          try {
+              const cashoutMultiplier = state.multiplier;
+              const cashoutTime = (Date.now() - state.gameStartTime) / 1000;
+              
+              // Создаем интервал для симуляции продолжения графика
+              let simulationTimeout = null;
+              let lastTime = Date.now();
+              let simulationInterval = setInterval(() => {
+                  try {
+                      // Вычисляем текущее время от начала игры
+                      const elapsedTime = (Date.now() - state.gameStartTime) / 1000;
+                      
+                      // Обновляем множитель (используем ту же формулу, что и в updateGame)
+                      const growthFactor = 0.5;
+                      const simulatedMultiplier = Math.exp(elapsedTime * growthFactor);
+                      const displayMultiplier = Math.floor(simulatedMultiplier * 100) / 100;
+                      
+                      // Добавляем точку на график
+                      if (Date.now() - lastTime > 100) {
+                          addGraphPoint(displayMultiplier);
+                          lastTime = Date.now();
+                      }
+                      
+                      // Проверяем, достигли ли точки краша
+                      if (simulatedMultiplier >= state.crashPoint) {
+                          clearInterval(simulationInterval);
+                          
+                          // Анимация краша на графике
+                          animateCrash();
+                          
+                          // Показываем сообщение о том, что произошел бы краш
+                          if (elements.crushResult && elements.crushResult.classList.contains('win')) {
+                              const crashInfo = document.createElement('div');
+                              crashInfo.className = 'crash-info';
+                              crashInfo.textContent = `Would have crashed at ${state.crashPoint.toFixed(2)}x`;
+                              elements.crushResult.appendChild(crashInfo);
+                          }
+                      }
+                  } catch (simError) {
+                      app.log('Crush', `Ошибка в симуляции: ${simError.message}`, true);
+                      clearInterval(simulationInterval);
+                  }
+              }, 50);
+              
+              // Останавливаем симуляцию через 5 секунд для экономии ресурсов
+              simulationTimeout = setTimeout(() => {
+                  clearInterval(simulationInterval);
+              }, 5000);
+              
+              // Защита от утечек памяти
+              window.addEventListener('beforeunload', () => {
+                  if (simulationInterval) clearInterval(simulationInterval);
+                  if (simulationTimeout) clearTimeout(simulationTimeout);
+              });
+          } catch (error) {
+              app.log('Crush', `Ошибка симуляции продолжения: ${error.message}`, true);
+          }
+      };
+      
+      // Возвращаем публичный интерфейс
+      return {
+          // Основные методы
+          init: init,
+          startGame: startGame,
+          cashout: cashout,
+          
+          // Метод для проверки состояния
+          getStatus: function() {
+              return {
+                  initialized: state.initialized,
+                  initializationStarted: state.initializationStarted,
+                  isPlaying: state.isPlaying,
+                  elementsFound: {
+                      startBtn: !!elements.startBtn,
+                      cashoutBtn: !!elements.cashoutBtn,
+                      crushBet: !!elements.crushBet,
+                      multiplierDisplay: !!elements.multiplierDisplay,
+                      crushGraph: !!elements.crushGraph
+                  },
+                  graphReady: !!graphCtx,
+                  gameState: {
+                      multiplier: state.multiplier,
+                      crashPoint: state.crashPoint,
+                      graphPoints: state.graphPoints.length
+                  }
+              };
+          }
+      };
+  })();
+  
+  // Регистрируем игру во всех форматах для максимальной совместимости
+  try {
+      // 1. Регистрация через новую систему
+      if (window.registerGame) {
+          window.registerGame('crushGame', crushGame);
+          app.log('Crush', 'Игра зарегистрирована через новую систему registerGame');
       }
-    }
-  }
-  
-  // Настройка звуков
-  function setupSounds() {
-    try {
-      // Создаем аудио-контексты если поддерживаются
-      const AudioContext = window.AudioContext || window.webkitAudioContext;
-      if (AudioContext) {
-        const audioCtx = new AudioContext();
-        
-        // Заглушка для локальной разработки
-        startSound = { play: () => console.log('[Crush] Звук старта') };
-        tickSound = { play: () => console.log('[Crush] Звук тика') };
-        cashoutSound = { play: () => console.log('[Crush] Звук кешаута') };
-        crashSound = { play: () => console.log('[Crush] Звук краша') };
-      }
-    } catch (e) {
-      console.log('[Crush] Аудио не поддерживается', e);
-    }
-  }
-  
-  // Создание интерфейса истории
-  function createHistoryUI() {
-    // Проверяем, существует ли контейнер игры
-    const crushContainer = document.querySelector('.crush-container');
-    if (!crushContainer) {
-      console.warn('[Crush] Контейнер игры не найден');
-      return;
-    }
-    
-    // Проверяем, существует ли уже контейнер истории
-    let historyContainer = document.querySelector('.crush-history');
-    
-    if (!historyContainer) {
-      // Создаем контейнер для истории
-      historyContainer = document.createElement('div');
-      historyContainer.className = 'crush-history';
-      historyContainer.innerHTML = `
-        <h3>История</h3>
-        <div class="history-items"></div>
-      `;
       
-      // Добавляем после графика
-      if (crushGraph) {
-        crushGraph.after(historyContainer);
-      } else {
-        crushContainer.appendChild(historyContainer);
-      }
-    }
-    
-    // Обновляем содержимое истории
-    updateHistoryDisplay();
-  }
-  
-  // Сброс графика
-  function resetGraph() {
-    if (!graphCtx) {
-      console.warn('[Crush] graphCtx не доступен, невозможно сбросить график');
-      return;
-    }
-    
-    // Очищаем холст
-    graphCtx.clearRect(0, 0, graphCanvas.width, graphCanvas.height);
-    
-    // Рисуем сетку
-    drawGrid();
-    
-    // Сбрасываем точки
-    graphPoints = [];
-  }
-  
-  // Рисование сетки графика
-  function drawGrid() {
-    if (!graphCtx) {
-      console.warn('[Crush] graphCtx не доступен, невозможно нарисовать сетку');
-      return;
-    }
-    
-    const width = graphCanvas.width;
-    const height = graphCanvas.height;
-    
-    // Стиль сетки
-    graphCtx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-    graphCtx.lineWidth = 1;
-    
-    // Горизонтальные линии
-    for (let y = height; y >= 0; y -= height / 4) {
-      graphCtx.beginPath();
-      graphCtx.moveTo(0, y);
-      graphCtx.lineTo(width, y);
-      graphCtx.stroke();
-    }
-    
-    // Вертикальные линии
-    for (let x = 0; x < width; x += width / 5) {
-      graphCtx.beginPath();
-      graphCtx.moveTo(x, 0);
-      graphCtx.lineTo(x, height);
-      graphCtx.stroke();
-    }
-  }
-  
-  // Загрузка истории
-  function loadHistory() {
-    // В реальном приложении здесь был бы запрос к API
-    // Для демонстрации генерируем случайную историю
-    gameHistory = [];
-    
-    for (let i = 0; i < 10; i++) {
-      const isCrash = Math.random() > 0.3; // 70% вероятность краша
-      const crashMultiplier = isCrash ? 
-        (1 + Math.random() * Math.random() * 4).toFixed(2) : 
-        (1 + Math.random() * Math.random() * 8).toFixed(2);
+      // 2. Экспорт в глобальное пространство имен (обратная совместимость)
+      window.crushGame = crushGame;
+      app.log('Crush', 'Игра экспортирована в глобальное пространство имен');
       
-      gameHistory.push({
-        multiplier: parseFloat(crashMultiplier),
-        timestamp: new Date(Date.now() - i * 60000).toISOString(),
-        isCashedOut: !isCrash
-      });
-    }
-    
-    // Обновляем отображение истории
-    updateHistoryDisplay();
-  }
-  
-  // Обновление отображения истории
-  function updateHistoryDisplay() {
-    const historyItems = document.querySelector('.history-items');
-    if (!historyItems) {
-      console.warn('[Crush] Элемент history-items не найден');
-      return;
-    }
-    
-    historyItems.innerHTML = '';
-    
-    // Добавляем элементы истории
-    gameHistory.forEach(item => {
-      const historyItem = document.createElement('div');
-      historyItem.className = `history-item ${item.isCashedOut ? 'cashed-out' : 'crashed'}`;
+      // 3. Сообщаем в лог о завершении загрузки модуля
+      app.log('Crush', 'Модуль успешно загружен и готов к инициализации');
       
-      // Определяем цвет в зависимости от множителя
-      let colorClass = '';
-      if (item.multiplier <= 1.5) {
-        colorClass = 'low';
-      } else if (item.multiplier <= 3) {
-        colorClass = 'medium';
-      } else if (item.multiplier <= 5) {
-        colorClass = 'high';
-      } else {
-        colorClass = 'extreme';
-      }
-      
-      // Форматируем время
-      const date = new Date(item.timestamp);
-      const time = `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
-      
-      historyItem.classList.add(colorClass);
-      historyItem.innerHTML = `
-        <div class="history-multiplier">${item.multiplier.toFixed(2)}x</div>
-      `;
-      
-      historyItems.appendChild(historyItem);
-    });
+  } catch (error) {
+      app.log('Crush', `Ошибка регистрации игры: ${error.message}`, true);
   }
-  
-  // Старт игры
-  async function startGame() {
-    // Проверяем наличие элементов
-    if (!crushBet) {
-      console.error('[Crush] Элемент crushBet не найден');
-      return;
-    }
-    
-    // Проверяем наличие casinoApp
-    if (!window.casinoApp) {
-      console.error('[Crush] casinoApp не найден');
-      alert('Ошибка инициализации приложения');
-      return;
-    }
-    
-    // Получаем размер ставки
-    betAmount = parseInt(crushBet.value);
-    
-    // Проверяем ставку
-    if (isNaN(betAmount) || betAmount <= 0) {
-      window.casinoApp.showNotification('Пожалуйста, введите корректную ставку');
-      return;
-    }
-    
-    // Проверяем, достаточно ли средств
-    if (betAmount > window.casinoApp.currentUser.balance) {
-      window.casinoApp.showNotification('Недостаточно средств для ставки');
-      return;
-    }
-    
-    // Сбрасываем состояние игры
-    multiplier = 1.00;
-    if (multiplierDisplay) {
-      multiplierDisplay.textContent = multiplier.toFixed(2);
-      multiplierDisplay.classList.remove('crashed', 'cashed-out');
-      multiplierDisplay.classList.add('active');
-    }
-    
-    isPlaying = true;
-    
-    // Вычисляем точку краша
-    crashPoint = generateCrashPoint();
-    console.log('[Crush] Игра закончится на:', crashPoint.toFixed(2));
-    
-    // Обновляем интерфейс
-    if (startBtn) {
-      startBtn.disabled = true;
-      startBtn.classList.add('disabled');
-    }
-    
-    if (cashoutBtn) {
-      cashoutBtn.disabled = false;
-      cashoutBtn.classList.remove('disabled');
-      cashoutBtn.classList.add('active');
-    }
-    
-    // Скрываем предыдущий результат
-    if (crushResult) {
-      crushResult.style.opacity = '0';
-      crushResult.style.transform = 'translateY(20px)';
-      setTimeout(() => {
-        crushResult.textContent = '';
-        crushResult.className = 'result';
-        crushResult.style.display = 'none';
-      }, 300);
-    }
-    
-    // Тактильная обратная связь
-    if (window.casinoApp.provideTactileFeedback) {
-      window.casinoApp.provideTactileFeedback('medium');
-    }
-    
-    // Сбрасываем график
-    resetGraph();
-    gameStartTime = Date.now();
-    addGraphPoint(1.00); // Начальная точка
-    
-    // Воспроизводим звук старта
-    if (startSound) startSound.play();
-    
-    // Отправляем начальную ставку на сервер
-    await window.casinoApp.processGameResult(
-      'crush',
-      betAmount,
-      'bet',
-      0,
-      { startMultiplier: multiplier }
-    );
-    
-    // Запускаем интервал игры
-    gameInterval = setInterval(updateGame, 50); // Более частое обновление для плавности
-    
-    console.log('[Crush] Игра запущена успешно');
-  }
-  
-  // Генерация точки краша
-  function generateCrashPoint() {
-    // Используем распределение с большей вероятностью малых значений
-    // и редкой вероятностью больших значений
-    
-    // Базовое случайное число от 0 до 1
-    const r = Math.random();
-    
-    // Формула для распределения, имитирующего экспоненциальный рост с возможностью редких больших значений
-    // Обычно график будет крашиться между 1.0 и 2.0, но иногда может доходить до больших значений
-    let crash = 1.0;
-    
-    if (r < 0.5) {
-      // 50% шанс краша между 1.0 и 2.0
-      crash = 1.0 + r;
-    } else if (r < 0.8) {
-      // 30% шанс краша между 2.0 и 4.0
-      crash = 2.0 + (r - 0.5) * 6.67;
-    } else if (r < 0.95) {
-      // 15% шанс краша между 4.0 и 8.0
-      crash = 4.0 + (r - 0.8) * 26.67;
-    } else {
-      // 5% шанс краша между 8.0 и 100.0 (редкие крупные множители)
-      crash = 8.0 + (r - 0.95) * 1840;
-    }
-    
-    // Ограничиваем максимальное значение для безопасности
-    return Math.min(crash, 100.0);
-  }
-  
-  // Обновление состояния игры
-  function updateGame() {
-    if (!isPlaying) return;
-    
-    const elapsedTime = (Date.now() - gameStartTime) / 1000;
-    
-    // Обновляем множитель (более естественный рост)
-    // Формула обеспечивает экспоненциальный рост multiplier = e^(time * growthFactor)
-    const growthFactor = 0.5;
-    multiplier = Math.exp(elapsedTime * growthFactor);
-    
-    // Округляем до 2 знаков после запятой для отображения
-    const displayMultiplier = Math.floor(multiplier * 100) / 100;
-    
-    // Обновляем отображение
-    if (multiplierDisplay) {
-      multiplierDisplay.textContent = displayMultiplier.toFixed(2);
-      
-      // Добавляем визуальный эффект для больших множителей
-      multiplierDisplay.classList.remove('low', 'medium', 'high', 'extreme');
-      
-      if (displayMultiplier <= 1.5) {
-        multiplierDisplay.classList.add('low');
-      } else if (displayMultiplier <= 3) {
-        multiplierDisplay.classList.add('medium');
-      } else if (displayMultiplier <= 5) {
-        multiplierDisplay.classList.add('high');
-      } else {
-        multiplierDisplay.classList.add('extreme');
-      }
-    }
-    
-    // Добавляем точку на график каждые 100мс для плавности
-    if (Date.now() % 100 < 50) {
-      addGraphPoint(displayMultiplier);
-    }
-    
-    // Воспроизводим звук тика при определенных множителях
-    if (Math.floor(multiplier * 2) / 2 === multiplier && tickSound) {
-      tickSound.play();
-    }
-    
-    // Проверяем, должна ли игра завершиться
-    if (multiplier >= crashPoint) {
-      gameCrash();
-    }
-  }
-  
-  // Добавление точки на график
-  function addGraphPoint(mult) {
-    const elapsedTimeMs = Date.now() - gameStartTime;
-    const elapsedTimeSec = elapsedTimeMs / 1000;
-    
-    // Масштабирование по времени
-    const timeScale = 2; // Сколько секунд должно помещаться по ширине графика
-    
-    // Сохраняем точку для возможного перерисовывания при ресайзе
-    graphPoints.push({
-      time: elapsedTimeSec,
-      multiplier: mult
-    });
-    
-    // Перерисовываем график
-    redrawGraph();
-  }
-  
-  // Перерисовка всего графика
-  function redrawGraph() {
-    if (!graphCtx || !graphCanvas) {
-      console.warn('[Crush] Невозможно перерисовать график - графический контекст не доступен');
-      return;
-    }
-    
-    // Очищаем холст
-    graphCtx.clearRect(0, 0, graphCanvas.width, graphCanvas.height);
-    
-    // Рисуем сетку
-    drawGrid();
-    
-    // Если нет точек или всего одна точка, выходим
-    if (graphPoints.length < 2) return;
-    
-    const width = graphCanvas.width;
-    const height = graphCanvas.height;
-    
-    // Находим максимальные значения для масштабирования
-    const maxTime = Math.max(5, graphPoints[graphPoints.length - 1].time);
-    const maxMult = Math.max(5, ...graphPoints.map(p => p.multiplier));
-    
-    // Начинаем рисовать линию
-    graphCtx.beginPath();
-    
-    // Перемещаемся к первой точке
-    const x0 = (graphPoints[0].time / maxTime) * width;
-    const y0 = height - (graphPoints[0].multiplier / maxMult) * height;
-    graphCtx.moveTo(x0, y0);
-    
-    // Добавляем остальные точки
-    for (let i = 1; i < graphPoints.length; i++) {
-      const x = (graphPoints[i].time / maxTime) * width;
-      const y = height - (graphPoints[i].multiplier / maxMult) * height;
-      
-      // Используем кривую Безье для сглаживания
-      if (i < graphPoints.length - 1) {
-        // Контрольные точки для сглаживания
-        const nextX = (graphPoints[i + 1].time / maxTime) * width;
-        const nextY = height - (graphPoints[i + 1].multiplier / maxMult) * height;
-        
-        const cpx1 = x - (x - x0) / 2;
-        const cpy1 = y;
-        const cpx2 = x + (nextX - x) / 2;
-        const cpy2 = y;
-        
-        graphCtx.bezierCurveTo(cpx1, cpy1, cpx2, cpy2, x, y);
-      } else {
-        graphCtx.lineTo(x, y);
-      }
-    }
-    
-    // Настройки линии
-    graphCtx.strokeStyle = 'rgba(0, 168, 107, 0.8)';
-    graphCtx.lineWidth = 3;
-    graphCtx.shadowColor = 'rgba(0, 168, 107, 0.5)';
-    graphCtx.shadowBlur = 10;
-    graphCtx.stroke();
-    
-    // Добавляем заливку под линией графика
-    const lastX = (graphPoints[graphPoints.length - 1].time / maxTime) * width;
-    graphCtx.lineTo(lastX, height);
-    graphCtx.lineTo(0, height);
-    graphCtx.closePath();
-    
-    // Градиентная заливка
-    const gradient = graphCtx.createLinearGradient(0, 0, 0, height);
-    gradient.addColorStop(0, 'rgba(0, 168, 107, 0.5)');
-    gradient.addColorStop(1, 'rgba(0, 168, 107, 0)');
-    graphCtx.fillStyle = gradient;
-    graphCtx.fill();
-    
-    // Текущее значение множителя
-    const lastPoint = graphPoints[graphPoints.length - 1];
-    const lastY = height - (lastPoint.multiplier / maxMult) * height;
-    
-    // Рисуем точку на конце линии
-    graphCtx.beginPath();
-    graphCtx.arc(lastX, lastY, 6, 0, Math.PI * 2);
-    graphCtx.fillStyle = 'rgba(0, 168, 107, 1)';
-    graphCtx.fill();
-    graphCtx.strokeStyle = 'white';
-    graphCtx.lineWidth = 2;
-    graphCtx.stroke();
-  }
-  
-  // Обработка краша игры
-  async function gameCrash() {
-    // Проверяем состояние игры
-    if (!isPlaying) return;
-    
-    // Проверяем наличие casinoApp
-    if (!window.casinoApp) {
-      console.error('[Crush] casinoApp не найден');
-      return;
-    }
-    
-    // Останавливаем игру
-    clearInterval(gameInterval);
-    isPlaying = false;
-    
-    // Воспроизводим звук краша
-    if (crashSound) crashSound.play();
-    
-    // Тактильная обратная связь
-    if (window.casinoApp.provideTactileFeedback) {
-      window.casinoApp.provideTactileFeedback('error');
-    }
-    
-    // Обновляем интерфейс
-    if (crushResult) {
-      crushResult.innerHTML = `
-        <div class="crash-icon">💥</div>
-        <div class="crash-text">Crash at ${multiplier.toFixed(2)}x!</div>
-      `;
-      crushResult.classList.add('lose');
-      crushResult.style.display = 'block';
-      setTimeout(() => {
-        crushResult.style.opacity = '1';
-        crushResult.style.transform = 'translateY(0)';
-      }, 50);
-    }
-    
-    if (multiplierDisplay) {
-      multiplierDisplay.classList.remove('active', 'low', 'medium', 'high', 'extreme');
-      multiplierDisplay.classList.add('crashed');
-    }
-    
-    if (startBtn) {
-      startBtn.disabled = false;
-      startBtn.classList.remove('disabled');
-    }
-    
-    if (cashoutBtn) {
-      cashoutBtn.disabled = true;
-      cashoutBtn.classList.remove('active');
-      cashoutBtn.classList.add('disabled');
-    }
-    
-    // Анимация краша на графике
-    animateCrash();
-    
-    // Обновляем историю
-    gameHistory.unshift({
-      multiplier: multiplier,
-      timestamp: new Date().toISOString(),
-      isCashedOut: false
-    });
-    
-    // Обрезаем историю до максимального размера
-    if (gameHistory.length > MAX_HISTORY) {
-      gameHistory = gameHistory.slice(0, MAX_HISTORY);
-    }
-    
-    // Обновляем отображение истории
-    updateHistoryDisplay();
-    
-    // Отправляем проигрыш на сервер
-    await window.casinoApp.processGameResult(
-      'crush',
-      0, // Нет дополнительной ставки
-      'lose',
-      0,
-      {
-        crashPoint: multiplier,
-        finalMultiplier: multiplier
-      }
-    );
-    
-    console.log(`[Crush] Игра завершена крашем на множителе ${multiplier.toFixed(2)}`);
-  }
-  
-  // Анимация краша
-  function animateCrash() {
-    if (!graphCanvas || !graphCtx) {
-      console.warn('[Crush] Невозможно анимировать краш - графический контекст не доступен');
-      return;
-    }
-    
-    // Добавляем визуальный эффект взрыва
-    const lastPoint = graphPoints[graphPoints.length - 1];
-    
-    // Находим позицию последней точки на графике
-    const width = graphCanvas.width;
-    const height = graphCanvas.height;
-    
-    // Максимальные значения для масштабирования
-    const maxTime = Math.max(5, lastPoint.time);
-    const maxMult = Math.max(5, lastPoint.multiplier);
-    
-    const crashX = (lastPoint.time / maxTime) * width;
-    const crashY = height - (lastPoint.multiplier / maxMult) * height;
-    
-    // Рисуем взрыв
-    const explosionRadius = 20;
-    const explosionColors = [
-      'rgba(255, 0, 0, 0.8)',
-      'rgba(255, 165, 0, 0.8)',
-      'rgba(255, 255, 0, 0.8)'
-    ];
-    
-    for (let i = 0; i < 3; i++) {
-      setTimeout(() => {
-        if (!graphCtx) return;
-        
-        graphCtx.beginPath();
-        graphCtx.arc(crashX, crashY, explosionRadius * (i + 1), 0, Math.PI * 2);
-        graphCtx.fillStyle = explosionColors[i];
-        graphCtx.fill();
-        
-        // Перерисовываем через небольшую задержку
-        setTimeout(redrawGraph, 150);
-      }, i * 100);
-    }
-  }
-  
-  // Кешаут (досрочный выход)
-  async function cashout() {
-    // Проверяем состояние игры
-    if (!isPlaying) return;
-    
-    // Проверяем наличие casinoApp
-    if (!window.casinoApp) {
-      console.error('[Crush] casinoApp не найден');
-      return;
-    }
-    
-    // Останавливаем игру
-    clearInterval(gameInterval);
-    isPlaying = false;
-    
-    // Воспроизводим звук кешаута
-    if (cashoutSound) cashoutSound.play();
-    
-    // Тактильная обратная связь
-    if (window.casinoApp.provideTactileFeedback) {
-      window.casinoApp.provideTactileFeedback('success');
-    }
-    
-    // Вычисляем выигрыш
-    const winAmount = Math.floor(betAmount * multiplier);
-    
-    // Обновляем интерфейс
-    if (crushResult) {
-      crushResult.innerHTML = `
-        <div class="cashout-icon">💰</div>
-        <div class="cashout-text">Cashed out at ${multiplier.toFixed(2)}x!</div>
-        <div class="win-amount">+${winAmount} ⭐</div>
-      `;
-      crushResult.classList.add('win');
-      crushResult.style.display = 'block';
-      setTimeout(() => {
-        crushResult.style.opacity = '1';
-        crushResult.style.transform = 'translateY(0)';
-      }, 50);
-    }
-    
-    if (multiplierDisplay) {
-      multiplierDisplay.classList.remove('active', 'low', 'medium', 'high', 'extreme');
-      multiplierDisplay.classList.add('cashed-out');
-    }
-    
-    if (startBtn) {
-      startBtn.disabled = false;
-      startBtn.classList.remove('disabled');
-    }
-    
-    if (cashoutBtn) {
-      cashoutBtn.disabled = true;
-      cashoutBtn.classList.remove('active');
-      cashoutBtn.classList.add('disabled');
-    }
-    
-    // Анимация кешаута на графике
-    animateCashout();
-    
-    // Обновляем историю
-    gameHistory.unshift({
-      multiplier: multiplier,
-      timestamp: new Date().toISOString(),
-      isCashedOut: true
-    });
-    
-    // Обрезаем историю до максимального размера
-    if (gameHistory.length > MAX_HISTORY) {
-      gameHistory = gameHistory.slice(0, MAX_HISTORY);
-    }
-    
-    // Обновляем отображение истории
-    updateHistoryDisplay();
-    
-    // Отправляем выигрыш на сервер
-    await window.casinoApp.processGameResult(
-      'crush',
-      0, // Нет дополнительной ставки
-      'win',
-      winAmount,
-      {
-        cashoutMultiplier: multiplier,
-        crashPoint: crashPoint
-      }
-    );
-    
-    // Продолжаем показывать симуляцию графика до краша
-    simulateContinuation();
-    
-    console.log(`[Crush] Успешный кешаут на множителе ${multiplier.toFixed(2)}, выигрыш: ${winAmount}`);
-  }
-  
-  // Анимация кешаута
-  function animateCashout() {
-    if (!graphCanvas || !graphCtx) {
-      console.warn('[Crush] Невозможно анимировать кешаут - графический контекст не доступен');
-      return;
-    }
-    
-    // Добавляем визуальный эффект успешного кешаута
-    const lastPoint = graphPoints[graphPoints.length - 1];
-    
-    // Находим позицию последней точки на графике
-    const width = graphCanvas.width;
-    const height = graphCanvas.height;
-    
-    // Максимальные значения для масштабирования
-    const maxTime = Math.max(5, lastPoint.time);
-    const maxMult = Math.max(5, lastPoint.multiplier);
-    
-    const cashoutX = (lastPoint.time / maxTime) * width;
-    const cashoutY = height - (lastPoint.multiplier / maxMult) * height;
-    
-    // Рисуем эффект успешного кешаута
-    for (let i = 0; i < 3; i++) {
-      setTimeout(() => {
-        if (!graphCtx) return;
-        
-        graphCtx.beginPath();
-        graphCtx.arc(cashoutX, cashoutY, 15 - i * 3, 0, Math.PI * 2);
-        graphCtx.strokeStyle = 'rgba(0, 255, 0, ' + (0.8 - i * 0.2) + ')';
-        graphCtx.lineWidth = 3;
-        graphCtx.stroke();
-        
-        // Отмечаем точку кешаута на графике
-        graphCtx.beginPath();
-        graphCtx.arc(cashoutX, cashoutY, 8, 0, Math.PI * 2);
-        graphCtx.fillStyle = 'rgba(0, 255, 0, 0.8)';
-        graphCtx.fill();
-        graphCtx.strokeStyle = 'white';
-        graphCtx.lineWidth = 2;
-        graphCtx.stroke();
-      }, i * 100);
-    }
-  }
-  
-  // Симуляция продолжения графика после кешаута
-  function simulateContinuation() {
-    const cashoutMultiplier = multiplier;
-    const cashoutTime = (Date.now() - gameStartTime) / 1000;
-    
-    // Создаем интервал для симуляции продолжения графика
-    let simulationInterval = setInterval(() => {
-      // Вычисляем текущее время от начала игры
-      const elapsedTime = (Date.now() - gameStartTime) / 1000;
-      
-      // Обновляем множитель (используем ту же формулу, что и в updateGame)
-      const growthFactor = 0.5;
-      const simulatedMultiplier = Math.exp(elapsedTime * growthFactor);
-      const displayMultiplier = Math.floor(simulatedMultiplier * 100) / 100;
-      
-      // Добавляем точку на график
-      if (Date.now() % 100 < 50) {
-        addGraphPoint(displayMultiplier);
-      }
-      
-      // Проверяем, достигли ли точки краша
-      if (simulatedMultiplier >= crashPoint) {
-        clearInterval(simulationInterval);
-        
-        // Воспроизводим звук краша (тише)
-        if (crashSound) {
-          // Уменьшаем громкость для симуляции
-          crashSound.volume = 0.3;
-          crashSound.play();
-          crashSound.volume = 1.0; // Восстанавливаем громкость
-        }
-        
-        // Анимация краша на графике
-        animateCrash();
-        
-        // Показываем сообщение о том, что произошел бы краш
-        if (crushResult && crushResult.classList.contains('win')) {
-          const crashInfo = document.createElement('div');
-          crashInfo.className = 'crash-info';
-          crashInfo.textContent = `Would have crashed at ${crashPoint.toFixed(2)}x`;
-          crushResult.appendChild(crashInfo);
-        }
-      }
-    }, 50);
-    
-    // Останавливаем симуляцию через 5 секунд для экономии ресурсов
-    setTimeout(() => {
-      clearInterval(simulationInterval);
-    }, 5000);
-  }
-  
-  // Инициализация при загрузке
-  document.addEventListener('DOMContentLoaded', init);
-  
-  // Возвращаем публичные методы
-  return {
-    init,
-    startGame,
-    cashout
-  };
 })();
-// Глобальный экспорт объекта игры
-window.crushGame = crushGame;
-console.log('[Crush] Экспорт игрового объекта в глобальную область видимости');
