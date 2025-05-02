@@ -1,13 +1,14 @@
 /**
- * crush.js - Оптимизированная версия игры Crush
- * Версия 3.0.0
+ * crush.js - Оптимизированная версия игры Crush с общим графиком для всех игроков
+ * Версия 3.5.0
  * 
  * Особенности:
- * - Неблокирующая инициализация (идентичная слотам)
+ * - Общий график и история для всех игроков
+ * - 10-секундная пауза между раундами
+ * - Неблокирующая инициализация (стандартная система)
  * - Улучшенная обработка ошибок с таймаутами
  * - Изолированное состояние игры
  * - Автоматические ставки и выход
- * - Улучшенная визуализация с оптимизированной производительностью
  */
 
 // Предотвращаем возможные конфликты и обеспечиваем изолированную среду
@@ -24,7 +25,7 @@
   }
   
   const app = window.GreenLightApp;
-  app.log('Crush', 'Инициализация модуля игры Crush v3.0.0');
+  app.log('Crush', 'Инициализация модуля игры Crush v3.5.0 с общим графиком');
   
   // Игровая логика в замыкании для изоляции
   const crushGame = (function() {
@@ -37,47 +38,61 @@
           crushGraph: null,
           crushResult: null,
           container: null,
-          autoSettings: null,
           autoEnabled: null,
-          autoCashoutAt: null
+          autoCashoutAt: null,
+          nextRoundTimer: null,
+          bettingPhaseInfo: null,
+          currentPhaseDisplay: null
       };
       
       // Canvas для графика
       let graphCanvas = null;
       let graphCtx = null;
       
-      // Состояние игры
-      let state = {
-          isPlaying: false,
-          initialized: false,
-          initializationStarted: false,
-          multiplier: 1.00,
-          gameInterval: null,
-          crashPoint: 1.00,
-          betAmount: 0,
-          gameStartTime: 0,
-          graphPoints: [],
-          isAutoCashoutEnabled: false,
-          autoCashoutMultiplier: 2.00,
-          cashoutTimerId: null
+      // Глобальное состояние игры (общее для всех игроков)
+      let globalState = {
+          isActiveRound: false,        // Активен ли в данный момент раунд игры
+          isWaitingForNextRound: false, // Ожидание следующего раунда
+          waitingTimeLeft: 0,          // Оставшееся время ожидания в секундах
+          currentMultiplier: 1.0,      // Текущий множитель (общий для всех)
+          crashPoint: 1.0,             // Точка краша (общая для всех)
+          roundStartTime: 0,           // Время начала текущего раунда
+          graphPoints: [],             // Точки графика (общие для всех)
+          gameHistory: [],             // История игр (общая для всех)
+          roundId: 0,                  // Идентификатор текущего раунда
+          roundTimerInterval: null,    // Интервал для обновления таймера между раундами
+          gameInterval: null           // Интервал для обновления игры
       };
       
-      // История игр
-      let gameHistory = [];
-      const MAX_HISTORY = 10;
+      // Индивидуальное состояние пользователя
+      let userState = {
+          initialized: false,           // Инициализирована ли игра
+          initializationStarted: false, // Начата ли инициализация
+          hasBetInCurrentRound: false,  // Сделана ли ставка в текущем раунде
+          betAmount: 0,                 // Размер ставки пользователя
+          isAutoCashoutEnabled: false,  // Включен ли автоматический выход
+          autoCashoutMultiplier: 2.0,   // Множитель для автоматического выхода
+          hasCollectedWin: false        // Собран ли выигрыш в текущем раунде
+      };
+      
+      // Константы игры
+      const WAITING_TIME_BETWEEN_ROUNDS = 10; // 10 секунд между раундами
+      const MAX_HISTORY_SIZE = 10;            // Максимальный размер истории
+      const GAME_UPDATE_INTERVAL = 30;        // Интервал обновления игры (мс)
+      const TIMER_UPDATE_INTERVAL = 500;      // Интервал обновления таймера (мс)
       
       /**
-       * Инициализация игры (аналогично слотам)
+       * Инициализация игры
        * С защитой от повторной инициализации и таймаутом
        */
       const init = async function() {
           // Предотвращаем повторную инициализацию
-          if (state.initialized || state.initializationStarted) {
+          if (userState.initialized || userState.initializationStarted) {
               app.log('Crush', 'Инициализация уже выполнена или выполняется');
               return true;
           }
           
-          state.initializationStarted = true;
+          userState.initializationStarted = true;
           app.log('Crush', 'Начало инициализации игры');
           
           try {
@@ -102,15 +117,25 @@
                       // Сбрасываем график
                       resetGraph();
                       
-                      // Генерируем начальную историю игр
-                      loadHistory();
+                      // Генерируем начальную историю игр, если она пуста
+                      if (globalState.gameHistory.length === 0) {
+                          loadHistory();
+                      }
+                      
+                      // Инициализируем таймер между раундами, если игра не активна
+                      if (!globalState.isActiveRound && !globalState.isWaitingForNextRound) {
+                          startWaitingForNextRound();
+                      }
                       
                       // Скрываем результат
                       if (elements.crushResult) {
                           elements.crushResult.style.display = 'none';
                       }
                       
-                      state.initialized = true;
+                      // Обновляем отображение текущего состояния игры
+                      updateGamePhaseDisplay();
+                      
+                      userState.initialized = true;
                       app.log('Crush', 'Инициализация успешно завершена');
                       resolve(true);
                   } catch (innerError) {
@@ -139,7 +164,7 @@
       };
       
       /**
-       * Поиск DOM элементов с защитой от null (идентично слотам)
+       * Поиск DOM элементов с защитой от null
        */
       const findDOMElements = async function() {
           // Используем Promise для асинхронности
@@ -156,7 +181,9 @@
                       elements.crushResult = document.getElementById('crush-result');
                       elements.autoEnabled = document.getElementById('auto-enabled');
                       elements.autoCashoutAt = document.getElementById('auto-cashout-at');
-                      elements.autoSettings = document.getElementById('auto-settings');
+                      elements.nextRoundTimer = document.getElementById('next-round-timer');
+                      elements.bettingPhaseInfo = document.getElementById('betting-phase-info');
+                      elements.currentPhaseDisplay = document.getElementById('current-phase');
                       
                       // Проверяем критические элементы
                       if (!elements.startBtn) {
@@ -219,6 +246,11 @@
               
               // Создаем HTML разметку для игры
               elements.container.innerHTML = `
+                  <div class="game-phase-display">
+                      <div id="current-phase" class="phase-indicator">Ожидание начала игры</div>
+                      <div id="next-round-timer" class="round-timer">Следующий раунд через: <span class="time-value">10</span> сек.</div>
+                  </div>
+                  
                   <div class="game-controls">
                       <div class="bet-control">
                           <label for="crush-bet">Ставка:</label>
@@ -226,7 +258,11 @@
                       </div>
                       
                       <div class="multiplier-container">
-                          <span>Множитель: <span id="multiplier">1.00</span>x</span>
+                          <span>Множитель: <span id="multiplier" class="multiplier-value">1.00</span>x</span>
+                      </div>
+                      
+                      <div id="betting-phase-info" class="betting-phase-info">
+                          <p>Разместите вашу ставку до начала раунда!</p>
                       </div>
                       
                       <div id="auto-settings" class="auto-settings">
@@ -238,7 +274,7 @@
                       </div>
                       
                       <div class="crush-buttons">
-                          <button id="start-crush-btn" class="action-btn">СТАРТ</button>
+                          <button id="start-crush-btn" class="action-btn">СДЕЛАТЬ СТАВКУ</button>
                           <button id="cash-crush-btn" class="action-btn" disabled>ЗАБРАТЬ</button>
                       </div>
                   </div>
@@ -264,7 +300,9 @@
               elements.crushResult = document.getElementById('crush-result');
               elements.autoEnabled = document.getElementById('auto-enabled');
               elements.autoCashoutAt = document.getElementById('auto-cashout-at');
-              elements.autoSettings = document.getElementById('auto-settings');
+              elements.nextRoundTimer = document.getElementById('next-round-timer');
+              elements.bettingPhaseInfo = document.getElementById('betting-phase-info');
+              elements.currentPhaseDisplay = document.getElementById('current-phase');
               
               app.log('Crush', 'Интерфейс игры успешно создан');
           } catch (error) {
@@ -312,7 +350,7 @@
        */
       const setupEventListeners = function() {
           try {
-              // Кнопка старта
+              // Кнопка ставки
               if (elements.startBtn) {
                   // Очищаем текущие обработчики (предотвращаем дублирование)
                   const newStartBtn = elements.startBtn.cloneNode(true);
@@ -322,10 +360,10 @@
                   elements.startBtn = newStartBtn;
                   
                   // Добавляем обработчик
-                  elements.startBtn.addEventListener('click', startGame);
-                  app.log('Crush', 'Обработчик для кнопки старта установлен');
+                  elements.startBtn.addEventListener('click', placeBet);
+                  app.log('Crush', 'Обработчик для кнопки ставки установлен');
               } else {
-                  app.log('Crush', 'Невозможно установить обработчик: кнопка старта не найдена', true);
+                  app.log('Crush', 'Невозможно установить обработчик: кнопка ставки не найдена', true);
               }
               
               // Кнопка вывода
@@ -343,14 +381,14 @@
               // Обработчик для авто-вывода
               if (elements.autoEnabled) {
                   elements.autoEnabled.addEventListener('change', function() {
-                      state.isAutoCashoutEnabled = this.checked;
+                      userState.isAutoCashoutEnabled = this.checked;
                   });
               }
               
               // Обработчик для значения авто-вывода
               if (elements.autoCashoutAt) {
                   elements.autoCashoutAt.addEventListener('input', function() {
-                      state.autoCashoutMultiplier = parseFloat(this.value) || 2.0;
+                      userState.autoCashoutMultiplier = parseFloat(this.value) || 2.0;
                   });
               }
               
@@ -394,8 +432,8 @@
               // Рисуем сетку
               drawGrid();
               
-              // Сбрасываем точки
-              state.graphPoints = [];
+              // Сбрасываем точки графика
+              globalState.graphPoints = [];
               
               app.log('Crush', 'График сброшен успешно');
           } catch (error) {
@@ -441,30 +479,35 @@
       };
       
       /**
-       * Создание случайной истории игр
+       * Создание случайной истории игр (только при первой инициализации)
        */
       const loadHistory = function() {
           try {
-              // Генерируем случайную историю
-              gameHistory = [];
+              // Генерируем случайную историю только если она пуста
+              if (globalState.gameHistory.length > 0) {
+                  return;
+              }
               
-              for (let i = 0; i < 10; i++) {
-                  const isCrash = Math.random() > 0.3; // 70% вероятность краша
-                  const crashMultiplier = isCrash ? 
+              globalState.gameHistory = [];
+              
+              for (let i = 0; i < MAX_HISTORY_SIZE; i++) {
+                  const isCrashed = Math.random() > 0.3; // 70% вероятность краша
+                  const crashValue = isCrashed ? 
                       (1 + Math.random() * Math.random() * 4).toFixed(2) : 
                       (1 + Math.random() * Math.random() * 8).toFixed(2);
                   
-                  gameHistory.push({
-                      multiplier: parseFloat(crashMultiplier),
+                  globalState.gameHistory.push({
+                      roundId: globalState.roundId - i - 1, // Предыдущие раунды
+                      multiplier: parseFloat(crashValue),
                       timestamp: new Date(Date.now() - i * 60000).toISOString(),
-                      isCashedOut: !isCrash
+                      crashed: isCrashed
                   });
               }
               
               // Обновляем отображение истории
               updateHistoryDisplay();
               
-              app.log('Crush', `История загружена: ${gameHistory.length} записей`);
+              app.log('Crush', `История загружена: ${globalState.gameHistory.length} записей`);
           } catch (error) {
               app.log('Crush', `Ошибка загрузки истории: ${error.message}`, true);
           }
@@ -484,9 +527,9 @@
               historyItems.innerHTML = '';
               
               // Добавляем элементы истории
-              gameHistory.forEach(item => {
+              globalState.gameHistory.forEach(item => {
                   const historyItem = document.createElement('div');
-                  historyItem.className = `history-item ${item.isCashedOut ? 'cashed-out' : 'crashed'}`;
+                  historyItem.className = `history-item ${item.crashed ? 'crashed' : 'cashed-out'}`;
                   
                   // Определяем цвет в зависимости от множителя
                   let colorClass = '';
@@ -513,313 +556,315 @@
       };
       
       /**
-       * Проверка и создание объекта casinoApp, если он отсутствует
+       * Обновление отображения текущей фазы игры
        */
-      const ensureCasinoApp = function() {
-          if (window.casinoApp) return true;
-          
-          // Создаем минимальную реализацию casinoApp, если объект отсутствует
-          app.log('Crush', 'casinoApp не найден, создаем временную реализацию', true);
-          window.casinoApp = {
-              showNotification: function(message) {
-                  alert(message);
-              },
-              provideTactileFeedback: function() {
-                  // Заглушка для вибрации
-              },
-              processGameResult: function(gameType, bet, result, win, data) {
-                  app.log('Crush', `Игра: ${gameType}, Ставка: ${bet}, Результат: ${result}, Выигрыш: ${win}`, false);
-                  return Promise.resolve({success: true});
+      const updateGamePhaseDisplay = function() {
+          try {
+              // Обновляем отображение фазы
+              if (elements.currentPhaseDisplay) {
+                  if (globalState.isActiveRound) {
+                      elements.currentPhaseDisplay.textContent = 'Раунд активен';
+                      elements.currentPhaseDisplay.className = 'phase-indicator active-round';
+                  } else if (globalState.isWaitingForNextRound) {
+                      elements.currentPhaseDisplay.textContent = 'Ожидание следующего раунда';
+                      elements.currentPhaseDisplay.className = 'phase-indicator waiting';
+                  } else {
+                      elements.currentPhaseDisplay.textContent = 'Ожидание начала игры';
+                      elements.currentPhaseDisplay.className = 'phase-indicator idle';
+                  }
               }
-          };
-          
-          return true;
+              
+              // Обновляем отображение таймера
+              if (elements.nextRoundTimer) {
+                  if (globalState.isWaitingForNextRound) {
+                      elements.nextRoundTimer.style.display = 'block';
+                      const timeSpan = elements.nextRoundTimer.querySelector('.time-value');
+                      if (timeSpan) {
+                          timeSpan.textContent = globalState.waitingTimeLeft;
+                      }
+                  } else {
+                      elements.nextRoundTimer.style.display = 'none';
+                  }
+              }
+              
+              // Обновляем информацию о фазе ставок
+              if (elements.bettingPhaseInfo) {
+                  if (globalState.isWaitingForNextRound) {
+                      elements.bettingPhaseInfo.style.display = 'block';
+                      elements.bettingPhaseInfo.innerHTML = `
+                          <p class="betting-phase-message">Сделайте ставку до начала следующего раунда!</p>
+                      `;
+                  } else if (globalState.isActiveRound && !userState.hasBetInCurrentRound) {
+                      elements.bettingPhaseInfo.style.display = 'block';
+                      elements.bettingPhaseInfo.innerHTML = `
+                          <p class="betting-phase-message">Подождите начала следующего раунда для новой ставки.</p>
+                      `;
+                  } else {
+                      elements.bettingPhaseInfo.style.display = 'none';
+                  }
+              }
+              
+              // Обновляем доступность кнопок
+              updateButtonsState();
+              
+          } catch (error) {
+              app.log('Crush', `Ошибка обновления отображения фазы игры: ${error.message}`, true);
+          }
       };
       
       /**
-       * Начало игры
+       * Обновление состояния кнопок в зависимости от фазы игры
        */
-      const startGame = async function() {
-          app.log('Crush', 'Запуск игры');
-          
-          // Проверяем инициализацию
-          if (!state.initialized) {
-              app.log('Crush', 'Игра не инициализирована, запускаем инициализацию', true);
-              await init();
-              
-              // Если инициализация не удалась, выходим
-              if (!state.initialized) {
-                  app.log('Crush', 'Не удалось запустить игру: ошибка инициализации', true);
-                  return;
-              }
-          }
-          
+      const updateButtonsState = function() {
           try {
-              // Проверка наличия casinoApp
-              if (!ensureCasinoApp()) {
-                  return;
-              }
-              
-              // Проверка наличия элементов
-              if (!elements.crushBet) {
-                  app.log('Crush', 'Элемент ставки не найден', true);
-                  return;
-              }
-              
-              // Проверяем, не запущена ли уже игра
-              if (state.isPlaying) {
-                  app.log('Crush', 'Игра уже запущена');
-                  return;
-              }
-              
-              // Получаем размер ставки
-              state.betAmount = parseInt(elements.crushBet.value);
-              
-              // Проверяем ставку
-              if (isNaN(state.betAmount) || state.betAmount <= 0) {
-                  window.casinoApp.showNotification('Пожалуйста, введите корректную ставку');
-                  return;
-              }
-              
-              // Проверяем, достаточно ли средств (если есть информация о балансе)
-              if (window.GreenLightApp && window.GreenLightApp.user && 
-                  state.betAmount > window.GreenLightApp.user.balance) {
-                  window.casinoApp.showNotification('Недостаточно средств для ставки');
-                  return;
-              }
-              
-              // Обновляем автонастройки
-              if (elements.autoEnabled && elements.autoCashoutAt) {
-                  state.isAutoCashoutEnabled = elements.autoEnabled.checked;
-                  state.autoCashoutMultiplier = parseFloat(elements.autoCashoutAt.value) || 2.0;
-              }
-              
-              // Сбрасываем состояние игры
-              state.multiplier = 1.00;
-              if (elements.multiplierDisplay) {
-                  elements.multiplierDisplay.textContent = state.multiplier.toFixed(2);
-                  elements.multiplierDisplay.classList.remove('crashed', 'cashed-out');
-                  elements.multiplierDisplay.classList.add('active', 'low');
-              }
-              
-              state.isPlaying = true;
-              
-              // Вычисляем точку краша с учетом дома
-              state.crashPoint = generateCrashPoint();
-              app.log('Crush', `Игра закончится на: ${state.crashPoint.toFixed(2)}`);
-              
-              // Обновляем интерфейс
+              // Кнопка ставки
               if (elements.startBtn) {
-                  elements.startBtn.disabled = true;
+                  // Активна только во время фазы ожидания и если ставка не сделана
+                  elements.startBtn.disabled = !globalState.isWaitingForNextRound || userState.hasBetInCurrentRound;
               }
               
+              // Кнопка вывода
               if (elements.cashoutBtn) {
-                  elements.cashoutBtn.disabled = false;
+                  // Активна только во время активного раунда и если ставка сделана и не собран выигрыш
+                  elements.cashoutBtn.disabled = !globalState.isActiveRound || 
+                                                !userState.hasBetInCurrentRound || 
+                                                userState.hasCollectedWin;
               }
               
-              // Скрываем предыдущий результат
-              if (elements.crushResult) {
-                  elements.crushResult.style.display = 'none';
+              // Настройки авто-вывода
+              const autoSettings = document.getElementById('auto-settings');
+              if (autoSettings) {
+                  if (globalState.isActiveRound && userState.hasBetInCurrentRound && !userState.hasCollectedWin) {
+                      autoSettings.classList.add('disabled');
+                  } else {
+                      autoSettings.classList.remove('disabled');
+                  }
               }
               
-              // Отключаем настройки авто-вывода во время игры
-              if (elements.autoSettings) {
-                  elements.autoSettings.classList.add('disabled');
+          } catch (error) {
+              app.log('Crush', `Ошибка обновления состояния кнопок: ${error.message}`, true);
+          }
+      };
+      
+      /**
+       * Запуск таймера ожидания следующего раунда
+       */
+      const startWaitingForNextRound = function() {
+          try {
+              // Устанавливаем состояние
+              globalState.isWaitingForNextRound = true;
+              globalState.isActiveRound = false;
+              globalState.waitingTimeLeft = WAITING_TIME_BETWEEN_ROUNDS;
+              
+              // Сбрасываем состояние пользователя для нового раунда
+              userState.hasBetInCurrentRound = false;
+              userState.hasCollectedWin = false;
+              
+              // Инкрементируем ID раунда
+              globalState.roundId++;
+              
+              // Обновляем отображение
+              updateGamePhaseDisplay();
+              
+              // Очищаем предыдущий интервал, если есть
+              if (globalState.roundTimerInterval) {
+                  clearInterval(globalState.roundTimerInterval);
               }
               
-              // Тактильная обратная связь
-              if (window.casinoApp.provideTactileFeedback) {
-                  window.casinoApp.provideTactileFeedback('medium');
-              }
+              // Запускаем интервал для обновления таймера
+              globalState.roundTimerInterval = setInterval(() => {
+                  try {
+                      // Уменьшаем время
+                      globalState.waitingTimeLeft--;
+                      
+                      // Обновляем отображение
+                      updateGamePhaseDisplay();
+                      
+                      // Проверяем, закончилось ли время ожидания
+                      if (globalState.waitingTimeLeft <= 0) {
+                          clearInterval(globalState.roundTimerInterval);
+                          startNewRound();
+                      }
+                  } catch (error) {
+                      app.log('Crush', `Ошибка в интервале таймера: ${error.message}`, true);
+                      clearInterval(globalState.roundTimerInterval);
+                  }
+              }, TIMER_UPDATE_INTERVAL);
+              
+              app.log('Crush', `Начато ожидание следующего раунда: ${WAITING_TIME_BETWEEN_ROUNDS} секунд`);
+          } catch (error) {
+              app.log('Crush', `Ошибка запуска таймера: ${error.message}`, true);
+              
+              // В случае ошибки аварийно запускаем следующий раунд
+              startNewRound();
+          }
+      };
+      
+      /**
+       * Начало нового раунда игры
+       */
+      const startNewRound = function() {
+          try {
+              // Прекращаем ожидание
+              globalState.isWaitingForNextRound = false;
+              
+              // Запускаем активный раунд
+              globalState.isActiveRound = true;
+              
+              // Сбрасываем множитель
+              globalState.currentMultiplier = 1.00;
+              
+              // Запоминаем время начала
+              globalState.roundStartTime = Date.now();
+              
+              // Генерируем новую точку краша
+              globalState.crashPoint = generateCrashPoint();
+              app.log('Crush', `Начат новый раунд #${globalState.roundId}. Точка краша: ${globalState.crashPoint.toFixed(2)}`);
               
               // Сбрасываем график
               resetGraph();
               
-              // Запоминаем время начала игры
-              state.gameStartTime = Date.now();
+              // Обновляем отображение
+              updateGamePhaseDisplay();
+              updateMultiplierDisplay();
               
               // Добавляем начальную точку графика
               addGraphPoint(1.00);
               
-              // Отправляем начальную ставку на сервер
-              await window.casinoApp.processGameResult(
-                  'crush',
-                  state.betAmount,
-                  'bet',
-                  0,
-                  { 
-                      startMultiplier: state.multiplier,
-                      isAutoCashoutEnabled: state.isAutoCashoutEnabled,
-                      autoCashoutMultiplier: state.autoCashoutMultiplier
-                  }
-              );
-              
-              // Запускаем интервал игры с защитой от зависания
+              // Запускаем интервал игры
               startGameInterval();
               
-              app.log('Crush', 'Игра запущена успешно');
+              // Тактильная обратная связь при начале раунда
+              if (window.casinoApp && userState.hasBetInCurrentRound) {
+                  window.casinoApp.provideTactileFeedback('medium');
+              }
           } catch (error) {
-              app.log('Crush', `Ошибка запуска игры: ${error.message}`, true);
+              app.log('Crush', `Ошибка запуска нового раунда: ${error.message}`, true);
               
-              // Сбрасываем состояние в случае ошибки
-              state.isPlaying = false;
-              
-              if (elements.startBtn) {
-                  elements.startBtn.disabled = false;
-              }
-              
-              if (elements.autoSettings) {
-                  elements.autoSettings.classList.remove('disabled');
-              }
+              // В случае ошибки запускаем ожидание следующего раунда
+              startWaitingForNextRound();
           }
       };
       
       /**
-       * Генерация точки краша с учетом дома (edge)
-       */
-      const generateCrashPoint = function() {
-          try {
-              // Коэффициент преимущества казино (house edge)
-              // RTP 97% => house edge 3%
-              const houseEdge = 0.03;
-              
-              // Генерируем случайное число в диапазоне от 0 до 1
-              const randomValue = Math.random();
-              
-              // Используем оптимизированную формулу для краш-точки с учетом преимущества казино
-              // Скорректированная формула: (1 / (randomValue * (1 - houseEdge)))
-              let crashPoint = 1 / (randomValue * (1 - houseEdge));
-              
-              // Ограничиваем максимальную точку краша для защиты
-              const maxCrashPoint = 1000.0;
-              crashPoint = Math.min(crashPoint, maxCrashPoint);
-              
-              // Для тестирования и демонстрации иногда делаем ранний краш
-              if (Math.random() < 0.05) {  // 5% шанс раннего краша
-                  crashPoint = 1.0 + Math.random() * 0.5;  // Между 1.0 и 1.5
-              }
-              
-              return crashPoint;
-          } catch (error) {
-              app.log('Crush', `Ошибка генерации точки краша: ${error.message}`, true);
-              return 2.0; // Безопасное значение по умолчанию
-          }
-      };
-      
-      /**
-       * Запуск игрового интервала с защитой от зависания
+       * Запуск игрового интервала для обновления игры
        */
       const startGameInterval = function() {
           try {
-              // Устанавливаем максимальное время игры
-              const maxGameTime = 60000; // 60 секунд максимум
-              const gameStartMs = Date.now();
+              // Очищаем предыдущий интервал, если есть
+              if (globalState.gameInterval) {
+                  clearInterval(globalState.gameInterval);
+              }
               
-              // Запускаем интервал
-              state.gameInterval = setInterval(() => {
+              // Создаем интервал для обновления игры
+              globalState.gameInterval = setInterval(() => {
                   try {
-                      // Проверяем, не превышено ли максимальное время
-                      if (Date.now() - gameStartMs > maxGameTime) {
-                          app.log('Crush', 'Превышено максимальное время игры', true);
-                          clearInterval(state.gameInterval);
-                          gameCrash(); // Принудительный крах
+                      // Проверяем, активен ли раунд
+                      if (!globalState.isActiveRound) {
+                          clearInterval(globalState.gameInterval);
                           return;
                       }
                       
                       // Обновляем игру
                       updateGame();
                   } catch (error) {
-                      app.log('Crush', `Ошибка в игровом цикле: ${error.message}`, true);
-                      clearInterval(state.gameInterval);
-                      gameCrash(); // Принудительный крах при ошибке
+                      app.log('Crush', `Ошибка в игровом интервале: ${error.message}`, true);
+                      clearInterval(globalState.gameInterval);
+                      
+                      // В случае ошибки завершаем раунд
+                      finishRound();
                   }
-              }, 30); // Более частый интервал для плавной анимации
+              }, GAME_UPDATE_INTERVAL);
               
-              app.log('Crush', 'Игровой интервал запущен успешно');
+              app.log('Crush', 'Игровой интервал запущен');
           } catch (error) {
               app.log('Crush', `Ошибка запуска игрового интервала: ${error.message}`, true);
-              
-              // В случае ошибки, принудительно останавливаем игру
-              state.isPlaying = false;
-              if (state.gameInterval) {
-                  clearInterval(state.gameInterval);
-              }
+              finishRound();
           }
       };
       
       /**
-       * Обновление состояния игры
+       * Обновление игры
        */
       const updateGame = function() {
           try {
-              if (!state.isPlaying) return;
-              
-              const elapsedTime = (Date.now() - state.gameStartTime) / 1000;
+              // Вычисляем прошедшее время
+              const elapsedTime = (Date.now() - globalState.roundStartTime) / 1000;
               
               // Обновляем множитель по экспоненциальной формуле
-              // Скорость роста влияет на динамику игры
               const growthFactor = 0.5; // Настраиваемый параметр скорости роста
-              state.multiplier = Math.exp(elapsedTime * growthFactor);
+              globalState.currentMultiplier = Math.exp(elapsedTime * growthFactor);
               
-              // Округляем до 2 знаков после запятой для отображения
-              const displayMultiplier = Math.floor(state.multiplier * 100) / 100;
+              // Обновляем отображение
+              updateMultiplierDisplay();
               
-              // Обновляем отображение множителя
-              if (elements.multiplierDisplay) {
-                  elements.multiplierDisplay.textContent = displayMultiplier.toFixed(2);
-                  
-                  // Добавляем визуальные эффекты в зависимости от величины множителя
-                  elements.multiplierDisplay.classList.remove('low', 'medium', 'high', 'extreme');
-                  
-                  if (displayMultiplier <= 1.5) {
-                      elements.multiplierDisplay.classList.add('low');
-                  } else if (displayMultiplier <= 3) {
-                      elements.multiplierDisplay.classList.add('medium');
-                  } else if (displayMultiplier <= 5) {
-                      elements.multiplierDisplay.classList.add('high');
-                  } else {
-                      elements.multiplierDisplay.classList.add('extreme');
-                  }
-              }
-              
-              // Добавляем точку на график каждые 50мс для более плавной анимации
+              // Добавляем точку на график
               if (Date.now() % 50 < 30) {
-                  addGraphPoint(displayMultiplier);
+                  addGraphPoint(globalState.currentMultiplier);
               }
               
-              // Проверяем авто-кешаут
-              if (state.isAutoCashoutEnabled && state.multiplier >= state.autoCashoutMultiplier) {
+              // Проверяем автоматический выход для пользователя
+              if (userState.hasBetInCurrentRound && 
+                  !userState.hasCollectedWin && 
+                  userState.isAutoCashoutEnabled && 
+                  globalState.currentMultiplier >= userState.autoCashoutMultiplier) {
                   cashout();
                   return;
               }
               
-              // Проверяем, должна ли игра завершиться
-              if (state.multiplier >= state.crashPoint) {
-                  gameCrash();
+              // Проверяем, не достигнута ли точка краша
+              if (globalState.currentMultiplier >= globalState.crashPoint) {
+                  // Завершаем раунд крашем
+                  crashRound();
               }
           } catch (error) {
               app.log('Crush', `Ошибка обновления игры: ${error.message}`, true);
+              finishRound();
+          }
+      };
+      
+      /**
+       * Обновление отображения множителя
+       */
+      const updateMultiplierDisplay = function() {
+          try {
+              if (!elements.multiplierDisplay) return;
               
-              // В случае ошибки, прекращаем игру
-              if (state.gameInterval) {
-                  clearInterval(state.gameInterval);
+              // Округляем до 2 знаков после запятой для отображения
+              const displayMultiplier = Math.floor(globalState.currentMultiplier * 100) / 100;
+              
+              // Обновляем отображение множителя
+              elements.multiplierDisplay.textContent = displayMultiplier.toFixed(2);
+              
+              // Добавляем визуальные эффекты в зависимости от величины множителя
+              elements.multiplierDisplay.classList.remove('low', 'medium', 'high', 'extreme');
+              
+              if (displayMultiplier <= 1.5) {
+                  elements.multiplierDisplay.classList.add('low');
+              } else if (displayMultiplier <= 3) {
+                  elements.multiplierDisplay.classList.add('medium');
+              } else if (displayMultiplier <= 5) {
+                  elements.multiplierDisplay.classList.add('high');
+              } else {
+                  elements.multiplierDisplay.classList.add('extreme');
               }
-              gameCrash();
+          } catch (error) {
+              app.log('Crush', `Ошибка обновления отображения множителя: ${error.message}`, true);
           }
       };
       
       /**
        * Добавление точки на график
        */
-      const addGraphPoint = function(mult) {
+      const addGraphPoint = function(multiplier) {
           try {
-              const elapsedTimeMs = Date.now() - state.gameStartTime;
-              const elapsedTimeSec = elapsedTimeMs / 1000;
+              // Вычисляем прошедшее время от начала раунда
+              const elapsedTime = (Date.now() - globalState.roundStartTime) / 1000;
               
-              // Сохраняем точку для возможного перерисовывания при ресайзе
-              state.graphPoints.push({
-                  time: elapsedTimeSec,
-                  multiplier: mult
+              // Сохраняем точку в глобальное состояние
+              globalState.graphPoints.push({
+                  time: elapsedTime,
+                  multiplier: multiplier
               });
               
               // Перерисовываем график
@@ -830,7 +875,7 @@
       };
       
       /**
-       * Перерисовка всего графика
+       * Перерисовка графика
        */
       const redrawGraph = function() {
           try {
@@ -846,33 +891,33 @@
               drawGrid();
               
               // Если нет точек или всего одна точка, выходим
-              if (state.graphPoints.length < 2) return;
+              if (globalState.graphPoints.length < 2) return;
               
               const width = graphCanvas.width;
               const height = graphCanvas.height;
               
               // Находим максимальные значения для масштабирования
-              const maxTime = Math.max(5, state.graphPoints[state.graphPoints.length - 1].time);
-              const maxMult = Math.max(5, ...state.graphPoints.map(p => p.multiplier));
+              const maxTime = Math.max(5, globalState.graphPoints[globalState.graphPoints.length - 1].time);
+              const maxMult = Math.max(5, ...globalState.graphPoints.map(p => p.multiplier));
               
               // Начинаем рисовать линию
               graphCtx.beginPath();
               
               // Перемещаемся к первой точке
-              const x0 = (state.graphPoints[0].time / maxTime) * width;
-              const y0 = height - (state.graphPoints[0].multiplier / maxMult) * height;
+              const x0 = (globalState.graphPoints[0].time / maxTime) * width;
+              const y0 = height - (globalState.graphPoints[0].multiplier / maxMult) * height;
               graphCtx.moveTo(x0, y0);
               
               // Добавляем остальные точки с использованием сглаживания Безье для плавности
-              for (let i = 1; i < state.graphPoints.length; i++) {
-                  const x = (state.graphPoints[i].time / maxTime) * width;
-                  const y = height - (state.graphPoints[i].multiplier / maxMult) * height;
+              for (let i = 1; i < globalState.graphPoints.length; i++) {
+                  const x = (globalState.graphPoints[i].time / maxTime) * width;
+                  const y = height - (globalState.graphPoints[i].multiplier / maxMult) * height;
                   
                   // Используем кривую Безье для сглаживания
-                  if (i < state.graphPoints.length - 1) {
+                  if (i < globalState.graphPoints.length - 1) {
                       // Контрольные точки для сглаживания
-                      const nextX = (state.graphPoints[i + 1].time / maxTime) * width;
-                      const nextY = height - (state.graphPoints[i + 1].multiplier / maxMult) * height;
+                      const nextX = (globalState.graphPoints[i + 1].time / maxTime) * width;
+                      const nextY = height - (globalState.graphPoints[i + 1].multiplier / maxMult) * height;
                       
                       const cpx1 = x - (x - x0) / 2;
                       const cpy1 = y;
@@ -893,8 +938,8 @@
               graphCtx.stroke();
               
               // Добавляем заливку под линией графика
-              const lastX = (state.graphPoints[state.graphPoints.length - 1].time / maxTime) * width;
-              const lastY = height - (state.graphPoints[state.graphPoints.length - 1].multiplier / maxMult) * height;
+              const lastX = (globalState.graphPoints[globalState.graphPoints.length - 1].time / maxTime) * width;
+              const lastY = height - (globalState.graphPoints[globalState.graphPoints.length - 1].multiplier / maxMult) * height;
               
               graphCtx.lineTo(lastX, height);
               graphCtx.lineTo(0, height);
@@ -922,102 +967,212 @@
       };
       
       /**
-       * Обработка краша игры
+       * Размещение ставки
        */
-      const gameCrash = async function() {
+      const placeBet = async function() {
           try {
-              // Проверяем состояние игры
-              if (!state.isPlaying) return;
+              // Проверяем возможность размещения ставки
+              if (!globalState.isWaitingForNextRound || userState.hasBetInCurrentRound) {
+                  app.log('Crush', 'Невозможно разместить ставку: неверная фаза игры');
+                  return;
+              }
               
-              // Останавливаем игру
-              clearInterval(state.gameInterval);
-              state.isPlaying = false;
+              // Проверяем наличие элементов
+              if (!elements.crushBet) {
+                  app.log('Crush', 'Элемент ставки не найден', true);
+                  return;
+              }
+              
+              // Получаем размер ставки
+              userState.betAmount = parseInt(elements.crushBet.value);
+              
+              // Проверяем ставку
+              if (isNaN(userState.betAmount) || userState.betAmount <= 0) {
+                  if (window.casinoApp && window.casinoApp.showNotification) {
+                      window.casinoApp.showNotification('Пожалуйста, введите корректную ставку');
+                  } else {
+                      alert('Пожалуйста, введите корректную ставку');
+                  }
+                  return;
+              }
+              
+              // Проверяем, достаточно ли средств (если есть информация о балансе)
+              if (window.GreenLightApp && window.GreenLightApp.user && 
+                  userState.betAmount > window.GreenLightApp.user.balance) {
+                  if (window.casinoApp && window.casinoApp.showNotification) {
+                      window.casinoApp.showNotification('Недостаточно средств для ставки');
+                  } else {
+                      alert('Недостаточно средств для ставки');
+                  }
+                  return;
+              }
+              
+              // Обновляем настройки автовывода
+              if (elements.autoEnabled && elements.autoCashoutAt) {
+                  userState.isAutoCashoutEnabled = elements.autoEnabled.checked;
+                  userState.autoCashoutMultiplier = parseFloat(elements.autoCashoutAt.value) || 2.0;
+              }
+              
+              // Отмечаем, что ставка размещена
+              userState.hasBetInCurrentRound = true;
+              userState.hasCollectedWin = false;
+              
+              // Обновляем отображение
+              updateGamePhaseDisplay();
               
               // Тактильная обратная связь
               if (window.casinoApp && window.casinoApp.provideTactileFeedback) {
-                  window.casinoApp.provideTactileFeedback('error');
+                  window.casinoApp.provideTactileFeedback('light');
               }
               
-              // Обновляем интерфейс
-              if (elements.crushResult) {
-                  elements.crushResult.innerHTML = `
-                      <div class="crash-icon">💥</div>
-                      <div class="crash-text">Crash at ${state.multiplier.toFixed(2)}x!</div>
-                  `;
-                  elements.crushResult.classList.add('lose');
-                  elements.crushResult.style.display = 'block';
-              }
-              
-              if (elements.multiplierDisplay) {
-                  elements.multiplierDisplay.classList.remove('active', 'low', 'medium', 'high', 'extreme');
-                  elements.multiplierDisplay.classList.add('crashed');
-              }
-              
-              if (elements.startBtn) {
-                  elements.startBtn.disabled = false;
-              }
-              
-              if (elements.cashoutBtn) {
-                  elements.cashoutBtn.disabled = true;
-              }
-              
-              // Разблокируем настройки авто-вывода
-              if (elements.autoSettings) {
-                  elements.autoSettings.classList.remove('disabled');
-              }
-              
-              // Анимация краша на графике
-              animateCrash();
-              
-              // Обновляем историю
-              gameHistory.unshift({
-                  multiplier: state.multiplier,
-                  timestamp: new Date().toISOString(),
-                  isCashedOut: false
-              });
-              
-              // Обрезаем историю
-              if (gameHistory.length > MAX_HISTORY) {
-                  gameHistory = gameHistory.slice(0, MAX_HISTORY);
-              }
-              
-              // Обновляем отображение истории
-              updateHistoryDisplay();
-              
-              // Отправляем проигрыш на сервер
-              if (window.casinoApp) {
+              // Отправляем ставку на сервер (если доступно)
+              if (window.casinoApp && window.casinoApp.processGameResult) {
                   await window.casinoApp.processGameResult(
                       'crush',
-                      0, // Нет дополнительной ставки
-                      'lose',
+                      userState.betAmount,
+                      'bet',
                       0,
-                      {
-                          crashPoint: state.multiplier,
-                          finalMultiplier: state.multiplier,
-                          isAutoCashoutEnabled: state.isAutoCashoutEnabled,
-                          autoCashoutMultiplier: state.autoCashoutMultiplier
+                      { 
+                          roundId: globalState.roundId,
+                          isAutoCashoutEnabled: userState.isAutoCashoutEnabled,
+                          autoCashoutMultiplier: userState.autoCashoutMultiplier
                       }
                   );
               }
               
-              app.log('Crush', `Игра завершена крашем на множителе ${state.multiplier.toFixed(2)}`);
+              app.log('Crush', `Ставка размещена: ${userState.betAmount}, авто-вывод: ${userState.isAutoCashoutEnabled ? userState.autoCashoutMultiplier + 'x' : 'выключен'}`);
           } catch (error) {
-              app.log('Crush', `Ошибка обработки краша: ${error.message}`, true);
+              app.log('Crush', `Ошибка размещения ставки: ${error.message}`, true);
               
-              // Сбрасываем состояние в любом случае
-              state.isPlaying = false;
-              
-              if (state.gameInterval) {
-                  clearInterval(state.gameInterval);
+              // Отменяем ставку в случае ошибки
+              userState.hasBetInCurrentRound = false;
+              updateGamePhaseDisplay();
+          }
+      };
+      
+      /**
+       * Вывод выигрыша
+       */
+      const cashout = async function() {
+          try {
+              // Проверяем возможность вывода
+              if (!globalState.isActiveRound || !userState.hasBetInCurrentRound || userState.hasCollectedWin) {
+                  app.log('Crush', 'Невозможно вывести выигрыш: неверная фаза игры или выигрыш уже собран');
+                  return;
               }
               
-              if (elements.startBtn) {
-                  elements.startBtn.disabled = false;
+              // Отмечаем, что выигрыш собран
+              userState.hasCollectedWin = true;
+              
+              // Вычисляем выигрыш
+              const winAmount = Math.floor(userState.betAmount * globalState.currentMultiplier);
+              
+              // Обновляем отображение
+              updateGamePhaseDisplay();
+              
+              // Показываем результат
+              if (elements.crushResult) {
+                  elements.crushResult.innerHTML = `
+                      <div class="cashout-icon">💰</div>
+                      <div class="cashout-text">Вы вывели деньги при ${globalState.currentMultiplier.toFixed(2)}x!</div>
+                      <div class="win-amount">+${winAmount} ⭐</div>
+                  `;
+                  elements.crushResult.className = 'result win';
+                  elements.crushResult.style.display = 'block';
               }
               
-              if (elements.cashoutBtn) {
-                  elements.cashoutBtn.disabled = true;
+              // Подсвечиваем множитель
+              if (elements.multiplierDisplay) {
+                  elements.multiplierDisplay.className = 'multiplier-value cashed-out';
               }
+              
+              // Тактильная обратная связь
+              if (window.casinoApp && window.casinoApp.provideTactileFeedback) {
+                  window.casinoApp.provideTactileFeedback('success');
+              }
+              
+              // Отправляем результат на сервер (если доступно)
+              if (window.casinoApp && window.casinoApp.processGameResult) {
+                  await window.casinoApp.processGameResult(
+                      'crush',
+                      0, // Не новая ставка
+                      'win',
+                      winAmount,
+                      {
+                          roundId: globalState.roundId,
+                          cashoutMultiplier: globalState.currentMultiplier,
+                          crashPoint: globalState.crashPoint
+                      }
+                  );
+              }
+              
+              app.log('Crush', `Успешный вывод при ${globalState.currentMultiplier.toFixed(2)}x, выигрыш: ${winAmount}`);
+          } catch (error) {
+              app.log('Crush', `Ошибка вывода выигрыша: ${error.message}`, true);
+              
+              // В случае ошибки все равно помечаем выигрыш как собранный
+              userState.hasCollectedWin = true;
+              updateGamePhaseDisplay();
+          }
+      };
+      
+      /**
+       * Завершение раунда крашем
+       */
+      const crashRound = function() {
+          try {
+              // Анимация краша
+              animateCrash();
+              
+              // Показываем результат для игрока, если он участвовал в раунде
+              if (userState.hasBetInCurrentRound && !userState.hasCollectedWin) {
+                  if (elements.crushResult) {
+                      elements.crushResult.innerHTML = `
+                          <div class="crash-icon">💥</div>
+                          <div class="crash-text">Краш при ${globalState.currentMultiplier.toFixed(2)}x!</div>
+                          <div class="lose-message">Вы проиграли ${userState.betAmount} ⭐</div>
+                      `;
+                      elements.crushResult.className = 'result lose';
+                      elements.crushResult.style.display = 'block';
+                  }
+                  
+                  // Тактильная обратная связь
+                  if (window.casinoApp && window.casinoApp.provideTactileFeedback) {
+                      window.casinoApp.provideTactileFeedback('error');
+                  }
+                  
+                  // Отправляем результат на сервер (если доступно)
+                  if (window.casinoApp && window.casinoApp.processGameResult) {
+                      window.casinoApp.processGameResult(
+                          'crush',
+                          0, // Не новая ставка
+                          'lose',
+                          0,
+                          {
+                              roundId: globalState.roundId,
+                              crashPoint: globalState.currentMultiplier
+                          }
+                      ).catch(error => {
+                          app.log('Crush', `Ошибка отправки результата: ${error.message}`, true);
+                      });
+                  }
+              }
+              
+              // Подсвечиваем множитель
+              if (elements.multiplierDisplay) {
+                  elements.multiplierDisplay.className = 'multiplier-value crashed';
+              }
+              
+              // Обновляем историю
+              addToHistory(true);
+              
+              // Финализируем раунд
+              finishRound();
+              
+              app.log('Crush', `Раунд завершился крашем при ${globalState.currentMultiplier.toFixed(2)}x`);
+          } catch (error) {
+              app.log('Crush', `Ошибка завершения раунда крашем: ${error.message}`, true);
+              finishRound();
           }
       };
       
@@ -1026,13 +1181,12 @@
        */
       const animateCrash = function() {
           try {
-              if (!graphCanvas || !graphCtx) {
-                  app.log('Crush', 'Невозможно анимировать краш - графический контекст не доступен', true);
+              if (!graphCanvas || !graphCtx || globalState.graphPoints.length === 0) {
                   return;
               }
               
               // Получаем последнюю точку графика
-              const lastPoint = state.graphPoints[state.graphPoints.length - 1];
+              const lastPoint = globalState.graphPoints[globalState.graphPoints.length - 1];
               
               // Находим позицию последней точки на графике
               const width = graphCanvas.width;
@@ -1063,13 +1217,6 @@
                       graphCtx.arc(crashX, crashY, explosionRadius, 0, Math.PI * 2);
                       graphCtx.fillStyle = explosionColors[i];
                       graphCtx.fill();
-                      
-                      // Перерисовываем через небольшую задержку
-                      setTimeout(() => {
-                          if (!state.isPlaying) {
-                              redrawGraph();
-                          }
-                      }, 150);
                   }, i * 100);
               }
           } catch (error) {
@@ -1078,250 +1225,150 @@
       };
       
       /**
-       * Вывод выигрыша
+       * Завершение раунда (общая функция)
        */
-      const cashout = async function() {
+      const finishRound = function() {
           try {
-              // Проверяем состояние игры
-              if (!state.isPlaying) return;
-              
-              // Останавливаем игру
-              clearInterval(state.gameInterval);
-              state.isPlaying = false;
-              
-              // Тактильная обратная связь
-              if (window.casinoApp && window.casinoApp.provideTactileFeedback) {
-                  window.casinoApp.provideTactileFeedback('success');
+              // Останавливаем игровой интервал
+              if (globalState.gameInterval) {
+                  clearInterval(globalState.gameInterval);
+                  globalState.gameInterval = null;
               }
               
-              // Вычисляем выигрыш
-              const winAmount = Math.floor(state.betAmount * state.multiplier);
+              // Обновляем состояние игры
+              globalState.isActiveRound = false;
               
-              // Обновляем интерфейс
-              if (elements.crushResult) {
-                  elements.crushResult.innerHTML = `
-                      <div class="cashout-icon">💰</div>
-                      <div class="cashout-text">Cashed out at ${state.multiplier.toFixed(2)}x!</div>
-                      <div class="win-amount">+${winAmount} ⭐</div>
-                  `;
-                  elements.crushResult.classList.add('win');
-                  elements.crushResult.style.display = 'block';
-              }
+              // Обновляем отображение
+              updateGamePhaseDisplay();
               
-              if (elements.multiplierDisplay) {
-                  elements.multiplierDisplay.classList.remove('active', 'low', 'medium', 'high', 'extreme');
-                  elements.multiplierDisplay.classList.add('cashed-out');
-              }
+              // Запускаем ожидание следующего раунда через небольшую задержку
+              setTimeout(() => {
+                  startWaitingForNextRound();
+              }, 2000);
               
-              if (elements.startBtn) {
-                  elements.startBtn.disabled = false;
-              }
+          } catch (error) {
+              app.log('Crush', `Ошибка финализации раунда: ${error.message}`, true);
               
-              if (elements.cashoutBtn) {
-                  elements.cashoutBtn.disabled = true;
-              }
-              
-              // Разблокируем настройки авто-вывода
-              if (elements.autoSettings) {
-                  elements.autoSettings.classList.remove('disabled');
-              }
-              
-              // Анимация кешаута на графике
-              animateCashout();
-              
-              // Обновляем историю
-              gameHistory.unshift({
-                  multiplier: state.multiplier,
+              // В случае ошибки запускаем ожидание следующего раунда
+              setTimeout(() => {
+                  startWaitingForNextRound();
+              }, 2000);
+          }
+      };
+      
+      /**
+       * Добавление результата раунда в историю
+       */
+      const addToHistory = function(crashed) {
+          try {
+              // Создаем запись о текущем раунде
+              const historyEntry = {
+                  roundId: globalState.roundId,
+                  multiplier: globalState.currentMultiplier,
                   timestamp: new Date().toISOString(),
-                  isCashedOut: true
-              });
+                  crashed: crashed
+              };
               
-              // Обрезаем историю
-              if (gameHistory.length > MAX_HISTORY) {
-                  gameHistory = gameHistory.slice(0, MAX_HISTORY);
+              // Добавляем в начало истории
+              globalState.gameHistory.unshift(historyEntry);
+              
+              // Ограничиваем размер истории
+              if (globalState.gameHistory.length > MAX_HISTORY_SIZE) {
+                  globalState.gameHistory = globalState.gameHistory.slice(0, MAX_HISTORY_SIZE);
               }
               
               // Обновляем отображение истории
               updateHistoryDisplay();
               
-              // Отправляем выигрыш на сервер
-              if (window.casinoApp) {
-                  await window.casinoApp.processGameResult(
-                      'crush',
-                      0, // Нет дополнительной ставки
-                      'win',
-                      winAmount,
-                      {
-                          cashoutMultiplier: state.multiplier,
-                          crashPoint: state.crashPoint,
-                          isAutoCashoutEnabled: state.isAutoCashoutEnabled,
-                          autoCashoutMultiplier: state.autoCashoutMultiplier
-                      }
-                  );
-              }
-              
-              // Продолжаем показывать симуляцию графика до краша
-              simulateContinuation();
-              
-              app.log('Crush', `Успешный кешаут на множителе ${state.multiplier.toFixed(2)}, выигрыш: ${winAmount}`);
           } catch (error) {
-              app.log('Crush', `Ошибка кешаута: ${error.message}`, true);
-              
-              // Сбрасываем состояние в любом случае
-              state.isPlaying = false;
-              
-              if (state.gameInterval) {
-                  clearInterval(state.gameInterval);
-              }
-              
-              if (elements.startBtn) {
-                  elements.startBtn.disabled = false;
-              }
-              
-              if (elements.cashoutBtn) {
-                  elements.cashoutBtn.disabled = true;
-              }
+              app.log('Crush', `Ошибка добавления в историю: ${error.message}`, true);
           }
       };
       
       /**
-       * Анимация кешаута
+       * Генерация точки краша с учетом дома (edge)
        */
-      const animateCashout = function() {
+      const generateCrashPoint = function() {
           try {
-              if (!graphCanvas || !graphCtx) {
-                  app.log('Crush', 'Невозможно анимировать кешаут - графический контекст не доступен', true);
-                  return;
+              // Коэффициент преимущества казино (house edge)
+              // RTP 97% => house edge 3%
+              const houseEdge = 0.03;
+              
+              // Генерируем случайное число в диапазоне от 0 до 1
+              const randomValue = Math.random();
+              
+              // Формула для краш-точки с учетом преимущества казино
+              let crashPoint = 1 / (randomValue * (1 - houseEdge));
+              
+              // Ограничиваем максимальную точку краша для безопасности
+              const maxCrashPoint = 1000.0;
+              crashPoint = Math.min(crashPoint, maxCrashPoint);
+              
+              // Для тестирования и демонстрации иногда делаем ранний краш
+              if (Math.random() < 0.05) {  // 5% шанс раннего краша
+                  crashPoint = 1.0 + Math.random() * 0.5;  // Между 1.0 и 1.5
               }
               
-              // Получаем последнюю точку графика
-              const lastPoint = state.graphPoints[state.graphPoints.length - 1];
-              
-              // Находим позицию последней точки на графике
-              const width = graphCanvas.width;
-              const height = graphCanvas.height;
-              
-              // Максимальные значения для масштабирования
-              const maxTime = Math.max(5, lastPoint.time);
-              const maxMult = Math.max(5, lastPoint.multiplier);
-              
-              const cashoutX = (lastPoint.time / maxTime) * width;
-              const cashoutY = height - (lastPoint.multiplier / maxMult) * height;
-              
-              // Рисуем эффект успешного кешаута
-              for (let i = 0; i < 3; i++) {
-                  setTimeout(() => {
-                      if (!graphCtx) return;
-                      
-                      // Отмечаем точку кешаута на графике
-                      graphCtx.beginPath();
-                      graphCtx.arc(cashoutX, cashoutY, 15 - i * 3, 0, Math.PI * 2);
-                      graphCtx.strokeStyle = 'rgba(0, 255, 0, ' + (0.8 - i * 0.2) + ')';
-                      graphCtx.lineWidth = 3;
-                      graphCtx.stroke();
-                      
-                      // Рисуем сияющую зеленую точку в месте кешаута
-                      graphCtx.beginPath();
-                      graphCtx.arc(cashoutX, cashoutY, 8, 0, Math.PI * 2);
-                      graphCtx.fillStyle = 'rgba(0, 255, 0, 0.8)';
-                      graphCtx.fill();
-                      graphCtx.strokeStyle = 'white';
-                      graphCtx.lineWidth = 2;
-                      graphCtx.stroke();
-                  }, i * 100);
-              }
+              return crashPoint;
           } catch (error) {
-              app.log('Crush', `Ошибка анимации кешаута: ${error.message}`, true);
+              app.log('Crush', `Ошибка генерации точки краша: ${error.message}`, true);
+              return 2.0; // Безопасное значение по умолчанию
           }
       };
       
       /**
-       * Симуляция продолжения графика после кешаута
+       * Проверка и создание объекта casinoApp, если он отсутствует
        */
-      const simulateContinuation = function() {
-          try {
-              // Запоминаем точку кешаута
-              const cashoutMultiplier = state.multiplier;
-              const cashoutTime = (Date.now() - state.gameStartTime) / 1000;
-              
-              // Создаем интервал для симуляции продолжения графика
-              let simulatedMultiplier = cashoutMultiplier;
-              let simulatedTime = cashoutTime;
-              let lastUpdateTime = Date.now();
-              
-              const simulationInterval = setInterval(() => {
-                  try {
-                      // Обновляем время симуляции
-                      const currentTime = Date.now();
-                      const deltaTime = (currentTime - lastUpdateTime) / 1000;
-                      simulatedTime += deltaTime;
-                      
-                      // Обновляем множитель (используем ту же формулу, что и в игре)
-                      const growthFactor = 0.5;
-                      simulatedMultiplier = Math.exp(simulatedTime * growthFactor);
-                      
-                      // Добавляем точку на график
-                      addGraphPoint(simulatedMultiplier);
-                      
-                      // Обновляем время последнего обновления
-                      lastUpdateTime = currentTime;
-                      
-                      // Проверяем, достигли ли точки краша
-                      if (simulatedMultiplier >= state.crashPoint) {
-                          clearInterval(simulationInterval);
-                          
-                          // Анимация краша на графике
-                          setTimeout(() => {
-                              animateCrash();
-                          }, 300);
-                          
-                          // Показываем сообщение о том, что произошел бы краш
-                          if (elements.crushResult && elements.crushResult.classList.contains('win')) {
-                              const crashInfo = document.createElement('div');
-                              crashInfo.className = 'crash-info';
-                              crashInfo.textContent = `Игра завершилась бы на ${state.crashPoint.toFixed(2)}x`;
-                              elements.crushResult.appendChild(crashInfo);
-                          }
-                      }
-                  } catch (simError) {
-                      app.log('Crush', `Ошибка в симуляции: ${simError.message}`, true);
-                      clearInterval(simulationInterval);
-                  }
-              }, 50);
-              
-              // Останавливаем симуляцию через 5 секунд для экономии ресурсов
-              setTimeout(() => {
-                  clearInterval(simulationInterval);
-              }, 5000);
-          } catch (error) {
-              app.log('Crush', `Ошибка симуляции продолжения: ${error.message}`, true);
-          }
+      const ensureCasinoApp = function() {
+          if (window.casinoApp) return true;
+          
+          // Создаем минимальную реализацию casinoApp, если объект отсутствует
+          app.log('Crush', 'casinoApp не найден, создаем временную реализацию', true);
+          window.casinoApp = {
+              showNotification: function(message) {
+                  alert(message);
+              },
+              provideTactileFeedback: function() {
+                  // Заглушка для вибрации
+              },
+              processGameResult: function(gameType, bet, result, win, data) {
+                  app.log('Crush', `Игра: ${gameType}, Ставка: ${bet}, Результат: ${result}, Выигрыш: ${win}`, false);
+                  return Promise.resolve({success: true});
+              }
+          };
+          
+          return true;
       };
       
       // Возвращаем публичный интерфейс
       return {
           // Основные методы
           init: init,
-          startGame: startGame,
+          placeBet: placeBet,
           cashout: cashout,
           
           // Метод для создания интерфейса при необходимости
           createUI: setupUI,
           
+          // Ручные методы для управления игрой (для отладки)
+          startWaitingForNextRound: startWaitingForNextRound,
+          startNewRound: startNewRound,
+          crashRound: crashRound,
+          
           // Метод для проверки состояния
           getStatus: function() {
               return {
-                  initialized: state.initialized,
-                  initializationStarted: state.initializationStarted,
-                  isPlaying: state.isPlaying,
-                  elements: elements,
-                  graphReady: !!graphCtx,
-                  gameState: {
-                      multiplier: state.multiplier,
-                      crashPoint: state.crashPoint,
-                      isAutoCashoutEnabled: state.isAutoCashoutEnabled,
-                      autoCashoutMultiplier: state.autoCashoutMultiplier
-                  }
+                  user: userState,
+                  global: globalState,
+                  elementsFound: {
+                      startBtn: !!elements.startBtn,
+                      cashoutBtn: !!elements.cashoutBtn,
+                      crushBet: !!elements.crushBet,
+                      multiplierDisplay: !!elements.multiplierDisplay,
+                      crushGraph: !!elements.crushGraph,
+                      nextRoundTimer: !!elements.nextRoundTimer
+                  },
+                  graphReady: !!graphCtx
               };
           },
           
@@ -1343,6 +1390,57 @@
                           max-width: 500px;
                       }
                       
+                      .game-phase-display {
+                          background-color: rgba(0, 0, 0, 0.2);
+                          border-radius: 8px;
+                          padding: 10px;
+                          margin-bottom: 15px;
+                          text-align: center;
+                          border: 1px solid var(--primary-green);
+                      }
+                      
+                      .phase-indicator {
+                          font-size: 18px;
+                          font-weight: bold;
+                          margin-bottom: 5px;
+                      }
+                      
+                      .phase-indicator.active-round {
+                          color: var(--primary-green);
+                      }
+                      
+                      .phase-indicator.waiting {
+                          color: var(--gold);
+                      }
+                      
+                      .phase-indicator.idle {
+                          color: var(--light-gray);
+                      }
+                      
+                      .round-timer {
+                          font-size: 16px;
+                          color: var(--gold);
+                      }
+                      
+                      .time-value {
+                          font-weight: bold;
+                      }
+                      
+                      .betting-phase-info {
+                          background-color: rgba(255, 215, 0, 0.1);
+                          border-radius: 8px;
+                          padding: 10px;
+                          margin: 10px 0;
+                          border: 1px solid var(--gold);
+                      }
+                      
+                      .betting-phase-message {
+                          color: var(--gold);
+                          text-align: center;
+                          margin: 0;
+                          font-weight: bold;
+                      }
+                      
                       .multiplier-container {
                           font-size: 18px;
                           font-weight: bold;
@@ -1350,36 +1448,32 @@
                           margin: 10px 0;
                       }
                       
-                      #multiplier {
+                      .multiplier-value {
                           transition: color 0.3s ease;
                       }
                       
-                      #multiplier.active {
-                          color: #4CAF50;
+                      .multiplier-value.crashed {
+                          color: var(--red);
                       }
                       
-                      #multiplier.crashed {
-                          color: #F44336;
-                      }
-                      
-                      #multiplier.cashed-out {
+                      .multiplier-value.cashed-out {
                           color: #2196F3;
                       }
                       
-                      #multiplier.low {
-                          color: #4CAF50;
+                      .multiplier-value.low {
+                          color: var(--primary-green);
                       }
                       
-                      #multiplier.medium {
-                          color: #FFC107;
+                      .multiplier-value.medium {
+                          color: var(--gold);
                       }
                       
-                      #multiplier.high {
+                      .multiplier-value.high {
                           color: #FF9800;
                       }
                       
-                      #multiplier.extreme {
-                          color: #F44336;
+                      .multiplier-value.extreme {
+                          color: var(--red);
                       }
                       
                       .crush-graph {
@@ -1449,10 +1543,17 @@
                           border-radius: 4px;
                       }
                       
-                      .crash-info {
+                      .win-amount {
+                          font-size: 18px;
+                          font-weight: bold;
+                          color: var(--primary-green);
                           margin-top: 10px;
-                          font-size: 14px;
-                          color: #757575;
+                      }
+                      
+                      .lose-message {
+                          font-size: 16px;
+                          color: var(--red);
+                          margin-top: 10px;
                       }
                   `;
                   document.head.appendChild(styleElement);
@@ -1486,7 +1587,7 @@
       // 5. Запускаем автоматическую инициализацию при загрузке страницы
       document.addEventListener('DOMContentLoaded', function() {
           setTimeout(() => {
-              if (!crushGame.getStatus().initialized && !crushGame.getStatus().initializationStarted) {
+              if (!crushGame.getStatus().user.initialized && !crushGame.getStatus().user.initializationStarted) {
                   app.log('Crush', 'Запускаем автоматическую инициализацию');
                   crushGame.init();
               }
@@ -1496,7 +1597,7 @@
       // 6. Если DOM уже загружен, запускаем инициализацию сразу
       if (document.readyState === 'complete' || document.readyState === 'interactive') {
           setTimeout(() => {
-              if (!crushGame.getStatus().initialized && !crushGame.getStatus().initializationStarted) {
+              if (!crushGame.getStatus().user.initialized && !crushGame.getStatus().user.initializationStarted) {
                   app.log('Crush', 'Запускаем автоматическую инициализацию (DOM уже загружен)');
                   crushGame.init();
               }

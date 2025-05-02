@@ -1,16 +1,18 @@
 /**
- * roulette.js - Simple Roulette Game for Telegram WebApp
- * Version 1.0.0
+ * roulette.js - Improved roulette game with continuous spin cycle
+ * Version 3.0.1
  * 
  * Features:
- * - Simple bet input
- * - Realistic wheel animation
- * - Win calculation and display
+ * - Non-blocking initialization
+ * - Continuous spin cycle with configurable betting windows
+ * - Shared game state for all players
+ * - Improved error handling and timeout protection
+ * - Compatible with the game registration system
  */
 
-// Self-executing function to create closure and prevent variable conflicts
+// Prevent potential conflicts and provide an isolated environment
 (function() {
-    // Check for app environment
+    // Check for main application object
     if (!window.GreenLightApp) {
         console.error('[Roulette] GreenLightApp not initialized!');
         window.GreenLightApp = {
@@ -22,34 +24,55 @@
     }
     
     const app = window.GreenLightApp;
-    app.log('Roulette', 'Initializing Roulette game module v1.0.0');
+    app.log('Roulette', 'Initializing continuous roulette game module v3.0.1');
     
-    // Main game implementation
+    // Game logic in closure for isolation
     const rouletteGame = (function() {
-        // DOM Elements
+        // Game elements
         let elements = {
-            spinBtn: null,
-            betInput: null,
-            resultDisplay: null,
-            wheel: null,
-            ball: null,
-            winningNumber: null,
-            potentialWin: null,
-            container: null
+            placeBetBtn: null,
+            clearBetBtn: null,
+            rouletteBet: null,
+            betTypeSelect: null,
+            betColorContainer: null,
+            betNumberContainer: null,
+            betOddEvenContainer: null,
+            rouletteNumber: null,
+            colorBtns: [],
+            oddEvenBtns: [],
+            wheelInner: null,
+            rouletteBall: null,
+            rouletteResult: null,
+            timerDisplay: null,
+            nextSpinTime: null,
+            betsList: null,
+            historyContainer: null,
+            gameContainer: null
         };
         
         // Game state
         let state = {
-            isSpinning: false,
             initialized: false,
             initializationStarted: false,
-            lastResult: null
+            currentPhase: 'waiting', // 'waiting', 'betting', 'spinning', 'results'
+            timeRemaining: 0,
+            gameInterval: null,
+            nextSpinTimestamp: 0,
+            selectedBetType: 'color',
+            selectedColor: null,
+            selectedOddEven: null,
+            selectedNumber: null,
+            activeBets: [],
+            lastResult: null,
+            lastResults: []
         };
         
-        // Roulette configuration
-        const numbers = [0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26];
+        // Roulette numbers
+        const numbers = [
+            0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26
+        ];
         
-        // Color mapping for numbers
+        // Color map for numbers
         const numberColors = {
             '0': 'green',
             '1': 'red',
@@ -89,13 +112,21 @@
             '35': 'black',
             '36': 'red'
         };
-  
+        
+        // Configuration
+        const config = {
+            bettingPhaseDuration: { min: 15, max: 30 }, // seconds
+            spinningPhaseDuration: 8, // seconds
+            resultsPhaseDuration: 5, // seconds
+            maxHistory: 10 // number of last results to keep
+        };
+        
         /**
-         * Initialize the roulette game
-         * @returns {Promise<boolean>} True if initialization successful
+         * Initialize the game
+         * With protection against repeated initialization and timeout
          */
         const init = async function() {
-            // Guard against multiple initialization
+            // Prevent repeated initialization
             if (state.initialized || state.initializationStarted) {
                 app.log('Roulette', 'Initialization already completed or in progress');
                 return true;
@@ -105,36 +136,40 @@
             app.log('Roulette', 'Starting game initialization');
             
             try {
-                // Use Promise.race for timeout protection
+                // Set initialization timeout
                 const initPromise = new Promise(async (resolve) => {
                     try {
-                        // Find or create DOM elements
+                        // Create game container if needed
+                        await createGameContainer();
+                        
+                        // Add game styles
+                        addGameStyles();
+                        
+                        // Find DOM elements (with availability check)
                         await findDOMElements();
                         
-                        // Create wheel if needed
-                        createRouletteWheel();
+                        // Set up the wheel
+                        setupWheel();
                         
-                        // Set up event listeners
+                        // Add event listeners
                         setupEventListeners();
                         
-                        // Set up bet input change handler to update potential win
-                        setupBetInputHandler();
+                        // Create history container
+                        createHistoryContainer();
                         
-                        // Hide previous result
-                        if (elements.resultDisplay) {
-                            elements.resultDisplay.style.display = 'none';
-                        }
+                        // Start the game cycle
+                        startGameCycle();
                         
                         state.initialized = true;
                         app.log('Roulette', 'Initialization completed successfully');
                         resolve(true);
-                    } catch (error) {
-                        app.log('Roulette', `Error during initialization: ${error.message}`, true);
+                    } catch (innerError) {
+                        app.log('Roulette', `Error during initialization: ${innerError.message}`, true);
                         resolve(false);
                     }
                 });
                 
-                // Timeout promise
+                // Set timeout (3 seconds)
                 const timeoutPromise = new Promise((resolve) => {
                     setTimeout(() => {
                         app.log('Roulette', 'Initialization timeout', true);
@@ -142,8 +177,9 @@
                     }, 3000);
                 });
                 
-                // Race the promises
+                // Use Promise.race to prevent hanging
                 const result = await Promise.race([initPromise, timeoutPromise]);
+                
                 return result;
                 
             } catch (error) {
@@ -153,76 +189,160 @@
         };
         
         /**
-         * Find or create required DOM elements
+         * Create the main game container if it doesn't exist
+         */
+        const createGameContainer = function() {
+            return new Promise((resolve) => {
+                try {
+                    // Check if container already exists
+                    let container = document.querySelector('.roulette-container');
+                    if (container) {
+                        elements.gameContainer = container;
+                        resolve();
+                        return;
+                    }
+                    
+                    // Check if there's a roulette screen to add to
+                    const rouletteScreen = document.getElementById('roulette-screen');
+                    if (rouletteScreen) {
+                        container = document.createElement('div');
+                        container.className = 'roulette-container';
+                        
+                        // Create a basic structure
+                        container.innerHTML = `
+                            <div class="roulette-game-area">
+                                <div class="roulette-wheel">
+                                    <!-- Wheel will be created here -->
+                                </div>
+                                <!-- Controls and other elements will be added dynamically -->
+                            </div>
+                        `;
+                        
+                        rouletteScreen.appendChild(container);
+                        elements.gameContainer = container;
+                        app.log('Roulette', 'Game container created inside roulette-screen');
+                        resolve();
+                        return;
+                    }
+                    
+                    // If no roulette screen, try to find main content
+                    const mainContent = document.querySelector('.main-content');
+                    if (mainContent) {
+                        container = document.createElement('div');
+                        container.className = 'roulette-container';
+                        container.innerHTML = `
+                            <div class="game-header">
+                                <button class="back-btn">← Back</button>
+                                <h2>Roulette</h2>
+                            </div>
+                            <div class="roulette-game-area">
+                                <div class="roulette-wheel">
+                                    <!-- Wheel will be created here -->
+                                </div>
+                                <!-- Controls and other elements will be added dynamically -->
+                            </div>
+                        `;
+                        
+                        mainContent.appendChild(container);
+                        elements.gameContainer = container;
+                        
+                        // Add back button functionality
+                        const backBtn = container.querySelector('.back-btn');
+                        if (backBtn) {
+                            backBtn.addEventListener('click', () => {
+                                if (typeof window.activateWelcomeScreen === 'function') {
+                                    window.activateWelcomeScreen();
+                                } else {
+                                    container.style.display = 'none';
+                                }
+                            });
+                        }
+                        
+                        app.log('Roulette', 'Game container created in main content');
+                        resolve();
+                        return;
+                    }
+                    
+                    // Last resort - add to body
+                    container = document.createElement('div');
+                    container.className = 'roulette-container';
+                    container.innerHTML = `
+                        <h2>Roulette</h2>
+                        <div class="roulette-game-area">
+                            <div class="roulette-wheel">
+                                <!-- Wheel will be created here -->
+                            </div>
+                            <!-- Controls and other elements will be added dynamically -->
+                        </div>
+                    `;
+                    
+                    document.body.appendChild(container);
+                    elements.gameContainer = container;
+                    app.log('Roulette', 'Game container created in body');
+                    resolve();
+                    
+                } catch (error) {
+                    app.log('Roulette', `Error creating game container: ${error.message}`, true);
+                    // Continue even if we can't create the container
+                    resolve();
+                }
+            });
+        };
+        
+        /**
+         * Find DOM elements with null protection
          */
         const findDOMElements = async function() {
+            // Use Promise for asynchronous behavior
             return new Promise((resolve, reject) => {
                 try {
-                    // Use setTimeout for non-blocking operation
+                    // Timeout to wait for DOM readiness
                     setTimeout(() => {
-                        elements.spinBtn = document.getElementById('roulette-spin-btn');
-                        elements.betInput = document.getElementById('roulette-bet');
-                        elements.resultDisplay = document.getElementById('roulette-result');
-                        elements.wheel = document.getElementById('roulette-wheel');
-                        elements.ball = document.getElementById('roulette-ball');
-                        elements.winningNumber = document.getElementById('winning-number');
-                        elements.potentialWin = document.getElementById('potential-win');
-                        elements.container = document.querySelector('.roulette-container');
+                        elements.placeBetBtn = document.getElementById('place-bet-btn');
+                        elements.clearBetBtn = document.getElementById('clear-bet-btn');
+                        elements.rouletteBet = document.getElementById('roulette-bet');
+                        elements.betTypeSelect = document.getElementById('roulette-bet-type');
+                        elements.betColorContainer = document.getElementById('bet-color-container');
+                        elements.betNumberContainer = document.getElementById('bet-number-container');
+                        elements.betOddEvenContainer = document.getElementById('bet-odd-even-container');
+                        elements.rouletteNumber = document.getElementById('roulette-number');
+                        elements.colorBtns = document.querySelectorAll('.color-btn');
+                        elements.oddEvenBtns = document.querySelectorAll('.odd-even-btn');
+                        elements.wheelInner = document.getElementById('wheel-inner');
+                        elements.rouletteBall = document.getElementById('roulette-ball');
+                        elements.rouletteResult = document.getElementById('roulette-result');
+                        elements.timerDisplay = document.getElementById('timer-display');
+                        elements.nextSpinTime = document.getElementById('next-spin-time');
+                        elements.betsList = document.getElementById('bets-list');
+                        elements.historyContainer = document.querySelector('.history-container');
                         
-                        // Check for missing elements and create if needed
-                        if (!elements.container) {
-                            const mainContainer = document.querySelector('#roulette-screen') || 
-                                                 document.querySelector('.main-content');
+                        // Check critical elements
+                        if (!elements.wheelInner || !elements.rouletteBall) {
+                            app.log('Roulette', 'Wheel elements not found, creating them', true);
                             
-                            if (mainContainer) {
-                                const container = document.createElement('div');
-                                container.className = 'roulette-container';
-                                
-                                // Create basic structure if missing
-                                container.innerHTML = `
-                                    <div class="bet-controls">
-                                        <div class="bet-input">
-                                            <label for="roulette-bet">Your Bet:</label>
-                                            <input type="number" id="roulette-bet" min="1" max="1000" value="10">
-                                        </div>
-                                        <div class="potential-win">
-                                            <span>Potential Win: <span id="potential-win">35</span> ⭐</span>
-                                        </div>
-                                        <button id="roulette-spin-btn" class="action-btn">SPIN</button>
-                                    </div>
-                                    
-                                    <div id="roulette-wheel-container" class="wheel-container">
-                                        <div id="roulette-wheel" class="wheel">
-                                            <!-- Numbers will be added dynamically -->
-                                        </div>
-                                        <div id="roulette-ball" class="ball"></div>
-                                    </div>
-                                    
-                                    <div id="roulette-result" class="result"></div>
-                                `;
-                                
-                                mainContainer.appendChild(container);
-                                elements.container = container;
-                                
-                                // Update references to newly created elements
-                                elements.spinBtn = document.getElementById('roulette-spin-btn');
-                                elements.betInput = document.getElementById('roulette-bet');
-                                elements.resultDisplay = document.getElementById('roulette-result');
-                                elements.wheel = document.getElementById('roulette-wheel');
-                                elements.ball = document.getElementById('roulette-ball');
-                                elements.potentialWin = document.getElementById('potential-win');
-                                
-                                app.log('Roulette', 'Created container and elements');
+                            // Try to find the container and create wheel if possible
+                            const container = document.querySelector('.roulette-wheel');
+                            if (container) {
+                                createWheel(container);
                             }
                         }
                         
-                        // Log critical element status
-                        if (!elements.spinBtn) {
-                            app.log('Roulette', 'Warning: spin button not found', true);
+                        // Check for bet controls and create if needed
+                        if (!elements.betTypeSelect || !elements.placeBetBtn) {
+                            app.log('Roulette', 'Betting controls not found, creating them', true);
+                            createBettingControls();
                         }
                         
-                        if (!elements.wheel) {
-                            app.log('Roulette', 'Warning: wheel element not found', true);
+                        // Create timer display if not found
+                        if (!elements.timerDisplay) {
+                            app.log('Roulette', 'Creating timer display', true);
+                            createTimerDisplay();
+                        }
+                        
+                        // Create results display if not found
+                        if (!elements.rouletteResult) {
+                            app.log('Roulette', 'Creating results display', true);
+                            createResultsDisplay();
                         }
                         
                         resolve();
@@ -235,153 +355,26 @@
         };
         
         /**
-         * Create the roulette wheel interface
+         * Create wheel and its elements if they don't exist
          */
-        const createRouletteWheel = function() {
+        const createWheel = function(container) {
             try {
-                if (!elements.wheel) {
-                    app.log('Roulette', 'Cannot create wheel: element not found', true);
+                if (!container) {
+                    app.log('Roulette', 'Cannot create wheel: container not found', true);
                     return;
                 }
                 
-                // Clear existing wheel
-                elements.wheel.innerHTML = '';
+                // Create wheel structure
+                const wheelHtml = `
+                    <div class="wheel-outer">
+                        <div id="wheel-inner" class="wheel-inner"></div>
+                        <div id="roulette-ball" class="ball"></div>
+                    </div>
+                `;
                 
-                // Add the numbers to the wheel
-                numbers.forEach((number, index) => {
-                    const angle = (index * 360 / numbers.length);
-                    const color = numberColors[number.toString()];
-                    
-                    const numberEl = document.createElement('div');
-                    numberEl.className = `wheel-number ${color}`;
-                    numberEl.textContent = number;
-                    numberEl.style.transform = `rotate(${angle}deg) translateY(-120px)`;
-                    
-                    elements.wheel.appendChild(numberEl);
-                });
-                
-                // Add CSS if not already present
-                if (!document.getElementById('roulette-styles')) {
-                    const style = document.createElement('style');
-                    style.id = 'roulette-styles';
-                    style.textContent = `
-                        .roulette-container {
-                            padding: 15px;
-                            max-width: 500px;
-                            margin: 0 auto;
-                        }
-                        
-                        .bet-controls {
-                            display: flex;
-                            flex-direction: column;
-                            gap: 10px;
-                            margin-bottom: 20px;
-                        }
-                        
-                        .bet-input {
-                            display: flex;
-                            align-items: center;
-                            gap: 10px;
-                        }
-                        
-                        .bet-input label {
-                            min-width: 70px;
-                        }
-                        
-                        .bet-input input {
-                            flex: 1;
-                            padding: 8px;
-                            border: 1px solid #ccc;
-                            border-radius: 4px;
-                        }
-                        
-                        .potential-win {
-                            padding: 10px;
-                            background: rgba(0, 168, 107, 0.1);
-                            border-radius: 4px;
-                            text-align: center;
-                        }
-                        
-                        .wheel-container {
-                            position: relative;
-                            width: 300px;
-                            height: 300px;
-                            margin: 20px auto;
-                            border-radius: 50%;
-                            background: #333;
-                            border: 4px solid #222;
-                            overflow: hidden;
-                        }
-                        
-                        .wheel {
-                            position: relative;
-                            width: 100%;
-                            height: 100%;
-                            transition: transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99);
-                        }
-                        
-                        .wheel-number {
-                            position: absolute;
-                            width: 30px;
-                            height: 30px;
-                            top: 50%;
-                            left: 50%;
-                            transform-origin: center;
-                            display: flex;
-                            align-items: center;
-                            justify-content: center;
-                            font-size: 12px;
-                            font-weight: bold;
-                            color: white;
-                        }
-                        
-                        .wheel-number.red {
-                            background-color: #e61c39;
-                        }
-                        
-                        .wheel-number.black {
-                            background-color: #1d1d1d;
-                        }
-                        
-                        .wheel-number.green {
-                            background-color: #00a86b;
-                        }
-                        
-                        .ball {
-                            position: absolute;
-                            width: 12px;
-                            height: 12px;
-                            border-radius: 50%;
-                            background: white;
-                            top: 50%;
-                            left: 50%;
-                            margin: -6px 0 0 -6px;
-                            transform: translateY(-130px);
-                            transition: transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99);
-                            z-index: 10;
-                        }
-                        
-                        .result {
-                            margin-top: 20px;
-                            padding: 15px;
-                            text-align: center;
-                            border-radius: 4px;
-                            display: none;
-                        }
-                        
-                        .result.win {
-                            background-color: rgba(0, 168, 107, 0.2);
-                            color: #00a86b;
-                        }
-                        
-                        .result.lose {
-                            background-color: rgba(230, 28, 57, 0.2);
-                            color: #e61c39;
-                        }
-                    `;
-                    
-                    document.head.appendChild(style);
-                }
+                container.innerHTML = wheelHtml;
+                elements.wheelInner = document.getElementById('wheel-inner');
+                elements.rouletteBall = document.getElementById('roulette-ball');
                 
                 app.log('Roulette', 'Wheel created successfully');
             } catch (error) {
@@ -390,353 +383,1853 @@
         };
         
         /**
+         * Create betting controls if they don't exist
+         */
+        const createBettingControls = function() {
+            try {
+                const container = elements.gameContainer || document.querySelector('.roulette-container');
+                if (!container) {
+                    app.log('Roulette', 'Cannot create betting controls: container not found', true);
+                    return;
+                }
+                
+                // Create betting controls HTML
+                const controlsHtml = `
+                    <div class="betting-controls">
+                        <div class="bet-section">
+                            <div class="bet-amount">
+                                <label for="roulette-bet">Bet Amount:</label>
+                                <input type="number" id="roulette-bet" min="1" value="10">
+                            </div>
+                            
+                            <div class="bet-type">
+                                <label for="roulette-bet-type">Bet Type:</label>
+                                <select id="roulette-bet-type">
+                                    <option value="color">Color</option>
+                                    <option value="number">Number</option>
+                                    <option value="odd-even">Odd/Even</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div id="bet-color-container" class="bet-option-container">
+                            <button class="color-btn red-btn" data-color="red">Red</button>
+                            <button class="color-btn black-btn" data-color="black">Black</button>
+                            <button class="color-btn green-btn" data-color="green">Green (0)</button>
+                        </div>
+                        
+                        <div id="bet-number-container" class="bet-option-container hidden">
+                            <label for="roulette-number">Choose Number (0-36):</label>
+                            <input type="number" id="roulette-number" min="0" max="36" value="0">
+                        </div>
+                        
+                        <div id="bet-odd-even-container" class="bet-option-container hidden">
+                            <button class="odd-even-btn" data-type="odd">Odd</button>
+                            <button class="odd-even-btn" data-type="even">Even</button>
+                        </div>
+                        
+                        <div class="betting-buttons">
+                            <button id="place-bet-btn" class="action-btn">Place Bet</button>
+                            <button id="clear-bet-btn" class="action-btn">Clear Bet</button>
+                        </div>
+                    </div>
+                    
+                    <div id="bets-list" class="active-bets">
+                        <h3>Your Active Bets</h3>
+                        <div class="bets-container"></div>
+                    </div>
+                `;
+                
+                // Create a wrapper and insert it into the container
+                const controlsWrapper = document.createElement('div');
+                controlsWrapper.className = 'betting-controls-wrapper';
+                controlsWrapper.innerHTML = controlsHtml;
+                
+                // Insert after the wheel or at the beginning
+                const wheel = container.querySelector('.roulette-wheel');
+                if (wheel) {
+                    wheel.after(controlsWrapper);
+                } else {
+                    container.prepend(controlsWrapper);
+                }
+                
+                // Update element references
+                elements.placeBetBtn = document.getElementById('place-bet-btn');
+                elements.clearBetBtn = document.getElementById('clear-bet-btn');
+                elements.rouletteBet = document.getElementById('roulette-bet');
+                elements.betTypeSelect = document.getElementById('roulette-bet-type');
+                elements.betColorContainer = document.getElementById('bet-color-container');
+                elements.betNumberContainer = document.getElementById('bet-number-container');
+                elements.betOddEvenContainer = document.getElementById('bet-odd-even-container');
+                elements.rouletteNumber = document.getElementById('roulette-number');
+                elements.colorBtns = document.querySelectorAll('.color-btn');
+                elements.oddEvenBtns = document.querySelectorAll('.odd-even-btn');
+                elements.betsList = document.getElementById('bets-list');
+                
+                app.log('Roulette', 'Betting controls created successfully');
+            } catch (error) {
+                app.log('Roulette', `Error creating betting controls: ${error.message}`, true);
+            }
+        };
+        
+        /**
+         * Create timer display if it doesn't exist
+         */
+        const createTimerDisplay = function() {
+            try {
+                const container = elements.gameContainer || document.querySelector('.roulette-container');
+                if (!container) {
+                    app.log('Roulette', 'Cannot create timer display: container not found', true);
+                    return;
+                }
+                
+                // Create timer display HTML
+                const timerHtml = `
+                    <div class="timer-container">
+                        <div class="timer-status">
+                            <div class="game-phase">
+                                <span>Status: </span>
+                                <span id="game-phase-display">Waiting for next round</span>
+                            </div>
+                            <div class="time-remaining">
+                                <span>Time: </span>
+                                <span id="timer-display">00:00</span>
+                            </div>
+                            <div class="next-spin">
+                                <span>Next spin: </span>
+                                <span id="next-spin-time">--:--</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                // Create a wrapper and insert it into the container
+                const timerWrapper = document.createElement('div');
+                timerWrapper.className = 'timer-wrapper';
+                timerWrapper.innerHTML = timerHtml;
+                
+                // Insert at the top of the container
+                container.prepend(timerWrapper);
+                
+                // Update element references
+                elements.timerDisplay = document.getElementById('timer-display');
+                elements.nextSpinTime = document.getElementById('next-spin-time');
+                elements.gamePhaseDisplay = document.getElementById('game-phase-display');
+                
+                app.log('Roulette', 'Timer display created successfully');
+            } catch (error) {
+                app.log('Roulette', `Error creating timer display: ${error.message}`, true);
+            }
+        };
+        
+        /**
+         * Create results display if it doesn't exist
+         */
+        const createResultsDisplay = function() {
+            try {
+                const container = elements.gameContainer || document.querySelector('.roulette-container');
+                if (!container) {
+                    app.log('Roulette', 'Cannot create results display: container not found', true);
+                    return;
+                }
+                
+                // Create results display HTML
+                const resultsHtml = `
+                    <div id="roulette-result" class="result"></div>
+                `;
+                
+                // Find appropriate location to insert
+                const bettingControls = container.querySelector('.betting-controls-wrapper');
+                const resultsElement = document.createElement('div');
+                resultsElement.className = 'results-container';
+                resultsElement.innerHTML = resultsHtml;
+                
+                if (bettingControls) {
+                    bettingControls.after(resultsElement);
+                } else {
+                    const wheel = container.querySelector('.roulette-wheel');
+                    if (wheel) {
+                        wheel.after(resultsElement);
+                    } else {
+                        container.appendChild(resultsElement);
+                    }
+                }
+                
+                // Update element reference
+                elements.rouletteResult = document.getElementById('roulette-result');
+                
+                app.log('Roulette', 'Results display created successfully');
+            } catch (error) {
+                app.log('Roulette', `Error creating results display: ${error.message}`, true);
+            }
+        };
+        
+        /**
+         * Create history container if it doesn't exist
+         */
+        const createHistoryContainer = function() {
+            try {
+                const container = elements.gameContainer || document.querySelector('.roulette-container');
+                if (!container) {
+                    app.log('Roulette', 'Cannot create history container: container not found', true);
+                    return;
+                }
+                
+                // Check if history container already exists
+                if (elements.historyContainer) {
+                    return;
+                }
+                
+                // Create history HTML
+                const historyHtml = `
+                    <div class="history-section">
+                        <h3>Previous Results</h3>
+                        <div class="history-container"></div>
+                    </div>
+                `;
+                
+                // Create element and add to container
+                const historyElement = document.createElement('div');
+                historyElement.className = 'history-wrapper';
+                historyElement.innerHTML = historyHtml;
+                
+                // Find appropriate location
+                const resultsContainer = container.querySelector('.results-container');
+                if (resultsContainer) {
+                    resultsContainer.after(historyElement);
+                } else {
+                    container.appendChild(historyElement);
+                }
+                
+                // Update element reference
+                elements.historyContainer = historyElement.querySelector('.history-container');
+                
+                app.log('Roulette', 'History container created successfully');
+            } catch (error) {
+                app.log('Roulette', `Error creating history container: ${error.message}`, true);
+            }
+        };
+        
+        /**
+         * Set up wheel with numbers
+         */
+        const setupWheel = function() {
+            try {
+                if (!elements.wheelInner) {
+                    app.log('Roulette', 'Cannot set up wheel: wheel-inner element not found', true);
+                    return;
+                }
+                
+                // Clear current wheel
+                elements.wheelInner.innerHTML = '';
+                
+                // Create number cells
+                const fragment = document.createDocumentFragment();
+                
+                numbers.forEach((number, index) => {
+                    // Calculate position on the wheel
+                    const angle = (index * 360 / numbers.length);
+                    const color = numberColors[number.toString()];
+                    
+                    // Create number element
+                    const numberElement = document.createElement('div');
+                    numberElement.className = `wheel-number ${color}`;
+                    numberElement.textContent = number;
+                    numberElement.style.transform = `rotate(${angle}deg) translateY(-110px)`;
+                    
+                    fragment.appendChild(numberElement);
+                });
+                
+                elements.wheelInner.appendChild(fragment);
+                
+                // Position the ball
+                if (elements.rouletteBall) {
+                    elements.rouletteBall.style.transform = 'rotate(0deg) translateY(-90px)';
+                }
+                
+                app.log('Roulette', 'Wheel set up successfully');
+            } catch (error) {
+                app.log('Roulette', `Error setting up wheel: ${error.message}`, true);
+            }
+        };
+        
+        /**
          * Set up event listeners
          */
         const setupEventListeners = function() {
             try {
-                // Spin button
-                if (elements.spinBtn) {
-                    // Prevent duplicate listeners
-                    const newBtn = elements.spinBtn.cloneNode(true);
-                    if (elements.spinBtn.parentNode) {
-                        elements.spinBtn.parentNode.replaceChild(newBtn, elements.spinBtn);
-                    }
-                    elements.spinBtn = newBtn;
-                    
-                    // Add click handler
-                    elements.spinBtn.addEventListener('click', spinWheel);
-                    app.log('Roulette', 'Spin button event listener set up');
-                } else {
-                    app.log('Roulette', 'Cannot set up event listener: spin button not found', true);
+                // Bet type selector
+                if (elements.betTypeSelect) {
+                    elements.betTypeSelect.addEventListener('change', changeBetType);
                 }
+                
+                // Color selection buttons
+                if (elements.colorBtns && elements.colorBtns.length > 0) {
+                    elements.colorBtns.forEach(btn => {
+                        btn.addEventListener('click', selectColor);
+                    });
+                }
+                
+                // Odd/Even selection buttons
+                if (elements.oddEvenBtns && elements.oddEvenBtns.length > 0) {
+                    elements.oddEvenBtns.forEach(btn => {
+                        btn.addEventListener('click', selectOddEven);
+                    });
+                }
+                
+                // Place bet button
+                if (elements.placeBetBtn) {
+                    const newPlaceBetBtn = elements.placeBetBtn.cloneNode(true);
+                    if (elements.placeBetBtn.parentNode) {
+                        elements.placeBetBtn.parentNode.replaceChild(newPlaceBetBtn, elements.placeBetBtn);
+                    }
+                    elements.placeBetBtn = newPlaceBetBtn;
+                    elements.placeBetBtn.addEventListener('click', placeBet);
+                }
+                
+                // Clear bet button
+                if (elements.clearBetBtn) {
+                    const newClearBetBtn = elements.clearBetBtn.cloneNode(true);
+                    if (elements.clearBetBtn.parentNode) {
+                        elements.clearBetBtn.parentNode.replaceChild(newClearBetBtn, elements.clearBetBtn);
+                    }
+                    elements.clearBetBtn = newClearBetBtn;
+                    elements.clearBetBtn.addEventListener('click', clearBet);
+                }
+                
+                app.log('Roulette', 'Event listeners set up successfully');
             } catch (error) {
                 app.log('Roulette', `Error setting up event listeners: ${error.message}`, true);
             }
         };
         
         /**
-         * Set up bet input change handler
+         * Change bet type handler
          */
-        const setupBetInputHandler = function() {
+        const changeBetType = function() {
             try {
-                if (elements.betInput && elements.potentialWin) {
-                    elements.betInput.addEventListener('input', updatePotentialWin);
-                    // Initialize potential win display
-                    updatePotentialWin();
+                if (!elements.betTypeSelect) return;
+                
+                state.selectedBetType = elements.betTypeSelect.value;
+                
+                // Hide all containers
+                if (elements.betColorContainer) {
+                    elements.betColorContainer.classList.add('hidden');
                 }
+                
+                if (elements.betNumberContainer) {
+                    elements.betNumberContainer.classList.add('hidden');
+                }
+                
+                if (elements.betOddEvenContainer) {
+                    elements.betOddEvenContainer.classList.add('hidden');
+                }
+                
+                // Show appropriate container
+                switch (state.selectedBetType) {
+                    case 'color':
+                        if (elements.betColorContainer) {
+                            elements.betColorContainer.classList.remove('hidden');
+                        }
+                        break;
+                    case 'number':
+                        if (elements.betNumberContainer) {
+                            elements.betNumberContainer.classList.remove('hidden');
+                        }
+                        break;
+                    case 'odd-even':
+                        if (elements.betOddEvenContainer) {
+                            elements.betOddEvenContainer.classList.remove('hidden');
+                        }
+                        break;
+                }
+                
+                // Reset selections
+                state.selectedColor = null;
+                state.selectedOddEven = null;
+                
+                if (elements.colorBtns) {
+                    elements.colorBtns.forEach(btn => btn.classList.remove('selected'));
+                }
+                
+                if (elements.oddEvenBtns) {
+                    elements.oddEvenBtns.forEach(btn => btn.classList.remove('selected'));
+                }
+                
+                // Tactile feedback
+                if (window.casinoApp && window.casinoApp.provideTactileFeedback) {
+                    window.casinoApp.provideTactileFeedback('light');
+                }
+                
             } catch (error) {
-                app.log('Roulette', `Error setting up bet input handler: ${error.message}`, true);
+                app.log('Roulette', `Error changing bet type: ${error.message}`, true);
             }
         };
         
         /**
-         * Update potential win amount when bet changes
+         * Select color handler
          */
-        const updatePotentialWin = function() {
+        const selectColor = function(event) {
             try {
-                if (!elements.betInput || !elements.potentialWin) return;
+                // Remove selection from all color buttons
+                if (elements.colorBtns) {
+                    elements.colorBtns.forEach(btn => btn.classList.remove('selected'));
+                }
                 
-                const betAmount = parseInt(elements.betInput.value) || 0;
-                // Standard roulette straight-up bet pays 35:1
-                const potential = betAmount * 35;
+                // Add selection to the clicked button
+                event.currentTarget.classList.add('selected');
                 
-                elements.potentialWin.textContent = potential;
+                // Save selected color
+                state.selectedColor = event.currentTarget.getAttribute('data-color');
+                
+                // Tactile feedback
+                if (window.casinoApp && window.casinoApp.provideTactileFeedback) {
+                    window.casinoApp.provideTactileFeedback('light');
+                }
+                
             } catch (error) {
-                app.log('Roulette', `Error updating potential win: ${error.message}`, true);
+                app.log('Roulette', `Error selecting color: ${error.message}`, true);
             }
         };
         
         /**
-         * Main game action - spin the wheel
+         * Select odd/even handler
          */
-        const spinWheel = async function() {
-            app.log('Roulette', 'Starting wheel spin');
-            
-            // Check if initialized
-            if (!state.initialized) {
-                app.log('Roulette', 'Game not initialized, starting initialization', true);
-                await init();
-                
-                if (!state.initialized) {
-                    app.log('Roulette', 'Failed to start game: initialization error', true);
-                    return;
+        const selectOddEven = function(event) {
+            try {
+                // Remove selection from all odd/even buttons
+                if (elements.oddEvenBtns) {
+                    elements.oddEvenBtns.forEach(btn => btn.classList.remove('selected'));
                 }
+                
+                // Add selection to the clicked button
+                event.currentTarget.classList.add('selected');
+                
+                // Save selected type
+                state.selectedOddEven = event.currentTarget.getAttribute('data-type');
+                
+                // Tactile feedback
+                if (window.casinoApp && window.casinoApp.provideTactileFeedback) {
+                    window.casinoApp.provideTactileFeedback('light');
+                }
+                
+            } catch (error) {
+                app.log('Roulette', `Error selecting odd/even: ${error.message}`, true);
+            }
+        };
+        
+        /**
+       * Place bet handler
+       */
+      const placeBet = function() {
+        try {
+            // Check if betting is allowed
+            if (state.currentPhase !== 'betting') {
+                window.casinoApp.showNotification('Betting is currently closed. Please wait for the next round.');
+                return;
             }
             
+            // Check casino app
+            if (!ensureCasinoApp()) {
+                return;
+            }
+            
+            // Get bet amount
+            if (!elements.rouletteBet) {
+                app.log('Roulette', 'Bet input not found', true);
+                return;
+            }
+            
+            const betAmount = parseInt(elements.rouletteBet.value);
+            
+            // Validate bet amount
+            if (isNaN(betAmount) || betAmount <= 0) {
+                window.casinoApp.showNotification('Please enter a valid bet amount');
+                return;
+            }
+            
+            // Check if user has enough funds
+            if (window.GreenLightApp && window.GreenLightApp.user && 
+                betAmount > window.GreenLightApp.user.balance) {
+                window.casinoApp.showNotification('Insufficient funds for this bet');
+                return;
+            }
+            
+            // Validate bet selection
+            let betTarget = null;
+            let betDescription = '';
+            
+            switch (state.selectedBetType) {
+                case 'color':
+                    if (!state.selectedColor) {
+                        window.casinoApp.showNotification('Please select a color');
+                        return;
+                    }
+                    betTarget = state.selectedColor;
+                    betDescription = capitalizeFirstLetter(state.selectedColor);
+                    break;
+                    
+                case 'number':
+                    if (!elements.rouletteNumber) {
+                        window.casinoApp.showNotification('Number selection is not available');
+                        return;
+                    }
+                    
+                    const number = parseInt(elements.rouletteNumber.value);
+                    if (isNaN(number) || number < 0 || number > 36) {
+                        window.casinoApp.showNotification('Please enter a number between 0 and 36');
+                        return;
+                    }
+                    
+                    betTarget = number;
+                    betDescription = `Number ${number}`;
+                    break;
+                    
+                case 'odd-even':
+                    if (!state.selectedOddEven) {
+                        window.casinoApp.showNotification('Please select odd or even');
+                        return;
+                    }
+                    betTarget = state.selectedOddEven;
+                    betDescription = capitalizeFirstLetter(state.selectedOddEven);
+                    break;
+                    
+                default:
+                    window.casinoApp.showNotification('Please select a valid bet type');
+                    return;
+            }
+            
+            // Create bet object
+            const bet = {
+                id: Date.now() + Math.random().toString(36).substr(2, 5),
+                amount: betAmount,
+                type: state.selectedBetType,
+                target: betTarget,
+                description: betDescription,
+                userId: window.GreenLightApp?.user?.telegramId || 'guest'
+            };
+            
+            // Add to active bets
+            state.activeBets.push(bet);
+            
+            // Update UI
+            updateActiveBets();
+            
+            // Process bet transaction
+            window.casinoApp.processGameResult(
+                'roulette',
+                betAmount,
+                'bet',
+                0,
+                {
+                    betType: state.selectedBetType,
+                    betTarget: betTarget
+                }
+            );
+            
+            // Clear bet inputs (optional)
+            clearBet();
+            
+            // Tactile feedback
+            if (window.casinoApp.provideTactileFeedback) {
+                window.casinoApp.provideTactileFeedback('medium');
+            }
+            
+            app.log('Roulette', `Bet placed: ${betAmount} on ${betDescription}`);
+            
+            // Show notification
+            window.casinoApp.showNotification(`Bet placed: ${betAmount} on ${betDescription}`);
+            
+        } catch (error) {
+            app.log('Roulette', `Error placing bet: ${error.message}`, true);
+        }
+    };
+    
+    /**
+     * Clear bet inputs
+     */
+    const clearBet = function() {
+        try {
+            // Reset selections
+            state.selectedColor = null;
+            state.selectedOddEven = null;
+            
+            // Reset UI elements
+            if (elements.colorBtns) {
+                elements.colorBtns.forEach(btn => btn.classList.remove('selected'));
+            }
+            
+            if (elements.oddEvenBtns) {
+                elements.oddEvenBtns.forEach(btn => btn.classList.remove('selected'));
+            }
+            
+            // Reset number input
+            if (elements.rouletteNumber) {
+                elements.rouletteNumber.value = 0;
+            }
+            
+            // Tactile feedback
+            if (window.casinoApp && window.casinoApp.provideTactileFeedback) {
+                window.casinoApp.provideTactileFeedback('light');
+            }
+            
+        } catch (error) {
+            app.log('Roulette', `Error clearing bet: ${error.message}`, true);
+        }
+    };
+    
+    /**
+     * Update active bets display
+     */
+    const updateActiveBets = function() {
+        try {
+            if (!elements.betsList) return;
+            
+            const betsContainer = elements.betsList.querySelector('.bets-container');
+            if (!betsContainer) return;
+            
+            // Clear container
+            betsContainer.innerHTML = '';
+            
+            // Check if there are active bets
+            if (state.activeBets.length === 0) {
+                betsContainer.innerHTML = '<div class="no-bets">No active bets</div>';
+                return;
+            }
+            
+            // Create fragment for better performance
+            const fragment = document.createDocumentFragment();
+            
+            // Add each bet
+            state.activeBets.forEach(bet => {
+                const betElement = document.createElement('div');
+                betElement.className = 'bet-item';
+                
+                // Determine icon based on bet type
+                let icon = '🎯';
+                switch (bet.type) {
+                    case 'color':
+                        if (bet.target === 'red') icon = '🔴';
+                        else if (bet.target === 'black') icon = '⚫';
+                        else if (bet.target === 'green') icon = '🟢';
+                        break;
+                    case 'odd-even':
+                        icon = bet.target === 'odd' ? '1️⃣' : '2️⃣';
+                        break;
+                    case 'number':
+                        icon = '🔢';
+                        break;
+                }
+                
+                betElement.innerHTML = `
+                    <div class="bet-info">
+                        <span class="bet-icon">${icon}</span>
+                        <span class="bet-description">${bet.description}</span>
+                    </div>
+                    <div class="bet-amount">${bet.amount} ⭐</div>
+                `;
+                
+                fragment.appendChild(betElement);
+            });
+            
+            betsContainer.appendChild(fragment);
+            
+        } catch (error) {
+            app.log('Roulette', `Error updating active bets: ${error.message}`, true);
+        }
+    };
+    
+    /**
+     * Start the continuous game cycle
+     */
+    const startGameCycle = function() {
+        try {
+            app.log('Roulette', 'Starting continuous game cycle');
+            
+            // Schedule the first round
+            scheduleBettingPhase();
+            
+            // Set up game interval for updating the timer
+            state.gameInterval = setInterval(updateGameTimer, 1000);
+            
+        } catch (error) {
+            app.log('Roulette', `Error starting game cycle: ${error.message}`, true);
+        }
+    };
+    
+    /**
+     * Schedule the betting phase
+     */
+    const scheduleBettingPhase = function() {
+        try {
+            // Set the current phase
+            state.currentPhase = 'betting';
+            
+            // Generate a random betting phase duration between min and max
+            const bettingDuration = getRandomInRange(
+                config.bettingPhaseDuration.min, 
+                config.bettingPhaseDuration.max
+            );
+            
+            // Calculate when the next spin will happen
+            const nextSpinTimestamp = Date.now() + (bettingDuration * 1000);
+            state.nextSpinTimestamp = nextSpinTimestamp;
+            
+            // Set time remaining
+            state.timeRemaining = bettingDuration;
+            
+            // Update UI
+            updatePhaseDisplay('Betting Open');
+            updateNextSpinTime(nextSpinTimestamp);
+            
+            // Schedule the spinning phase
+            setTimeout(() => {
+                scheduleSpinningPhase();
+            }, bettingDuration * 1000);
+            
+            app.log('Roulette', `Betting phase started, duration: ${bettingDuration}s, next spin at: ${new Date(nextSpinTimestamp).toLocaleTimeString()}`);
+            
+        } catch (error) {
+            app.log('Roulette', `Error scheduling betting phase: ${error.message}`, true);
+            
+            // Emergency recovery - try again in 5 seconds
+            setTimeout(scheduleBettingPhase, 5000);
+        }
+    };
+    
+    /**
+     * Schedule the spinning phase
+     */
+    const scheduleSpinningPhase = function() {
+        try {
+            // Set the current phase
+            state.currentPhase = 'spinning';
+            
+            // Update UI
+            updatePhaseDisplay('Wheel Spinning');
+            
+            // Disable betting controls
+            disableBettingControls();
+            
+            // Spin the wheel
+            spinWheel()
+                .then(result => {
+                    // Process the result
+                    processSpinResult(result);
+                    
+                    // Move to results phase
+                    setTimeout(() => {
+                        scheduleResultsPhase();
+                    }, 1000);
+                })
+                .catch(error => {
+                    app.log('Roulette', `Error during wheel spin: ${error.message}`, true);
+                    
+                    // Emergency recovery - move to results with a random result
+                    const emergencyResult = numbers[Math.floor(Math.random() * numbers.length)];
+                    processSpinResult(emergencyResult);
+                    setTimeout(() => {
+                        scheduleResultsPhase();
+                    }, 1000);
+                });
+            
+        } catch (error) {
+            app.log('Roulette', `Error scheduling spinning phase: ${error.message}`, true);
+            
+            // Emergency recovery - go directly to results phase
+            setTimeout(() => {
+                scheduleResultsPhase();
+            }, 2000);
+        }
+    };
+    
+    /**
+     * Schedule the results phase
+     */
+    const scheduleResultsPhase = function() {
+        try {
+            // Set the current phase
+            state.currentPhase = 'results';
+            
+            // Update UI
+            updatePhaseDisplay('Showing Results');
+            
+            // Show results for a set duration
+            setTimeout(() => {
+                // Start a new round
+                scheduleBettingPhase();
+                
+                // Reset the wheel position with a delay
+                setTimeout(() => {
+                    resetWheel();
+                }, 1000);
+                
+                // Enable betting controls
+                enableBettingControls();
+                
+            }, config.resultsPhaseDuration * 1000);
+            
+        } catch (error) {
+            app.log('Roulette', `Error scheduling results phase: ${error.message}`, true);
+            
+            // Emergency recovery - start a new round
+            setTimeout(scheduleBettingPhase, 5000);
+        }
+    };
+    
+    /**
+     * Update the game timer every second
+     */
+    const updateGameTimer = function() {
+        try {
+            if (state.currentPhase === 'betting') {
+                // Decrement time remaining
+                state.timeRemaining = Math.max(0, state.timeRemaining - 1);
+                
+                // Update timer display
+                updateTimerDisplay(state.timeRemaining);
+                
+                // Flash the timer when time is running out (less than 5 seconds)
+                if (state.timeRemaining <= 5 && elements.timerDisplay) {
+                    elements.timerDisplay.classList.toggle('flashing');
+                } else if (elements.timerDisplay) {
+                    elements.timerDisplay.classList.remove('flashing');
+                }
+            }
+        } catch (error) {
+            app.log('Roulette', `Error updating game timer: ${error.message}`, true);
+        }
+    };
+    
+    /**
+     * Update the timer display
+     */
+    const updateTimerDisplay = function(seconds) {
+        try {
+            if (!elements.timerDisplay) return;
+            
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = seconds % 60;
+            
+            elements.timerDisplay.textContent = 
+                `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+            
+        } catch (error) {
+            app.log('Roulette', `Error updating timer display: ${error.message}`, true);
+        }
+    };
+    
+    /**
+     * Update the next spin time display
+     */
+    const updateNextSpinTime = function(timestamp) {
+        try {
+            if (!elements.nextSpinTime) return;
+            
+            const date = new Date(timestamp);
+            elements.nextSpinTime.textContent = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            
+        } catch (error) {
+            app.log('Roulette', `Error updating next spin time: ${error.message}`, true);
+        }
+    };
+    
+    /**
+     * Update the phase display
+     */
+    const updatePhaseDisplay = function(phase) {
+        try {
+            const phaseDisplay = document.getElementById('game-phase-display');
+            if (!phaseDisplay) return;
+            
+            phaseDisplay.textContent = phase;
+            
+            // Add appropriate styling based on the phase
+            phaseDisplay.className = '';
+            
+            switch (phase) {
+                case 'Betting Open':
+                    phaseDisplay.classList.add('phase-betting');
+                    break;
+                case 'Wheel Spinning':
+                    phaseDisplay.classList.add('phase-spinning');
+                    break;
+                case 'Showing Results':
+                    phaseDisplay.classList.add('phase-results');
+                    break;
+                default:
+                    phaseDisplay.classList.add('phase-waiting');
+            }
+            
+        } catch (error) {
+            app.log('Roulette', `Error updating phase display: ${error.message}`, true);
+        }
+    };
+    
+    /**
+     * Enable betting controls
+     */
+    const enableBettingControls = function() {
+        try {
+            if (elements.placeBetBtn) {
+                elements.placeBetBtn.disabled = false;
+                elements.placeBetBtn.classList.remove('disabled');
+            }
+            
+            if (elements.clearBetBtn) {
+                elements.clearBetBtn.disabled = false;
+                elements.clearBetBtn.classList.remove('disabled');
+            }
+            
+            if (elements.betTypeSelect) {
+                elements.betTypeSelect.disabled = false;
+            }
+            
+            if (elements.rouletteBet) {
+                elements.rouletteBet.disabled = false;
+            }
+            
+            if (elements.rouletteNumber) {
+                elements.rouletteNumber.disabled = false;
+            }
+            
+            // Enable color buttons
+            if (elements.colorBtns) {
+                elements.colorBtns.forEach(btn => {
+                    btn.disabled = false;
+                    btn.classList.remove('disabled');
+                });
+            }
+            
+            // Enable odd/even buttons
+            if (elements.oddEvenBtns) {
+                elements.oddEvenBtns.forEach(btn => {
+                    btn.disabled = false;
+                    btn.classList.remove('disabled');
+                });
+            }
+            
+        } catch (error) {
+            app.log('Roulette', `Error enabling betting controls: ${error.message}`, true);
+        }
+    };
+    
+    /**
+     * Disable betting controls
+     */
+    const disableBettingControls = function() {
+        try {
+            if (elements.placeBetBtn) {
+                elements.placeBetBtn.disabled = true;
+                elements.placeBetBtn.classList.add('disabled');
+            }
+            
+            if (elements.clearBetBtn) {
+                elements.clearBetBtn.disabled = true;
+                elements.clearBetBtn.classList.add('disabled');
+            }
+            
+            if (elements.betTypeSelect) {
+                elements.betTypeSelect.disabled = true;
+            }
+            
+            if (elements.rouletteBet) {
+                elements.rouletteBet.disabled = true;
+            }
+            
+            if (elements.rouletteNumber) {
+                elements.rouletteNumber.disabled = true;
+            }
+            
+            // Disable color buttons
+            if (elements.colorBtns) {
+                elements.colorBtns.forEach(btn => {
+                    btn.disabled = true;
+                    btn.classList.add('disabled');
+                });
+            }
+            
+            // Disable odd/even buttons
+            if (elements.oddEvenBtns) {
+                elements.oddEvenBtns.forEach(btn => {
+                    btn.disabled = true;
+                    btn.classList.add('disabled');
+                });
+            }
+            
+        } catch (error) {
+            app.log('Roulette', `Error disabling betting controls: ${error.message}`, true);
+        }
+    };
+    
+    /**
+     * Spin the wheel with animation
+     * Returns a Promise that resolves with the result number
+     */
+    const spinWheel = function() {
+        return new Promise((resolve, reject) => {
             try {
-                // Check if casino app is available
-                if (!window.casinoApp) {
-                    app.log('Roulette', 'casinoApp not found', true);
-                    alert('Application initialization error');
+                app.log('Roulette', 'Spinning wheel');
+                
+                // Check wheel elements
+                if (!elements.wheelInner || !elements.rouletteBall) {
+                    app.log('Roulette', 'Wheel elements not found', true);
+                    reject(new Error('Wheel elements not found'));
                     return;
                 }
                 
-                // Check if already spinning
-                if (state.isSpinning) {
-                    app.log('Roulette', 'Wheel is already spinning');
-                    return;
+                // Get a random result from the wheel
+                const randomIndex = Math.floor(Math.random() * numbers.length);
+                const winningNumber = numbers[randomIndex];
+                
+                // Get the required rotations for the animation
+                const rotations = 3 + Math.floor(Math.random() * 3); // 3-5 full rotations
+                const finalAngle = rotations * 360 + (randomIndex * 360 / numbers.length);
+                
+                // Animate the wheel and the ball
+                elements.wheelInner.style.transition = 'transform 4s cubic-bezier(0.2, 0.8, 0.2, 1)';
+                elements.rouletteBall.style.transition = 'transform 4s cubic-bezier(0.2, 0.8, 0.2, 1)';
+                
+                elements.wheelInner.style.transform = `rotate(${-finalAngle}deg)`;
+                elements.rouletteBall.style.transform = `rotate(${finalAngle}deg) translateY(-90px)`;
+                
+                // Sound effect if available
+                if (window.casinoApp && window.casinoApp.playSound) {
+                    window.casinoApp.playSound('roulette-spin');
                 }
                 
-                // Check for required elements
-                if (!elements.betInput || !elements.wheel || !elements.ball) {
-                    app.log('Roulette', 'Required elements not found', true);
-                    window.casinoApp.showNotification('Game error: Missing UI elements');
-                    return;
-                }
-                
-                // Get bet amount
-                const betAmount = parseInt(elements.betInput.value);
-                
-                // Validate bet
-                if (isNaN(betAmount) || betAmount <= 0) {
-                    window.casinoApp.showNotification('Please enter a valid bet amount');
-                    return;
-                }
-                
-                // Check if sufficient balance
-                if (betAmount > window.GreenLightApp.user.balance) {
-                    window.casinoApp.showNotification('Insufficient balance for this bet');
-                    return;
-                }
-                
-                // Set spinning state
-                state.isSpinning = true;
-                if (elements.spinBtn) {
-                    elements.spinBtn.disabled = true;
-                }
-                
-                // Hide previous result
-                if (elements.resultDisplay) {
-                    elements.resultDisplay.style.display = 'none';
-                }
-                
-                // Provide tactile feedback
-                if (window.casinoApp.provideTactileFeedback) {
+                // Tactile feedback
+                if (window.casinoApp && window.casinoApp.provideTactileFeedback) {
                     window.casinoApp.provideTactileFeedback('medium');
                 }
                 
-                // Process the bet with the server first
-                await window.casinoApp.processGameResult(
-                    'roulette',
-                    betAmount,
-                    'bet',
-                    0,
-                    { betType: 'straight-up' }
-                );
+                // Set timeouts for animation completion and result
+                let spinTimeout, resultTimeout;
                 
-                // Spin the wheel with timeout protection
-                const result = await spinWheelWithTimeout();
+                // Set a timeout for the animation
+                spinTimeout = setTimeout(() => {
+                    app.log('Roulette', 'Spin animation timeout', true);
+                    if (resultTimeout) clearTimeout(resultTimeout);
+                    resolve(winningNumber);
+                }, 5000); // 5 seconds max for the animation
                 
-                // Calculate win
-                const winningNumber = result.number;
-                const winningColor = numberColors[winningNumber.toString()];
-                
-                // Determine outcome
-                const isWin = false; // In straight-up bet, all numbers lose by default
-                const winAmount = isWin ? betAmount * 35 : 0;
-                
-                // Display the result
-                displayResult(winningNumber, winningColor, isWin, winAmount);
-                
-                // Provide tactile feedback based on result
-                if (window.casinoApp.provideTactileFeedback) {
-                    if (isWin) {
-                        window.casinoApp.provideTactileFeedback('success');
-                    } else {
-                        window.casinoApp.provideTactileFeedback('warning');
-                    }
-                }
-                
-                // Send result to server
-                await window.casinoApp.processGameResult(
-                    'roulette',
-                    0, // No additional bet
-                    isWin ? 'win' : 'lose',
-                    winAmount,
-                    {
+                // Set a timeout for the result
+                resultTimeout = setTimeout(() => {
+                    if (spinTimeout) clearTimeout(spinTimeout);
+                    
+                    app.log('Roulette', `Spin complete! Result: ${winningNumber}`);
+                    
+                    // Save the result
+                    state.lastResult = {
                         number: winningNumber,
-                        color: winningColor,
-                        betType: 'straight-up'
-                    }
-                );
+                        color: numberColors[winningNumber.toString()],
+                        isOdd: winningNumber !== 0 && winningNumber % 2 === 1,
+                        timestamp: new Date().toISOString()
+                    };
+                    
+                    // Add to history
+                    addToHistory(state.lastResult);
+                    
+                    // Resolve with the winning number
+                    resolve(winningNumber);
+                    
+                }, config.spinningPhaseDuration * 1000 - 500); // Just before the end of the spinning phase
                 
             } catch (error) {
-                app.log('Roulette', `Error during spin: ${error.message}`, true);
-                window.casinoApp.showNotification('An error occurred. Please try again.');
-            } finally {
-                // Reset state
-                state.isSpinning = false;
-                if (elements.spinBtn) {
-                    elements.spinBtn.disabled = false;
-                }
+                app.log('Roulette', `Error spinning wheel: ${error.message}`, true);
+                reject(error);
             }
-        };
-        
-        /**
-         * Spin wheel animation with timeout protection
-         */
-        const spinWheelWithTimeout = function() {
-            return Promise.race([
-                performSpinAnimation(),
-                new Promise((_, reject) => {
-                    setTimeout(() => {
-                        reject(new Error('Spin animation timeout'));
-                    }, 6000); // 6 seconds max for animation
-                })
-            ]);
-        };
-        
-        /**
-         * Perform the wheel spin animation
-         */
-        const performSpinAnimation = function() {
-            return new Promise((resolve) => {
-                try {
-                    // Generate a random outcome
-                    const randomIndex = Math.floor(Math.random() * numbers.length);
-                    const winningNumber = numbers[randomIndex];
-                    
-                    // Calculate rotation for animation
-                    const rotations = 3 + Math.floor(Math.random() * 3); // 3-5 full rotations
-                    const finalAngle = rotations * 360 + (randomIndex * 360 / numbers.length);
-                    
-                    // Animate the wheel and ball
-                    if (elements.wheel && elements.ball) {
-                        elements.wheel.style.transform = `rotate(${-finalAngle}deg)`;
-                        elements.ball.style.transform = `rotate(${finalAngle}deg) translateY(-130px)`;
+        });
+    };
+    
+    /**
+     * Process the spin result and determine winners
+     */
+    const processSpinResult = function(resultNumber) {
+        try {
+            if (!state.lastResult) {
+                app.log('Roulette', 'No result to process', true);
+                return;
+            }
+            
+            app.log('Roulette', `Processing result: ${resultNumber}, color: ${state.lastResult.color}`);
+            
+            // Display the result
+            displayResult(resultNumber);
+            
+            // Process each active bet
+            state.activeBets.forEach(bet => {
+                let isWin = false;
+                let multiplier = 1;
+                
+                // Check if the bet is a winner
+                switch (bet.type) {
+                    case 'color':
+                        isWin = bet.target === state.lastResult.color;
+                        multiplier = bet.target === 'green' ? 36 : 2; // Green (0) pays 36:1, red/black pays 2:1
+                        break;
                         
-                        // Wait for animation to complete
-                        setTimeout(() => {
-                            resolve({
-                                number: winningNumber,
-                                index: randomIndex
-                            });
-                        }, 4000); // Animation duration
-                    } else {
-                        // Fallback if elements not found
-                        setTimeout(() => {
-                            resolve({
-                                number: winningNumber,
-                                index: randomIndex
-                            });
-                        }, 1000);
-                    }
-                } catch (error) {
-                    app.log('Roulette', `Animation error: ${error.message}`, true);
-                    
-                    // Generate a fallback result
-                    const fallbackNumber = numbers[Math.floor(Math.random() * numbers.length)];
-                    resolve({
-                        number: fallbackNumber,
-                        index: numbers.indexOf(fallbackNumber)
+                    case 'number':
+                        isWin = parseInt(bet.target) === resultNumber;
+                        multiplier = 36; // Straight up bet pays 36:1
+                        break;
+                        
+                    case 'odd-even':
+                        // 0 is neither odd nor even in roulette rules
+                        if (resultNumber === 0) {
+                            isWin = false;
+                        } else {
+                            isWin = (bet.target === 'odd' && state.lastResult.isOdd) || 
+                                    (bet.target === 'even' && !state.lastResult.isOdd);
+                        }
+                        multiplier = 2; // Odd/Even pays 2:1
+                        break;
+                }
+                
+                // Calculate win amount
+                const winAmount = isWin ? bet.amount * multiplier : 0;
+                
+                // Process the result with the server
+                if (window.casinoApp) {
+                    window.casinoApp.processGameResult(
+                        'roulette',
+                        0, // No additional bet
+                        isWin ? 'win' : 'lose',
+                        winAmount,
+                        {
+                            betType: bet.type,
+                            betTarget: bet.target,
+                            resultNumber: resultNumber,
+                            resultColor: state.lastResult.color
+                        }
+                    ).catch(err => {
+                        app.log('Roulette', `Error processing game result: ${err.message}`, true);
                     });
                 }
+                
+                // Display individual bet results
+                displayBetResult(bet, isWin, winAmount);
             });
-        };
-        
-        /**
-         * Display the game result
-         */
-        const displayResult = function(number, color, isWin, amount) {
-            try {
-                if (!elements.resultDisplay) {
-                    app.log('Roulette', 'Result display element not found', true);
-                    return;
-                }
-                
-                // Update result display content
-                elements.resultDisplay.innerHTML = `
-                    <div class="result-number ${color}">${number}</div>
-                    <div class="result-text">
-                        Ball landed on <strong>${number} ${color}</strong>
-                    </div>
-                    <div class="result-outcome">
-                        ${isWin 
-                            ? `<div class="win-message">You won ${amount} ⭐!</div>` 
-                            : '<div class="lose-message">Better luck next time!</div>'}
-                    </div>
-                `;
-                
-                // Apply appropriate class for styling
-                elements.resultDisplay.className = 'result';
-                elements.resultDisplay.classList.add(isWin ? 'win' : 'lose');
-                
-                // Show the result with animation
-                elements.resultDisplay.style.display = 'block';
-                
-                // Save the result
-                state.lastResult = {
-                    number,
-                    color,
-                    isWin,
-                    amount
-                };
-                
-            } catch (error) {
-                app.log('Roulette', `Error displaying result: ${error.message}`, true);
-            }
-        };
-        
-        // Public API
-        return {
-            // Core methods
-            init: init,
-            spinWheel: spinWheel,
             
-            // Helper method to get game status
-            getStatus: function() {
-                return {
-                    initialized: state.initialized,
-                    initializationStarted: state.initializationStarted,
-                    isSpinning: state.isSpinning,
-                    elementsFound: {
-                        spinBtn: !!elements.spinBtn,
-                        betInput: !!elements.betInput,
-                        wheel: !!elements.wheel,
-                        ball: !!elements.ball,
-                        resultDisplay: !!elements.resultDisplay
-                    },
-                    lastResult: state.lastResult
-                };
-            }
-        };
-    })();
+            // Clear active bets for next round
+            state.activeBets = [];
+            updateActiveBets();
+            
+        } catch (error) {
+            app.log('Roulette', `Error processing result: ${error.message}`, true);
+        }
+    };
     
-    // Register game
+    /**
+     * Add result to history
+     */
+    const addToHistory = function(result) {
+        try {
+            // Add to the beginning of the array
+            state.lastResults.unshift(result);
+            
+            // Limit the history size
+            if (state.lastResults.length > config.maxHistory) {
+                state.lastResults = state.lastResults.slice(0, config.maxHistory);
+            }
+            
+            // Update history display
+            updateHistoryDisplay();
+            
+        } catch (error) {
+            app.log('Roulette', `Error adding to history: ${error.message}`, true);
+        }
+    };
+    
+    /**
+     * Update history display
+     */
+    const updateHistoryDisplay = function() {
+        try {
+            const historyContainer = document.querySelector('.history-container');
+            if (!historyContainer) return;
+            
+            // Clear container
+            historyContainer.innerHTML = '';
+            
+            // Create fragment for better performance
+            const fragment = document.createDocumentFragment();
+            
+            // Add each result
+            state.lastResults.forEach(result => {
+                const resultElement = document.createElement('div');
+                resultElement.className = `history-item ${result.color}`;
+                resultElement.textContent = result.number;
+                
+                fragment.appendChild(resultElement);
+            });
+            
+            historyContainer.appendChild(fragment);
+            
+        } catch (error) {
+            app.log('Roulette', `Error updating history display: ${error.message}`, true);
+        }
+    };
+    
+    /**
+     * Display the spin result
+     */
+    const displayResult = function(resultNumber) {
+        try {
+            if (!elements.rouletteResult) return;
+            
+            const result = state.lastResult;
+            
+            // Create result HTML
+            let resultHtml = '';
+            
+            // Add appropriate icon based on color
+            let resultIcon = '⚫';
+            if (result.color === 'red') {
+                resultIcon = '🔴';
+            } else if (result.color === 'green') {
+                resultIcon = '🟢';
+            }
+            
+            resultHtml = `
+                <div class="result-icon">${resultIcon}</div>
+                <div class="result-number">${resultNumber}</div>
+                <div class="result-color">${capitalizeFirstLetter(result.color)}</div>
+                <div class="result-parity">${resultNumber === 0 ? 'Zero' : (result.isOdd ? 'Odd' : 'Even')}</div>
+            `;
+            
+            // Update the result element
+            elements.rouletteResult.innerHTML = resultHtml;
+            elements.rouletteResult.className = `result ${result.color}`;
+            elements.rouletteResult.style.display = 'block';
+            
+            // Animation effect
+            elements.rouletteResult.classList.add('pulse');
+            setTimeout(() => {
+                if (elements.rouletteResult) {
+                    elements.rouletteResult.classList.remove('pulse');
+                }
+            }, 1000);
+            
+        } catch (error) {
+            app.log('Roulette', `Error displaying result: ${error.message}`, true);
+        }
+    };
+    
+    /**
+     * Display individual bet result
+     */
+    const displayBetResult = function(bet, isWin, winAmount) {
+        try {
+            // Find the bet element in the list
+            const betsContainer = elements.betsList?.querySelector('.bets-container');
+            if (!betsContainer) return;
+            
+            // Create a result notification
+            const resultElement = document.createElement('div');
+            resultElement.className = `bet-result ${isWin ? 'win' : 'lose'}`;
+            
+            resultElement.innerHTML = `
+                <div class="bet-result-info">
+                    <span class="bet-description">${bet.description}</span>
+                    <span class="bet-amount">${bet.amount} ⭐</span>
+                </div>
+                <div class="bet-result-outcome">
+                    ${isWin ? 
+                        `<span class="win-icon">🎉</span> <span class="win-amount">+${winAmount} ⭐</span>` : 
+                        '<span class="lose-icon">❌</span>'}
+                </div>
+            `;
+            
+            // Add to the container
+            betsContainer.appendChild(resultElement);
+            
+            // Animate the result
+            resultElement.classList.add('animate-in');
+            
+            // Tactile feedback
+            if (window.casinoApp && window.casinoApp.provideTactileFeedback) {
+                if (isWin) {
+                    window.casinoApp.provideTactileFeedback('success');
+                } else {
+                    window.casinoApp.provideTactileFeedback('warning');
+                }
+            }
+            
+        } catch (error) {
+            app.log('Roulette', `Error displaying bet result: ${error.message}`, true);
+        }
+    };
+    
+    /**
+     * Reset wheel position
+     */
+    const resetWheel = function() {
+        try {
+            if (!elements.wheelInner || !elements.rouletteBall) return;
+            
+            // Remove transition temporarily
+            elements.wheelInner.style.transition = 'none';
+            elements.rouletteBall.style.transition = 'none';
+            
+            // Reset positions
+            elements.wheelInner.style.transform = 'rotate(0deg)';
+            elements.rouletteBall.style.transform = 'rotate(0deg) translateY(-90px)';
+            
+            // Force reflow to apply changes immediately
+            void elements.wheelInner.offsetWidth;
+            void elements.rouletteBall.offsetWidth;
+            
+            // Restore transition
+            setTimeout(() => {
+                if (elements.wheelInner && elements.rouletteBall) {
+                    elements.wheelInner.style.transition = 'transform 4s cubic-bezier(0.2, 0.8, 0.2, 1)';
+                    elements.rouletteBall.style.transition = 'transform 4s cubic-bezier(0.2, 0.8, 0.2, 1)';
+                }
+            }, 50);
+            
+        } catch (error) {
+            app.log('Roulette', `Error resetting wheel: ${error.message}`, true);
+        }
+    };
+    
+    /**
+     * Generate a random number in a range (inclusive)
+     */
+    const getRandomInRange = function(min, max) {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+    };
+    
+    /**
+     * Capitalize the first letter of a string
+     */
+    const capitalizeFirstLetter = function(string) {
+        if (!string) return '';
+        return string.charAt(0).toUpperCase() + string.slice(1);
+    };
+    
+   /**
+     * Ensure casinoApp exists
+     */
+   const ensureCasinoApp = function() {
+    if (window.casinoApp) return true;
+    
+    // Create minimal casinoApp implementation if missing
+    app.log('Roulette', 'casinoApp not found, creating temporary implementation', true);
+    window.casinoApp = {
+        showNotification: function(message) {
+            alert(message);
+        },
+        provideTactileFeedback: function() {
+            // Vibration stub
+        },
+        processGameResult: function(gameType, bet, result, win, data) {
+            app.log('Roulette', `Game: ${gameType}, Bet: ${bet}, Result: ${result}, Win: ${win}`, false);
+            return Promise.resolve({success: true});
+        },
+        playSound: function(soundName) {
+            // Sound stub
+        }
+    };
+    
+    return true;
+};
+
+/**
+ * Add game styles if needed
+ */
+const addGameStyles = function() {
+    // Check if styles already exist
+    if (document.getElementById('roulette-styles')) return;
+    
     try {
-        // Register with new system
-        if (window.registerGame) {
-            window.registerGame('rouletteGame', rouletteGame);
-            app.log('Roulette', 'Game registered with registerGame system');
-        }
+        // Create style element
+        const styleElement = document.createElement('style');
+        styleElement.id = 'roulette-styles';
         
-        // Export to global namespace for compatibility
-        window.rouletteGame = rouletteGame;
-        app.log('Roulette', 'Game exported to global namespace');
-        
-        // Auto-initialize when DOM is ready
-        document.addEventListener('DOMContentLoaded', function() {
-            setTimeout(() => {
-                if (!rouletteGame.getStatus().initialized && 
-                    !rouletteGame.getStatus().initializationStarted) {
-                    app.log('Roulette', 'Running automatic initialization');
-                    rouletteGame.init();
+        // Set CSS content
+        styleElement.textContent = `
+            /* Roulette container */
+            .roulette-container {
+                display: flex;
+                flex-direction: column;
+                gap: 1.5rem;
+                padding: 1.5rem;
+                max-width: 800px;
+                margin: 0 auto;
+            }
+            
+            /* Timer area */
+            .timer-container {
+                background: rgba(0, 0, 0, 0.2);
+                border-radius: 8px;
+                padding: 1rem;
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                margin-bottom: 1rem;
+            }
+            
+            .timer-status {
+                display: flex;
+                justify-content: space-between;
+                flex-wrap: wrap;
+                gap: 0.5rem;
+            }
+            
+            .timer-status > div {
+                padding: 0.5rem;
+                border-radius: 4px;
+                background: rgba(0, 0, 0, 0.1);
+            }
+            
+            #game-phase-display {
+                font-weight: bold;
+            }
+            
+            .phase-betting {
+                color: #4CAF50;
+            }
+            
+            .phase-spinning {
+                color: #FF9800;
+            }
+            
+            .phase-results {
+                color: #2196F3;
+            }
+            
+            .phase-waiting {
+                color: #9E9E9E;
+            }
+            
+            #timer-display.flashing {
+                animation: flash 0.5s infinite alternate;
+            }
+            
+            @keyframes flash {
+                from { color: #FFF; }
+                to { color: #FF5722; }
+            }
+            
+            /* Wheel area */
+            .roulette-wheel {
+                width: 300px;
+                height: 300px;
+                position: relative;
+                margin: 0 auto 2rem;
+            }
+            
+            .wheel-outer {
+                position: absolute;
+                width: 100%;
+                height: 100%;
+                border-radius: 50%;
+                background: #333;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                border: 4px solid #FFD700;
+                overflow: hidden;
+                box-shadow: 0 0 15px rgba(255, 215, 0, 0.5);
+            }
+            
+            .wheel-inner {
+                width: 90%;
+                height: 90%;
+                border-radius: 50%;
+                background-color: #222;
+                position: relative;
+                transform-origin: center;
+                border: 2px solid #444;
+            }
+            
+            .wheel-number {
+                position: absolute;
+                width: 30px;
+                height: 30px;
+                border-radius: 50%;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                font-size: 0.8rem;
+                font-weight: bold;
+                transform-origin: center;
+                color: white;
+            }
+            
+            .wheel-number.red {
+                background: #D32F2F;
+            }
+            
+            .wheel-number.black {
+                background: #212121;
+            }
+            
+            .wheel-number.green {
+                background: #00C853;
+            }
+            
+            .ball {
+                position: absolute;
+                width: 12px;
+                height: 12px;
+                background: white;
+                border-radius: 50%;
+                transform-origin: center;
+                z-index: 2;
+                box-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+            }
+            
+            /* Betting controls */
+            .betting-controls {
+                background: rgba(0, 0, 0, 0.2);
+                border-radius: 8px;
+                padding: 1.5rem;
+                border: 1px solid rgba(255, 255, 255, 0.1);
+            }
+            
+            .bet-section {
+                display: flex;
+                gap: 1rem;
+                margin-bottom: 1rem;
+                flex-wrap: wrap;
+            }
+            
+            .bet-amount, .bet-type {
+                flex: 1;
+                min-width: 150px;
+            }
+            
+            .bet-option-container {
+                display: flex;
+                gap: 1rem;
+                margin: 1rem 0;
+                flex-wrap: wrap;
+            }
+            
+            .bet-option-container.hidden {
+                display: none;
+            }
+            
+            .color-btn, .odd-even-btn {
+                padding: 0.7rem 1.5rem;
+                border-radius: 4px;
+                border: none;
+                cursor: pointer;
+                font-weight: bold;
+                transition: all 0.2s;
+            }
+            
+            .color-btn.selected, .odd-even-btn.selected {
+                transform: scale(1.05);
+                box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+            }
+            
+            .color-btn.disabled, .odd-even-btn.disabled {
+                opacity: 0.5;
+                cursor: not-allowed;
+            }
+            
+            .red-btn {
+                background: #D32F2F;
+                color: white;
+            }
+            
+            .black-btn {
+                background: #212121;
+                color: white;
+            }
+            
+            .green-btn {
+                background: #00C853;
+                color: white;
+            }
+            
+            .betting-buttons {
+                display: flex;
+                gap: 1rem;
+                margin-top: 1.5rem;
+            }
+            
+            .action-btn {
+                padding: 0.7rem 1.5rem;
+                border-radius: 4px;
+                border: none;
+                cursor: pointer;
+                font-weight: bold;
+                background: #4CAF50;
+                color: white;
+                flex: 1;
+                transition: all 0.2s;
+            }
+            
+            .action-btn:hover {
+                background: #388E3C;
+            }
+            
+            .action-btn.disabled, .action-btn:disabled {
+                background: #9E9E9E;
+                cursor: not-allowed;
+            }
+            
+            /* Active bets */
+            .active-bets {
+                background: rgba(0, 0, 0, 0.2);
+                border-radius: 8px;
+                padding: 1.5rem;
+                border: 1px solid rgba(255, 255, 255, 0.1);
+            }
+            
+            .bets-container {
+                margin-top: 1rem;
+            }
+            
+            .bet-item {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 0.7rem 1rem;
+                border-radius: 4px;
+                background: rgba(0, 0, 0, 0.2);
+                margin-bottom: 0.5rem;
+            }
+            
+            .bet-info {
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+            }
+            
+            .no-bets {
+                text-align: center;
+                padding: 1rem;
+                color: #9E9E9E;
+                font-style: italic;
+            }
+            
+            /* Results */
+            .result {
+                text-align: center;
+                padding: 1.5rem;
+                border-radius: 8px;
+                background: rgba(0, 0, 0, 0.2);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                margin: 1rem 0;
+            }
+            
+            .result.pulse {
+                animation: pulse 0.5s;
+            }
+            
+            @keyframes pulse {
+                0% { transform: scale(1); }
+                50% { transform: scale(1.05); }
+                100% { transform: scale(1); }
+            }
+            
+            .result-icon {
+                font-size: 2rem;
+                margin-bottom: 0.5rem;
+            }
+            
+            .result-number {
+                font-size: 2.5rem;
+                font-weight: bold;
+                margin-bottom: 0.5rem;
+            }
+            
+            .result.red {
+                background: rgba(211, 47, 47, 0.2);
+                border-color: #D32F2F;
+            }
+            
+            .result.black {
+                background: rgba(33, 33, 33, 0.2);
+                border-color: #212121;
+            }
+            
+            .result.green {
+                background: rgba(0, 200, 83, 0.2);
+                border-color: #00C853;
+            }
+            
+            /* Bet results */
+            .bet-result {
+                padding: 0.7rem 1rem;
+                border-radius: 4px;
+                margin-bottom: 0.5rem;
+                animation: fadeIn 0.5s;
+            }
+            
+            .bet-result.win {
+                background: rgba(76, 175, 80, 0.2);
+                border: 1px solid #4CAF50;
+            }
+            
+            .bet-result.lose {
+                background: rgba(244, 67, 54, 0.2);
+                border: 1px solid #F44336;
+            }
+            
+            .bet-result-info {
+                display: flex;
+                justify-content: space-between;
+                margin-bottom: 0.5rem;
+            }
+            
+            .bet-result-outcome {
+                text-align: right;
+                font-weight: bold;
+            }
+            
+            .win-amount {
+                color: #4CAF50;
+            }
+            
+            .animate-in {
+                animation: slideIn 0.3s;
+            }
+            
+            @keyframes slideIn {
+                from { transform: translateY(-10px); opacity: 0; }
+                to { transform: translateY(0); opacity: 1; }
+            }
+            
+            @keyframes fadeIn {
+                from { opacity: 0; }
+                to { opacity: 1; }
+            }
+            
+            /* History display */
+            .history-section {
+                background: rgba(0, 0, 0, 0.2);
+                border-radius: 8px;
+                padding: 1.5rem;
+                border: 1px solid rgba(255, 255, 255, 0.1);
+            }
+            
+            .history-container {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 0.5rem;
+                margin-top: 1rem;
+            }
+            
+            .history-item {
+                width: 40px;
+                height: 40px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-weight: bold;
+                color: white;
+            }
+            
+            .history-item.red {
+                background: #D32F2F;
+            }
+            
+            .history-item.black {
+                background: #212121;
+            }
+            
+            .history-item.green {
+                background: #00C853;
+            }
+            
+            /* Responsive design */
+            @media (max-width: 600px) {
+                .roulette-wheel {
+                    width: 250px;
+                    height: 250px;
                 }
-            }, 500);
-        });
-        
-        // Initialize immediately if DOM is already loaded
-        if (document.readyState === 'complete' || document.readyState === 'interactive') {
-            setTimeout(() => {
-                if (!rouletteGame.getStatus().initialized && 
-                    !rouletteGame.getStatus().initializationStarted) {
-                    app.log('Roulette', 'Running immediate initialization (DOM already loaded)');
-                    rouletteGame.init();
+                
+                .wheel-number {
+                    width: 25px;
+                    height: 25px;
+                    font-size: 0.7rem;
                 }
-            }, 500);
-        }
+                
+                .bet-section {
+                    flex-direction: column;
+                    gap: 0.5rem;
+                }
+                
+                .timer-status {
+                    flex-direction: column;
+                }
+            }
+        `;
         
+        // Add to document head
+        document.head.appendChild(styleElement);
+        
+        app.log('Roulette', 'Game styles added successfully');
     } catch (error) {
-        app.log('Roulette', `Error registering game: ${error.message}`, true);
+        app.log('Roulette', `Error adding game styles: ${error.message}`, true);
     }
-  })();
+};
+
+// Return public interface
+return {
+    // Main methods
+    init: init,
+    
+    // Betting methods
+    placeBet: placeBet,
+    clearBet: clearBet,
+    
+    // Get game status
+    getStatus: function() {
+        return {
+            initialized: state.initialized,
+            initializationStarted: state.initializationStarted,
+            currentPhase: state.currentPhase,
+            timeRemaining: state.timeRemaining,
+            activeBets: state.activeBets.length,
+            lastResult: state.lastResult,
+            resultsHistory: state.lastResults.length
+        };
+    }
+};
+})();
+
+// Register the game in all formats for maximum compatibility
+try {
+// 1. Register through the new system
+if (window.registerGame) {
+    window.registerGame('rouletteGame', rouletteGame);
+    app.log('Roulette', 'Game registered through new registerGame system');
+}
+
+// 2. Export to global namespace (backward compatibility)
+window.rouletteGame = rouletteGame;
+app.log('Roulette', 'Game exported to global namespace');
+
+// 3. Log completion of module loading
+app.log('Roulette', 'Module successfully loaded and ready for initialization');
+
+// 4. Auto-initialize when DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(() => {
+        if (!rouletteGame.getStatus().initialized && !rouletteGame.getStatus().initializationStarted) {
+            app.log('Roulette', 'Starting automatic initialization');
+            rouletteGame.init();
+        }
+    }, 500);
+});
+
+// 5. If DOM is already loaded, initialize immediately
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    setTimeout(() => {
+        if (!rouletteGame.getStatus().initialized && !rouletteGame.getStatus().initializationStarted) {
+            app.log('Roulette', 'Starting automatic initialization (DOM already loaded)');
+            rouletteGame.init();
+        }
+    }, 500);
+}
+
+} catch (error) {
+app.log('Roulette', `Error registering game: ${error.message}`, true);
+}
+})();
