@@ -21,8 +21,13 @@ const transactionSchema = new mongoose.Schema({
   },
   game: {
     type: String,
-    enum: ['slots', 'roulette', 'guessnumber', 'miner', 'crush', 'none'],
+    enum: ['slots', 'roulette', 'guessnumber', 'miner', 'crush', 'dispute', 'none'],
     default: 'none'
+  },
+  disputeId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Dispute',
+    required: false
   },
   createdAt: {
     type: Date,

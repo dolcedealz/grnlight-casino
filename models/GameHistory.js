@@ -12,7 +12,7 @@ const gameHistorySchema = new mongoose.Schema({
   },
   gameType: {
     type: String,
-    enum: ['slots', 'roulette', 'guessnumber', 'miner', 'crush'],
+    enum: ['slots', 'roulette', 'guessnumber', 'miner', 'crush', 'dispute'],
     required: true
   },
   betAmount: {
@@ -29,6 +29,11 @@ const gameHistorySchema = new mongoose.Schema({
   },
   gameData: {
     type: Object
+  },
+  disputeId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Dispute',
+    required: false
   },
   createdAt: {
     type: Date,

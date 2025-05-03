@@ -1,24 +1,24 @@
-const express    = require('express');
-const cors       = require('cors');
-const dotenv     = require('dotenv');
-const path       = require('path');
-const connectDB  = require('./config/db');
+const express = require('express');
+const cors = require('cors');
+const dotenv = require('dotenv');
+const path = require('path');
+const connectDB = require('./config/db');
 
 // Импортируем фабрики ботов под другими именами
 const createCasinoBot = require('./bots/casinoBot');
-const createAdminBot  = require('./bots/adminBot');
+const createAdminBot = require('./bots/adminBot');
 
 // Load environment variables
 dotenv.config({ path: path.resolve(__dirname, '.env') });
 
 const CASINO_BOT_TOKEN = process.env.CASINO_BOT_TOKEN;
-const ADMIN_BOT_TOKEN  = process.env.ADMIN_BOT_TOKEN;
+const ADMIN_BOT_TOKEN = process.env.ADMIN_BOT_TOKEN;
 
 console.log('Tokens:', { CASINO_BOT_TOKEN, ADMIN_BOT_TOKEN });
 
 // Создаём экземпляры ботов
 const casinoBot = createCasinoBot(CASINO_BOT_TOKEN);
-const adminBot  = createAdminBot(ADMIN_BOT_TOKEN);
+const adminBot = createAdminBot(ADMIN_BOT_TOKEN);
 
 // Connect to database
 connectDB();
@@ -34,6 +34,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/games', require('./routes/gameRoutes'));
 app.use('/api/admin', require('./routes/adminRoutes'));
+app.use('/api/disputes', require('./routes/disputeRoutes')); // Добавляем новый роут для споров
 
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
@@ -54,5 +55,5 @@ adminBot.launch()
   .catch(err => console.error('Admin bot error:', err));
 
 // Грейсфул-выход
-process.once('SIGINT',  () => { casinoBot.stop('SIGINT');  adminBot.stop('SIGINT'); });
+process.once('SIGINT', () => { casinoBot.stop('SIGINT'); adminBot.stop('SIGINT'); });
 process.once('SIGTERM', () => { casinoBot.stop('SIGTERM'); adminBot.stop('SIGTERM'); });
