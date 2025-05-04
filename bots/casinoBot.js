@@ -135,6 +135,10 @@ module.exports = (token) => {
 
       // Создаем ID для спора
       const temporaryId = `${ctx.from.id}_${Date.now()}`;
+      
+      // Сокращаем callback_data для соответствия ограничению в 64 байта
+      const shortQuestion = question.substring(0, 20);
+      const callbackData = `ia_${ctx.from.id}_${amount}_${Date.now()}`;
 
       // Возвращаем результат
       await ctx.answerInlineQuery([{
@@ -143,14 +147,13 @@ module.exports = (token) => {
         title: `🎲 Спор на ${amount} ⭐`,
         description: question,
         input_message_content: {
-          message_text: `🎲 **Предложение спора**\n\n💰 Ставка: ${amount} ⭐\n❓ ${question}\n\n👤 От: @${ctx.from.username || ctx.from.first_name}`,
-          parse_mode: 'Markdown'
+          message_text: `🎲 Предложение спора\n\n💰 Ставка: ${amount} ⭐\n❓ ${question}\n\n👤 От: @${ctx.from.username || ctx.from.first_name}`
         },
         reply_markup: {
           inline_keyboard: [[
             {
               text: '✅ Принять спор',
-              callback_data: `inline_accept_${ctx.from.id}_${amount}_${encodeURIComponent(question.substring(0, 50))}`
+              callback_data: callbackData
             }
           ]]
         }
@@ -174,13 +177,12 @@ module.exports = (token) => {
   });
 
   // Обработчик для принятия спора через inline кнопку
-  bot.action(/inline_accept_(.+)_(\d+)_(.+)/, async (ctx) => {
+  bot.action(/ia_(\d+)_(\d+)_(\d+)/, async (ctx) => {
     try {
-      const [, creatorId, amountStr, encodedQuestion] = ctx.match;
+      const [, creatorId, amountStr, timestamp] = ctx.match;
       const amount = parseInt(amountStr);
-      const question = decodeURIComponent(encodedQuestion);
       
-      console.log('Inline accept:', { creatorId, amount, question });
+      console.log('Inline accept:', { creatorId, amount, timestamp });
 
       // Проверяем, не пытается ли создатель принять свой же спор
       if (ctx.from.id.toString() === creatorId) {
@@ -204,6 +206,11 @@ module.exports = (token) => {
         return ctx.answerCbQuery(`❌ Недостаточно средств. Требуется: ${amount} ⭐`);
       }
 
+      // Извлекаем вопрос из сообщения
+      const messageText = ctx.update.callback_query.message.text;
+      const questionMatch = messageText.match(/❓ (.+)\n\n/);
+      const question = questionMatch ? questionMatch[1] : 'Спор';
+
       // Создаем спор в базе данных
       const dispute = new Dispute({
         creator: creator._id,
@@ -221,12 +228,11 @@ module.exports = (token) => {
 
       // Обновляем сообщение
       await ctx.editMessageText(
-        `✅ **Спор принят!**\n\n` +
+        `✅ Спор принят!\n\n` +
         `💰 Ставка: ${amount} ⭐\n` +
         `❓ ${question}\n\n` +
         `👥 Участники: @${creator.username} vs @${opponent.username}\n\n` +
-        `Теперь оба участника должны сделать свой выбор в боте.`,
-        { parse_mode: 'Markdown' }
+        `Теперь оба участника должны сделать свой выбор в боте.`
       );
 
       // Отправляем уведомления обоим участникам
@@ -235,8 +241,8 @@ module.exports = (token) => {
       const keyboard = {
         reply_markup: {
           inline_keyboard: [[
-            { text: '✅ Да', callback_data: `choose_${dispute._id}_true` },
-            { text: '❌ Нет', callback_data: `choose_${dispute._id}_false` }
+            { text: '✅ Да', callback_data: `ch_${dispute._id}_y` },
+            { text: '❌ Нет', callback_data: `ch_${dispute._id}_n` }
           ]]
         }
       };
@@ -262,10 +268,10 @@ module.exports = (token) => {
   });
 
   // Обработчик выбора в споре
-  bot.action(/choose_(.+)_(true|false)/, async (ctx) => {
+  bot.action(/ch_(.+)_(y|n)/, async (ctx) => {
     try {
       const [, disputeId, choice] = ctx.match;
-      const userChoice = choice === 'true';
+      const userChoice = choice === 'y';
       
       const dispute = await Dispute.findById(disputeId)
         .populate('creator', 'telegramId username')
@@ -362,15 +368,14 @@ module.exports = (token) => {
   // Команда для создания спора (старый способ)
   bot.command('dispute', async (ctx) => {
     try {
-      ctx.reply(
-        '🎲 **Создание спора**\n\n' +
+      ctx.replyWithHTML(
+        '<b>🎲 Создание спора</b>\n\n' +
         'Теперь вы можете создавать споры прямо в любом чате!\n\n' +
         '1. В любом чате напишите: @' + ctx.botInfo.username + '\n' +
         '2. Введите сумму и вопрос, например: 100 Кто победит в матче?\n' +
         '3. Отправьте спор собеседнику\n\n' +
         'Или используйте старый способ:\n' +
-        '/dispute @username сумма',
-        { parse_mode: 'Markdown' }
+        '/dispute @username сумма'
       );
     } catch (error) {
       console.error('Ошибка в команде dispute:', error);
@@ -381,8 +386,7 @@ module.exports = (token) => {
   // Help command - обновляем, добавляя информацию о спорах
   bot.help((ctx) => {
     console.log('Получена команда /help от пользователя:', ctx.from.id);
-    ctx.reply(`
-Welcome to Greenlight Casino! 🎩✨
+    ctx.replyWithHTML(`<b>Welcome to Greenlight Casino!</b> 🎩✨
 
 Available commands:
 /start - Start the bot and get the game link
@@ -404,8 +408,7 @@ Games available:
 📈 Crush
 🎲 Disputes (use inline mode!)
 
-Good luck and enjoy the Gatsby-inspired experience!
-    `);
+Good luck and enjoy the Gatsby-inspired experience!`);
   });
   
   // Handle other messages
