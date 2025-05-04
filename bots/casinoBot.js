@@ -183,6 +183,7 @@ module.exports = (token) => {
       const amount = parseInt(amountStr);
       
       console.log('Inline accept:', { creatorId, amount, timestamp });
+      console.log('Callback query:', ctx.update.callback_query);
 
       // Проверяем, не пытается ли создатель принять свой же спор
       if (ctx.from.id.toString() === creatorId) {
@@ -206,10 +207,20 @@ module.exports = (token) => {
         return ctx.answerCbQuery(`❌ Недостаточно средств. Требуется: ${amount} ⭐`);
       }
 
-      // Извлекаем вопрос из сообщения
-      const messageText = ctx.update.callback_query.message.text;
-      const questionMatch = messageText.match(/❓ (.+)\n\n/);
-      const question = questionMatch ? questionMatch[1] : 'Спор';
+      // Для inline сообщений извлекаем информацию по-другому
+      let question = `Спор на ${amount} ⭐`;
+      
+      if (ctx.update.callback_query.message && ctx.update.callback_query.message.text) {
+        // Обычное сообщение
+        const messageText = ctx.update.callback_query.message.text;
+        const questionMatch = messageText.match(/❓ (.+)\n\n/);
+        if (questionMatch) {
+          question = questionMatch[1];
+        }
+      } else if (ctx.update.callback_query.inline_message_id) {
+        // Inline сообщение - вопрос недоступен напрямую, используем заглушку
+        question = `Спор на ${amount} ⭐ от @${creator.username || creator.firstName}`;
+      }
 
       // Создаем спор в базе данных
       const dispute = new Dispute({
@@ -226,40 +237,70 @@ module.exports = (token) => {
 
       await dispute.save();
 
-      // Обновляем сообщение
-      await ctx.editMessageText(
-        `✅ Спор принят!\n\n` +
-        `💰 Ставка: ${amount} ⭐\n` +
-        `❓ ${question}\n\n` +
-        `👥 Участники: @${creator.username} vs @${opponent.username}\n\n` +
-        `Теперь оба участника должны сделать свой выбор в боте.`
-      );
+      // Для inline сообщений не можем редактировать текст
+      if (ctx.update.callback_query.inline_message_id) {
+        // Отправляем уведомления участникам через личные сообщения
+        const message = `🎲 Спор активен!\n\n❓ ${question}\n💰 Ставка: ${amount} ⭐\n\nСделайте свой выбор:`;
+        
+        const keyboard = {
+          reply_markup: {
+            inline_keyboard: [[
+              { text: '✅ Да', callback_data: `ch_${dispute._id}_y` },
+              { text: '❌ Нет', callback_data: `ch_${dispute._id}_n` }
+            ]]
+          }
+        };
 
-      // Отправляем уведомления обоим участникам
-      const message = `🎲 Спор активен!\n\n❓ ${question}\n💰 Ставка: ${amount} ⭐\n\nСделайте свой выбор:`;
-      
-      const keyboard = {
-        reply_markup: {
-          inline_keyboard: [[
-            { text: '✅ Да', callback_data: `ch_${dispute._id}_y` },
-            { text: '❌ Нет', callback_data: `ch_${dispute._id}_n` }
-          ]]
-        }
-      };
+        // Уведомляем создателя
+        await bot.telegram.sendMessage(creator.telegramId, 
+          message + `\n\nОппонент: @${opponent.username || opponent.firstName}`, 
+          keyboard
+        );
 
-      // Уведомляем создателя
-      await bot.telegram.sendMessage(creator.telegramId, 
-        message + `\n\nОппонент: @${opponent.username}`, 
-        keyboard
-      );
+        // Уведомляем оппонента
+        await bot.telegram.sendMessage(opponent.telegramId,
+          message + `\n\nСоздатель: @${creator.username || creator.firstName}`,
+          keyboard
+        );
 
-      // Уведомляем оппонента
-      await bot.telegram.sendMessage(opponent.telegramId,
-        message + `\n\nСоздатель: @${creator.username}`,
-        keyboard
-      );
+        // Просто показываем уведомление
+        return ctx.answerCbQuery('✅ Спор принят! Проверьте личные сообщения.');
+      } else {
+        // Обычное сообщение - можем его редактировать
+        await ctx.editMessageText(
+          `✅ Спор принят!\n\n` +
+          `💰 Ставка: ${amount} ⭐\n` +
+          `❓ ${question}\n\n` +
+          `👥 Участники: @${creator.username || creator.firstName} vs @${opponent.username || opponent.firstName}\n\n` +
+          `Теперь оба участника должны сделать свой выбор в боте.`
+        );
 
-      ctx.answerCbQuery('✅ Спор успешно принят!');
+        // Отправляем уведомления участникам
+        const message = `🎲 Спор активен!\n\n❓ ${question}\n💰 Ставка: ${amount} ⭐\n\nСделайте свой выбор:`;
+        
+        const keyboard = {
+          reply_markup: {
+            inline_keyboard: [[
+              { text: '✅ Да', callback_data: `ch_${dispute._id}_y` },
+              { text: '❌ Нет', callback_data: `ch_${dispute._id}_n` }
+            ]]
+          }
+        };
+
+        // Уведомляем создателя
+        await bot.telegram.sendMessage(creator.telegramId, 
+          message + `\n\nОппонент: @${opponent.username || opponent.firstName}`, 
+          keyboard
+        );
+
+        // Уведомляем оппонента
+        await bot.telegram.sendMessage(opponent.telegramId,
+          message + `\n\nСоздатель: @${creator.username || creator.firstName}`,
+          keyboard
+        );
+
+        ctx.answerCbQuery('✅ Спор успешно принят!');
+      }
 
     } catch (error) {
       console.error('Ошибка при принятии inline спора:', error);
