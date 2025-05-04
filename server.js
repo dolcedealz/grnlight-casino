@@ -20,6 +20,9 @@ console.log('Tokens:', { CASINO_BOT_TOKEN, ADMIN_BOT_TOKEN });
 const casinoBot = createCasinoBot(CASINO_BOT_TOKEN);
 const adminBot = createAdminBot(ADMIN_BOT_TOKEN);
 
+// Делаем казино бота доступным глобально для отправки уведомлений
+global.casinoBot = casinoBot;
+
 // Connect to database
 connectDB();
 

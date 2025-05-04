@@ -1,364 +1,723 @@
 /**
- * dispute.js - Модуль для игры "Спор" (подбрасывание монетки)
- * Версия 1.0.0
+ * dispute.js - Модуль для игры "Спор" (споры с вопросами и голосованием)
+ * Версия 2.0.0
  */
 
 (function() {
-  // Проверяем наличие основного объекта приложения
-  if (!window.GreenLightApp) {
+    // Проверяем наличие основного объекта приложения
+    if (!window.GreenLightApp) {
       console.error('[Dispute] GreenLightApp не инициализирован!');
       window.GreenLightApp = {
-          log: function(source, message, isError) {
-              if (isError) console.error(`[${source}] ${message}`);
-              else console.log(`[${source}] ${message}`);
-          }
+        log: function(source, message, isError) {
+          if (isError) console.error(`[${source}] ${message}`);
+          else console.log(`[${source}] ${message}`);
+        }
       };
-  }
-  
-  const app = window.GreenLightApp;
-  app.log('Dispute', 'Инициализация модуля игры Dispute v1.0.0');
-  
-  // Игровая логика в замыкании для изоляции
-  const disputeGame = (function() {
+    }
+    
+    const app = window.GreenLightApp;
+    app.log('Dispute', 'Инициализация модуля игры Dispute v2.0.0');
+    
+    // Игровая логика в замыкании для изоляции
+    const disputeGame = (function() {
       // Элементы игры
       let elements = {
-          disputeContainer: null,
-          headsBtn: null,
-          tailsBtn: null,
-          flipBtn: null,
-          coinAnimation: null,
-          disputeResult: null,
-          disputeInfo: null,
-          opponentChoice: null,
-          myChoice: null
+        // Основные контейнеры
+        disputeContainer: null,
+        disputeQuestion: null,
+        disputeInfo: null,
+        
+        // Элементы выбора
+        yesBtn: null,
+        noBtn: null,
+        myChoiceDisplay: null,
+        opponentChoiceDisplay: null,
+        
+        // Элементы голосования
+        votingContainer: null,
+        voteCreatorBtn: null,
+        voteOpponentBtn: null,
+        votingResults: null,
+        
+        // Результаты
+        disputeResult: null,
+        
+        // Табы и списки
+        createTab: null,
+        activeTab: null,
+        pendingTab: null,
+        historyTab: null,
+        
+        createContent: null,
+        activeContent: null,
+        pendingContent: null,
+        historyContent: null,
+        
+        // Форма создания
+        createForm: null,
+        opponentUsername: null,
+        disputeBet: null,
+        disputeQuestionInput: null,
+        createDisputeBtn: null,
+        
+        // Списки
+        activeDisputesList: null,
+        pendingDisputesList: null,
+        historyDisputesList: null
       };
       
       // Состояние игры
       let state = {
-          initialized: false,
-          disputeId: null,
-          myTelegramId: null,
-          opponentTelegramId: null,
-          disputeData: null,
-          myChoice: null,
-          isFlipping: false
+        initialized: false,
+        currentTab: 'create',
+        disputeId: null,
+        disputeData: null,
+        myChoice: null,
+        isProcessing: false,
+        disputes: {
+          active: [],
+          pending: [],
+          history: []
+        }
       };
       
       /**
        * Инициализация игры
        */
       const init = async function() {
-          if (state.initialized) {
-              app.log('Dispute', 'Игра уже инициализирована');
-              return true;
+        if (state.initialized) {
+          app.log('Dispute', 'Игра уже инициализирована');
+          return true;
+        }
+        
+        try {
+          app.log('Dispute', 'Начало инициализации игры');
+          
+          // Получаем элементы DOM
+          await findDOMElements();
+          
+          // Настраиваем обработчики событий
+          setupEventListeners();
+          
+          // Проверяем, есть ли ID спора в URL
+          const urlParams = new URLSearchParams(window.location.search);
+          state.disputeId = urlParams.get('disputeId');
+          
+          if (state.disputeId) {
+            // Если есть ID, загружаем конкретный спор
+            await loadDispute(state.disputeId);
+          } else {
+            // Иначе показываем основной интерфейс
+            showTab('create');
+            await loadAllDisputes();
           }
           
-          try {
-              app.log('Dispute', 'Начало инициализации игры');
-              
-              // Получаем ID спора из URL
-              const urlParams = new URLSearchParams(window.location.search);
-              state.disputeId = urlParams.get('disputeId');
-              
-              if (!state.disputeId) {
-                  app.log('Dispute', 'ID спора не найден в URL', true);
-                  return false;
-              }
-              
-              // Получаем данные текущего пользователя
-              if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe) {
-                  state.myTelegramId = window.Telegram.WebApp.initDataUnsafe.user?.id;
-              }
-              
-              // Получаем элементы DOM
-              await findDOMElements();
-              
-              // Загружаем данные спора
-              await loadDisputeData();
-              
-              // Настраиваем обработчики событий
-              setupEventListeners();
-              
-              // Обновляем интерфейс
-              updateUI();
-              
-              state.initialized = true;
-              app.log('Dispute', 'Инициализация успешно завершена');
-              return true;
-              
-          } catch (error) {
-              app.log('Dispute', `Ошибка инициализации: ${error.message}`, true);
-              return false;
-          }
+          state.initialized = true;
+          app.log('Dispute', 'Инициализация успешно завершена');
+          return true;
+          
+        } catch (error) {
+          app.log('Dispute', `Ошибка инициализации: ${error.message}`, true);
+          return false;
+        }
       };
       
       /**
        * Поиск DOM элементов
        */
       const findDOMElements = async function() {
-          return new Promise((resolve) => {
-              elements.disputeContainer = document.getElementById('dispute-container');
-              elements.headsBtn = document.getElementById('heads-btn');
-              elements.tailsBtn = document.getElementById('tails-btn');
-              elements.flipBtn = document.getElementById('flip-btn');
-              elements.coinAnimation = document.getElementById('coin-animation');
-              elements.disputeResult = document.getElementById('dispute-result');
-              elements.disputeInfo = document.getElementById('dispute-info');
-              elements.opponentChoice = document.getElementById('opponent-choice');
-              elements.myChoice = document.getElementById('my-choice');
-              
-              resolve();
-          });
-      };
-      
-      /**
-       * Загрузка данных спора
-       */
-      const loadDisputeData = async function() {
-          try {
-              const response = await fetch(`/api/disputes/${state.disputeId}`);
-              
-              if (!response.ok) {
-                  throw new Error('Ошибка загрузки данных спора');
-              }
-              
-              const data = await response.json();
-              state.disputeData = data.dispute;
-              
-              // Определяем, кто мы в этом споре
-              if (state.myTelegramId === data.dispute.creatorId) {
-                  state.opponentTelegramId = data.dispute.opponentId;
-              } else {
-                  state.opponentTelegramId = data.dispute.creatorId;
-              }
-              
-              app.log('Dispute', 'Данные спора загружены успешно');
-              
-          } catch (error) {
-              app.log('Dispute', `Ошибка загрузки данных: ${error.message}`, true);
-              throw error;
-          }
+        return new Promise((resolve) => {
+          // Основные контейнеры
+          elements.disputeContainer = document.getElementById('dispute-container');
+          elements.disputeQuestion = document.getElementById('dispute-question');
+          elements.disputeInfo = document.getElementById('dispute-info');
+          
+          // Элементы выбора
+          elements.yesBtn = document.getElementById('yes-btn');
+          elements.noBtn = document.getElementById('no-btn');
+          elements.myChoiceDisplay = document.getElementById('my-choice-display');
+          elements.opponentChoiceDisplay = document.getElementById('opponent-choice-display');
+          
+          // Элементы голосования
+          elements.votingContainer = document.getElementById('voting-container');
+          elements.voteCreatorBtn = document.getElementById('vote-creator-btn');
+          elements.voteOpponentBtn = document.getElementById('vote-opponent-btn');
+          elements.votingResults = document.getElementById('voting-results');
+          
+          // Результаты
+          elements.disputeResult = document.getElementById('dispute-result');
+          
+          // Табы
+          elements.createTab = document.getElementById('create-dispute-tab');
+          elements.activeTab = document.getElementById('active-disputes-tab');
+          elements.pendingTab = document.getElementById('pending-disputes-tab');
+          elements.historyTab = document.getElementById('history-disputes-tab');
+          
+          // Контент табов
+          elements.createContent = document.getElementById('create-dispute-content');
+          elements.activeContent = document.getElementById('active-disputes-content');
+          elements.pendingContent = document.getElementById('pending-disputes-content');
+          elements.historyContent = document.getElementById('history-disputes-content');
+          
+          // Форма создания
+          elements.createForm = document.querySelector('.dispute-form');
+          elements.opponentUsername = document.getElementById('opponent-username');
+          elements.disputeBet = document.getElementById('dispute-bet');
+          elements.disputeQuestionInput = document.getElementById('dispute-question');
+          elements.createDisputeBtn = document.getElementById('create-dispute-btn');
+          
+          // Списки
+          elements.activeDisputesList = document.getElementById('active-disputes-list');
+          elements.pendingDisputesList = document.getElementById('pending-disputes-list');
+          elements.historyDisputesList = document.getElementById('history-disputes-list');
+          
+          resolve();
+        });
       };
       
       /**
        * Настройка обработчиков событий
        */
       const setupEventListeners = function() {
-          if (elements.headsBtn) {
-              elements.headsBtn.addEventListener('click', () => chooseSide('heads'));
-          }
-          
-          if (elements.tailsBtn) {
-              elements.tailsBtn.addEventListener('click', () => chooseSide('tails'));
-          }
-          
-          if (elements.flipBtn) {
-              elements.flipBtn.addEventListener('click', flipCoin);
-          }
+        // Обработчики табов
+        if (elements.createTab) {
+          elements.createTab.addEventListener('click', () => showTab('create'));
+        }
+        
+        if (elements.activeTab) {
+          elements.activeTab.addEventListener('click', () => showTab('active'));
+        }
+        
+        if (elements.pendingTab) {
+          elements.pendingTab.addEventListener('click', () => showTab('pending'));
+        }
+        
+        if (elements.historyTab) {
+          elements.historyTab.addEventListener('click', () => showTab('history'));
+        }
+        
+        // Кнопка создания спора
+        if (elements.createDisputeBtn) {
+          elements.createDisputeBtn.addEventListener('click', createDispute);
+        }
+        
+        // Кнопки выбора ответа
+        if (elements.yesBtn) {
+          elements.yesBtn.addEventListener('click', () => makeChoice(true));
+        }
+        
+        if (elements.noBtn) {
+          elements.noBtn.addEventListener('click', () => makeChoice(false));
+        }
+        
+        // Кнопки голосования
+        if (elements.voteCreatorBtn) {
+          elements.voteCreatorBtn.addEventListener('click', () => vote('creator'));
+        }
+        
+        if (elements.voteOpponentBtn) {
+          elements.voteOpponentBtn.addEventListener('click', () => vote('opponent'));
+        }
       };
       
       /**
-       * Выбор стороны монеты
+       * Показ таба
        */
-      const chooseSide = async function(side) {
-          if (state.myChoice) {
-              app.log('Dispute', 'Сторона уже выбрана');
-              return;
-          }
-          
-          try {
-              const response = await fetch(`/api/disputes/${state.disputeId}/choose-side`, {
-                  method: 'POST',
-                  headers: {
-                      'Content-Type': 'application/json'
-                  },
-                  body: JSON.stringify({
-                      telegramId: state.myTelegramId,
-                      side: side
-                  })
-              });
-              
-              if (!response.ok) {
-                  throw new Error('Ошибка выбора стороны');
-              }
-              
-              const data = await response.json();
-              state.disputeData = data.dispute;
-              state.myChoice = side;
-              
-              updateUI();
-              
-              // Проверяем, готовы ли оба игрока
-              checkReadyToFlip();
-              
-          } catch (error) {
-              app.log('Dispute', `Ошибка выбора стороны: ${error.message}`, true);
-              if (window.casinoApp) {
-                  window.casinoApp.showNotification('Ошибка выбора стороны');
-              }
-          }
+      const showTab = async function(tabName) {
+        state.currentTab = tabName;
+        
+        // Обновляем классы табов
+        document.querySelectorAll('.tab-btn').forEach(tab => {
+          tab.classList.remove('active');
+        });
+        
+        document.querySelectorAll('.tab-content').forEach(content => {
+          content.classList.remove('active');
+        });
+        
+        // Активируем нужный таб
+        const tabElement = document.getElementById(`${tabName}-dispute-tab`);
+        const contentElement = document.getElementById(`${tabName}-dispute-content`);
+        
+        if (tabElement) tabElement.classList.add('active');
+        if (contentElement) contentElement.classList.add('active');
+        
+        // Загружаем данные для таба
+        switch (tabName) {
+          case 'active':
+            await loadActiveDisputes();
+            break;
+          case 'pending':
+            await loadPendingDisputes();
+            break;
+          case 'history':
+            await loadHistoryDisputes();
+            break;
+        }
       };
       
       /**
-       * Проверка готовности к броску
+       * Создание нового спора
        */
-      const checkReadyToFlip = function() {
-          if (state.disputeData.status === 'in_progress') {
-              if (elements.flipBtn) {
-                  elements.flipBtn.disabled = false;
-                  elements.flipBtn.textContent = 'ПОДБРОСИТЬ МОНЕТУ';
-              }
+      const createDispute = async function() {
+        if (state.isProcessing) return;
+        
+        try {
+          state.isProcessing = true;
+          
+          const opponent = elements.opponentUsername.value.trim();
+          const amount = parseInt(elements.disputeBet.value);
+          const question = elements.disputeQuestionInput.value.trim();
+          
+          // Валидация
+          if (!opponent.startsWith('@')) {
+            throw new Error('Username должен начинаться с @');
           }
+          
+          if (!amount || amount <= 0) {
+            throw new Error('Укажите корректную сумму');
+          }
+          
+          if (!question) {
+            throw new Error('Введите вопрос спора');
+          }
+          
+          // Отправляем запрос
+          const response = await fetch('/api/disputes/create', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              creatorId: window.GreenLightApp.user.telegramId,
+              opponentUsername: opponent.substring(1), // убираем @
+              amount: amount,
+              question: question,
+              createdVia: 'web'
+            })
+          });
+          
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.message || 'Ошибка создания спора');
+          }
+          
+          // Очищаем форму
+          elements.opponentUsername.value = '';
+          elements.disputeBet.value = '';
+          elements.disputeQuestionInput.value = '';
+          
+          // Показываем уведомление и переключаемся на активные споры
+          if (window.casinoApp) {
+            window.casinoApp.showNotification('Спор создан! Ожидаем ответа оппонента.');
+          }
+          
+          showTab('active');
+          
+        } catch (error) {
+          app.log('Dispute', `Ошибка создания спора: ${error.message}`, true);
+          if (window.casinoApp) {
+            window.casinoApp.showNotification(error.message);
+          }
+        } finally {
+          state.isProcessing = false;
+        }
       };
       
       /**
-       * Подбрасывание монеты
+       * Загрузка конкретного спора
        */
-      const flipCoin = async function() {
-          if (state.isFlipping) return;
+      const loadDispute = async function(disputeId) {
+        try {
+          const response = await fetch(`/api/disputes/${disputeId}`);
           
-          try {
-              state.isFlipping = true;
-              
-              // Запускаем анимацию
-              if (elements.coinAnimation) {
-                  elements.coinAnimation.classList.add('flipping');
-              }
-              
-              // Отправляем запрос на сервер
-              const response = await fetch(`/api/disputes/${state.disputeId}/flip`, {
-                  method: 'POST',
-                  headers: {
-                      'Content-Type': 'application/json'
-                  }
-              });
-              
-              if (!response.ok) {
-                  throw new Error('Ошибка подбрасывания монеты');
-              }
-              
-              const data = await response.json();
-              
-              // Ждем окончания анимации
-              setTimeout(() => {
-                  if (elements.coinAnimation) {
-                      elements.coinAnimation.classList.remove('flipping');
-                      elements.coinAnimation.classList.add(data.coinResult);
-                  }
-                  
-                  // Показываем результат
-                  showResult(data);
-              }, 2000);
-              
-          } catch (error) {
-              app.log('Dispute', `Ошибка подбрасывания монеты: ${error.message}`, true);
-              state.isFlipping = false;
+          if (!response.ok) {
+            throw new Error('Ошибка загрузки спора');
           }
+          
+          const dispute = await response.json();
+          state.disputeData = dispute;
+          
+          // Отображаем спор
+          displayDispute(dispute);
+          
+        } catch (error) {
+          app.log('Dispute', `Ошибка загрузки спора: ${error.message}`, true);
+        }
       };
       
       /**
-       * Показ результата
+       * Отображение спора
        */
-      const showResult = function(data) {
-          if (!elements.disputeResult) return;
+      const displayDispute = function(dispute) {
+        // Показываем вопрос
+        if (elements.disputeQuestion) {
+          elements.disputeQuestion.textContent = dispute.question;
+        }
+        
+        // Показываем информацию
+        if (elements.disputeInfo) {
+          elements.disputeInfo.innerHTML = `
+            <div>Ставка: ${dispute.bet.amount} ⭐</div>
+            <div>Статус: ${getStatusText(dispute.status)}</div>
+          `;
+        }
+        
+        // Определяем, являемся ли мы создателем
+        const isCreator = window.GreenLightApp.user.telegramId === dispute.creator.telegramId;
+        const myChoice = isCreator ? dispute.bet.creatorChoice : dispute.bet.opponentChoice;
+        const opponentChoice = isCreator ? dispute.bet.opponentChoice : dispute.bet.creatorChoice;
+        
+        // Показываем выбор
+        if (myChoice !== null && elements.myChoiceDisplay) {
+          elements.myChoiceDisplay.textContent = `Ваш выбор: ${myChoice ? 'Да' : 'Нет'}`;
+          elements.myChoiceDisplay.style.display = 'block';
+        }
+        
+        if (opponentChoice !== null && elements.opponentChoiceDisplay) {
+          elements.opponentChoiceDisplay.textContent = 'Оппонент сделал выбор';
+          elements.opponentChoiceDisplay.style.display = 'block';
+        }
+        
+        // Управление кнопками выбора
+        if (myChoice === null && dispute.status === 'active') {
+          if (elements.yesBtn) elements.yesBtn.disabled = false;
+          if (elements.noBtn) elements.noBtn.disabled = false;
+        } else {
+          if (elements.yesBtn) elements.yesBtn.disabled = true;
+          if (elements.noBtn) elements.noBtn.disabled = true;
+        }
+        
+        // Управление голосованием
+        if (dispute.status === 'voting' && elements.votingContainer) {
+          elements.votingContainer.style.display = 'block';
           
-          const isWinner = data.winnerId === state.myTelegramId;
-          const resultText = isWinner ? 
-              `🎉 Поздравляем! Вы выиграли ${data.winAmount} ⭐!` : 
-              `😔 К сожалению, вы проиграли ${state.disputeData.amount} ⭐`;
+          // Проверяем, голосовали ли мы
+          const hasVoted = dispute.voting.votes.some(vote => 
+            vote.voter.telegramId === window.GreenLightApp.user.telegramId
+          );
           
-          elements.disputeResult.innerHTML = `
-              <div class="result-icon">${isWinner ? '🏆' : '❌'}</div>
-              <div class="result-text">${resultText}</div>
-              <div class="coin-result">Выпало: ${data.coinResult === 'heads' ? 'Орел' : 'Решка'}</div>
-              <button class="action-btn" onclick="window.location.href='/'">Вернуться в казино</button>
+          if (hasVoted) {
+            displayVotingResults(dispute);
+          } else {
+            if (elements.voteCreatorBtn) {
+              elements.voteCreatorBtn.textContent = `Голосовать за @${dispute.creator.username}`;
+              elements.voteCreatorBtn.disabled = false;
+            }
+            
+            if (elements.voteOpponentBtn) {
+              elements.voteOpponentBtn.textContent = `Голосовать за @${dispute.opponent.username}`;
+              elements.voteOpponentBtn.disabled = false;
+            }
+          }
+        }
+        
+        // Показываем результат
+        if (dispute.status === 'resolved' && elements.disputeResult) {
+          displayResult(dispute);
+        }
+      };
+      
+      /**
+       * Сделать выбор
+       */
+      const makeChoice = async function(choice) {
+        if (state.isProcessing || !state.disputeData) return;
+        
+        try {
+          state.isProcessing = true;
+          
+          const response = await fetch(`/api/disputes/${state.disputeData._id}/choose`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              userId: window.GreenLightApp.user.telegramId,
+              choice: choice
+            })
+          });
+          
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.message || 'Ошибка выбора');
+          }
+          
+          const updatedDispute = await response.json();
+          state.disputeData = updatedDispute;
+          displayDispute(updatedDispute);
+          
+          if (window.casinoApp) {
+            window.casinoApp.showNotification('Ваш выбор принят!');
+          }
+          
+        } catch (error) {
+          app.log('Dispute', `Ошибка выбора: ${error.message}`, true);
+          if (window.casinoApp) {
+            window.casinoApp.showNotification(error.message);
+          }
+        } finally {
+          state.isProcessing = false;
+        }
+      };
+      
+      /**
+       * Голосование
+       */
+      const vote = async function(voteFor) {
+        if (state.isProcessing || !state.disputeData) return;
+        
+        try {
+          state.isProcessing = true;
+          
+          const voteForId = voteFor === 'creator' ? 
+            state.disputeData.creator.telegramId : 
+            state.disputeData.opponent.telegramId;
+          
+          const response = await fetch(`/api/disputes/${state.disputeData._id}/vote`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              voterId: window.GreenLightApp.user.telegramId,
+              voteFor: voteForId
+            })
+          });
+          
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.message || 'Ошибка голосования');
+          }
+          
+          if (window.casinoApp) {
+            window.casinoApp.showNotification('Ваш голос принят!');
+          }
+          
+          // Перезагружаем спор
+          await loadDispute(state.disputeData._id);
+          
+        } catch (error) {
+          app.log('Dispute', `Ошибка голосования: ${error.message}`, true);
+          if (window.casinoApp) {
+            window.casinoApp.showNotification(error.message);
+          }
+        } finally {
+          state.isProcessing = false;
+        }
+      };
+      
+      /**
+       * Отображение результатов голосования
+       */
+      const displayVotingResults = function(dispute) {
+        if (!elements.votingResults) return;
+        
+        const votesForCreator = dispute.voting.votes.filter(v => 
+          v.voteFor._id === dispute.creator._id
+        ).length;
+        
+        const votesForOpponent = dispute.voting.votes.filter(v => 
+          v.voteFor._id === dispute.opponent._id
+        ).length;
+        
+        elements.votingResults.innerHTML = `
+          <div class="voting-stats">
+            <div>Голосов за @${dispute.creator.username}: ${votesForCreator}</div>
+            <div>Голосов за @${dispute.opponent.username}: ${votesForOpponent}</div>
+            <div>Всего голосов: ${dispute.voting.totalVotes}</div>
+          </div>
+        `;
+        
+        if (elements.voteCreatorBtn) elements.voteCreatorBtn.disabled = true;
+        if (elements.voteOpponentBtn) elements.voteOpponentBtn.disabled = true;
+      };
+      
+      /**
+       * Отображение результата
+       */
+      const displayResult = function(dispute) {
+        if (!elements.disputeResult) return;
+        
+        let resultHTML = '';
+        
+        if (dispute.result.isDraw) {
+          resultHTML = `
+            <div class="result-icon">🤝</div>
+            <div class="result-text">Ничья! Средства возвращены участникам.</div>
+          `;
+        } else if (dispute.result.winner) {
+          const isWinner = dispute.result.winner._id === window.GreenLightApp.user._id;
+          resultHTML = `
+            <div class="result-icon">${isWinner ? '🏆' : '😔'}</div>
+            <div class="result-text">
+              ${isWinner ? 
+                `Поздравляем! Вы выиграли ${dispute.bet.amount * 2} ⭐!` : 
+                `К сожалению, вы проиграли ${dispute.bet.amount} ⭐`}
+            </div>
           `;
           
           elements.disputeResult.classList.add(isWinner ? 'win' : 'lose');
-          
-          // Обновляем баланс
-          if (window.GreenLightApp && window.GreenLightApp.user) {
-              if (isWinner) {
-                  window.GreenLightApp.user.balance += data.winAmount;
-              } else {
-                  window.GreenLightApp.user.balance -= state.disputeData.amount;
-              }
-              
-              if (window.casinoApp && window.casinoApp.updateBalance) {
-                  window.casinoApp.updateBalance();
-              }
-          }
+        }
+        
+        elements.disputeResult.innerHTML = resultHTML;
+        elements.disputeResult.style.display = 'block';
       };
       
       /**
-       * Обновление интерфейса
+       * Загрузка активных споров
        */
-      const updateUI = function() {
-          if (!state.disputeData) return;
+      const loadActiveDisputes = async function() {
+        try {
+          const response = await fetch(`/api/disputes/user/${window.GreenLightApp.user.telegramId}`);
           
-          // Обновляем информацию о споре
-          if (elements.disputeInfo) {
-              elements.disputeInfo.innerHTML = `
-                  <div>Сумма спора: ${state.disputeData.amount} ⭐</div>
-                  <div>Статус: ${getStatusText(state.disputeData.status)}</div>
-              `;
+          if (!response.ok) {
+            throw new Error('Ошибка загрузки споров');
           }
           
-          // Показываем выбор игрока
-          if (elements.myChoice && state.myChoice) {
-              elements.myChoice.textContent = `Ваш выбор: ${state.myChoice === 'heads' ? 'Орел' : 'Решка'}`;
+          const disputes = await response.json();
+          const activeDisputes = disputes.filter(d => d.status === 'active' || d.status === 'voting');
+          
+          displayDisputesList(activeDisputes, elements.activeDisputesList);
+          
+        } catch (error) {
+          app.log('Dispute', `Ошибка загрузки активных споров: ${error.message}`, true);
+        }
+      };
+      
+      /**
+       * Загрузка ожидающих споров
+       */
+      const loadPendingDisputes = async function() {
+        try {
+          const response = await fetch(`/api/disputes/user/${window.GreenLightApp.user.telegramId}`);
+          
+          if (!response.ok) {
+            throw new Error('Ошибка загрузки споров');
           }
           
-          // Показываем выбор оппонента (если оба выбрали)
-          if (elements.opponentChoice && state.disputeData.status === 'in_progress') {
-              elements.opponentChoice.textContent = 'Оппонент сделал выбор';
+          const disputes = await response.json();
+          const pendingDisputes = disputes.filter(d => d.status === 'pending');
+          
+          displayDisputesList(pendingDisputes, elements.pendingDisputesList);
+          
+        } catch (error) {
+          app.log('Dispute', `Ошибка загрузки ожидающих споров: ${error.message}`, true);
+        }
+      };
+      
+      /**
+       * Загрузка истории споров
+       */
+      const loadHistoryDisputes = async function() {
+        try {
+          const response = await fetch(`/api/disputes/user/${window.GreenLightApp.user.telegramId}`);
+          
+          if (!response.ok) {
+            throw new Error('Ошибка загрузки споров');
           }
           
-          // Обновляем кнопки
-          if (state.myChoice) {
-              if (elements.headsBtn) elements.headsBtn.disabled = true;
-              if (elements.tailsBtn) elements.tailsBtn.disabled = true;
-          }
+          const disputes = await response.json();
+          const historyDisputes = disputes.filter(d => d.status === 'resolved' || d.status === 'cancelled');
           
-          // Активируем кнопку броска если оба готовы
-          if (state.disputeData.status === 'in_progress' && elements.flipBtn) {
-              elements.flipBtn.disabled = false;
-          }
+          displayDisputesList(historyDisputes, elements.historyDisputesList);
+          
+        } catch (error) {
+          app.log('Dispute', `Ошибка загрузки истории споров: ${error.message}`, true);
+        }
+      };
+      
+      /**
+       * Отображение списка споров
+       */
+      const displayDisputesList = function(disputes, container) {
+        if (!container) return;
+        
+        if (disputes.length === 0) {
+          container.innerHTML = '<div class="empty-message">Нет споров</div>';
+          return;
+        }
+        
+        const disputesHTML = disputes.map(dispute => `
+          <div class="dispute-item" onclick="window.disputeGame.openDispute('${dispute._id}')">
+            <div class="dispute-header">
+              <span class="dispute-status ${dispute.status}">${getStatusText(dispute.status)}</span>
+              <span class="dispute-amount">${dispute.bet.amount} ⭐</span>
+            </div>
+            <div class="dispute-question">${dispute.question}</div>
+            <div class="dispute-info">
+              <span>vs @${dispute.creator._id === window.GreenLightApp.user._id ? 
+                dispute.opponent.username : dispute.creator.username}</span>
+              <span>${formatDate(dispute.createdAt)}</span>
+            </div>
+          </div>
+        `).join('');
+        
+        container.innerHTML = disputesHTML;
+      };
+      
+      /**
+       * Открытие спора
+       */
+      const openDispute = function(disputeId) {
+        window.location.href = `?disputeId=${disputeId}`;
+      };
+      
+      /**
+       * Загрузка всех споров
+       */
+      const loadAllDisputes = async function() {
+        await Promise.all([
+          loadActiveDisputes(),
+          loadPendingDisputes(),
+          loadHistoryDisputes()
+        ]);
       };
       
       /**
        * Получение текста статуса
        */
       const getStatusText = function(status) {
-          switch (status) {
-              case 'pending': return 'Ожидание оппонента';
-              case 'accepted': return 'Выберите сторону монеты';
-              case 'in_progress': return 'Готов к броску';
-              case 'completed': return 'Завершен';
-              default: return status;
-          }
+        const statusMap = {
+          'pending': 'Ожидание',
+          'active': 'Активный',
+          'voting': 'Голосование',
+          'resolved': 'Завершен',
+          'cancelled': 'Отменен'
+        };
+        
+        return statusMap[status] || status;
+      };
+      
+      /**
+       * Форматирование даты
+       */
+      const formatDate = function(dateString) {
+        const date = new Date(dateString);
+        return date.toLocaleDateString();
       };
       
       // Возвращаем публичный интерфейс
       return {
-          init: init,
-          getStatus: function() {
-              return {
-                  initialized: state.initialized,
-                  disputeId: state.disputeId,
-                  myChoice: state.myChoice,
-                  isFlipping: state.isFlipping
-              };
-          }
+        init: init,
+        openDispute: openDispute,
+        getStatus: function() {
+          return {
+            initialized: state.initialized,
+            currentTab: state.currentTab,
+            disputeId: state.disputeId,
+            isProcessing: state.isProcessing
+          };
+        }
       };
-  })();
-  
-  // Регистрируем игру
-  if (window.registerGame) {
+    })();
+    
+    // Регистрируем игру
+    if (window.registerGame) {
       window.registerGame('disputeGame', disputeGame);
       app.log('Dispute', 'Игра зарегистрирована через систему registerGame');
-  }
-  
-  window.disputeGame = disputeGame;
-  app.log('Dispute', 'Модуль успешно загружен и готов к инициализации');
-})();
+    }
+    
+    window.disputeGame = disputeGame;
+    app.log('Dispute', 'Модуль успешно загружен и готов к инициализации');
+  })();
