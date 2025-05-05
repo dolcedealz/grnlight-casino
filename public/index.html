@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -131,31 +131,39 @@
                 <!-- Welcome Screen -->
                 <div id="welcome-screen" class="screen active">
                     <div class="game-selection">
-                        <h2>Выберите игру</h2>
-                        <div class="game-grid">
-                            <div class="game-card" data-game="slots">
-                                <div class="game-icon">🎰</div>
-                                <div class="game-name">Slots</div>
+                        <!-- Убираем заголовок для более минималистичного дизайна -->
+                        <div class="game-layout">
+                            <!-- Верхнее событие типа Polymarket -->
+                            <div class="event-card" data-game="events">
+                                <div class="event-icon">🏆</div>
+                                <div class="event-details">
+                                    <div class="event-name">События</div>
+                                    <div class="event-description">Ставки на события</div>
+                                </div>
                             </div>
-                            <div class="game-card" data-game="roulette">
-                                <div class="game-icon">🎲</div>
-                                <div class="game-name">Roulette</div>
+                            
+                            <!-- Слоты и Майнер (верхний ряд) -->
+                            <div class="game-row">
+                                <div class="game-card" data-game="slots">
+                                    <div class="game-icon">🎰</div>
+                                    <div class="game-name">Слоты</div>
+                                </div>
+                                <div class="game-card" data-game="miner">
+                                    <div class="game-icon">💣</div>
+                                    <div class="game-name">Майнер</div>
+                                </div>
                             </div>
-                            <div class="game-card" data-game="guessnumber">
-                                <div class="game-icon">🔢</div>
-                                <div class="game-name">Guess Number</div>
-                            </div>
-                            <div class="game-card" data-game="miner">
-                                <div class="game-icon">💣</div>
-                                <div class="game-name">Miner</div>
-                            </div>
-                            <div class="game-card" data-game="crush">
-                                <div class="game-icon">📈</div>
-                                <div class="game-name">Crush</div>
-                            </div>
-                            <div class="game-card" data-game="dispute">
-                                <div class="game-icon">🪙</div>
-                                <div class="game-name">Coin Flip</div>
+                            
+                            <!-- Coin Flip и Краш (нижний ряд) -->
+                            <div class="game-row">
+                                <div class="game-card" data-game="dispute">
+                                    <div class="game-icon">🪙</div>
+                                    <div class="game-name">Монета</div>
+                                </div>
+                                <div class="game-card" data-game="crush">
+                                    <div class="game-icon">📈</div>
+                                    <div class="game-name">Краш</div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -164,8 +172,8 @@
                 <!-- Slots Game Screen -->
                 <div id="slots-screen" class="screen">
                     <div class="game-header">
-                        <button class="back-btn">← Back</button>
-                        <h2>Slots</h2>
+                        <button class="back-btn">← Назад</button>
+                        <h2>Слоты</h2>
                     </div>
                     <div class="slots-container">
                         <div class="slot-reels">
@@ -174,41 +182,19 @@
                         <div id="slots-result" class="result"></div>
                         <div class="bet-controls">
                             <div class="bet-amount">
-                                <label for="slots-bet">Bet Amount:</label>
+                                <label for="slots-bet">Ставка:</label>
                                 <input type="number" id="slots-bet" min="1" value="10">
                             </div>
-                            <button id="spin-btn" class="action-btn">SPIN</button>
+                            <button id="spin-btn" class="action-btn">КРУТИТЬ</button>
                         </div>
                     </div>
-                </div>
-                
-                <!-- Остальные игровые экраны (roulette, guessnumber, miner, crush) -->
-                <!-- Оставлены те же, что и в исходной версии -->
-                
-                <!-- Roulette Game Screen -->
-                <div id="roulette-screen" class="screen">
-                    <!-- Содержимое для рулетки -->
-                    <div class="game-header">
-                        <button class="back-btn">← Back</button>
-                        <h2>Roulette</h2>
-                    </div>
-                    <!-- Содержимое рулетки -->
-                </div>
-                
-                <!-- Guess Number Game Screen -->
-                <div id="guessnumber-screen" class="screen">
-                    <div class="game-header">
-                        <button class="back-btn">← Back</button>
-                        <h2>Guess The Number</h2>
-                    </div>
-                    <!-- Содержимое игры Guess Number -->
                 </div>
                 
                 <!-- Miner Game Screen -->
                 <div id="miner-screen" class="screen">
                     <div class="game-header">
-                        <button class="back-btn">← Back</button>
-                        <h2>Miner</h2>
+                        <button class="back-btn">← Назад</button>
+                        <h2>Майнер</h2>
                     </div>
                     <!-- Содержимое игры Miner -->
                 </div>
@@ -216,17 +202,17 @@
                 <!-- Crush Game Screen -->
                 <div id="crush-screen" class="screen">
                     <div class="game-header">
-                        <button class="back-btn">← Back</button>
-                        <h2>Crush</h2>
+                        <button class="back-btn">← Назад</button>
+                        <h2>Краш</h2>
                     </div>
                     <!-- Содержимое игры Crush -->
                 </div>
 
-                <!-- Dispute Game Screen -->
+                <!-- Dispute/Coin Flip Game Screen -->
                 <div id="dispute-screen" class="screen">
                     <div class="game-header">
-                        <button class="back-btn">← Back</button>
-                        <h2>Coin Flip Duel</h2>
+                        <button class="back-btn">← Назад</button>
+                        <h2>Монета</h2>
                     </div>
                     <div class="dispute-container" id="dispute-container">
                         <div id="dispute-info" class="dispute-info">
@@ -234,15 +220,15 @@
                         </div>
                         
                         <div class="coin-selection">
-                            <h3>Choose Your Side</h3>
+                            <h3>Выберите сторону</h3>
                             <div class="coin-buttons">
                                 <button id="heads-btn" class="coin-btn">
                                     <div class="coin-icon">🦅</div>
-                                    <div class="coin-text">HEADS</div>
+                                    <div class="coin-text">ОРЁЛ</div>
                                 </button>
                                 <button id="tails-btn" class="coin-btn">
                                     <div class="coin-icon">🔱</div>
-                                    <div class="coin-text">TAILS</div>
+                                    <div class="coin-text">РЕШКА</div>
                                 </button>
                             </div>
                         </div>
@@ -254,14 +240,75 @@
                         
                         <div class="coin-animation-container">
                             <div id="coin-animation" class="coin">
-                                <div class="coin-heads">HEADS</div>
-                                <div class="coin-tails">TAILS</div>
+                                <div class="coin-heads">ОРЁЛ</div>
+                                <div class="coin-tails">РЕШКА</div>
                             </div>
                         </div>
                         
-                        <button id="flip-btn" class="action-btn" disabled>WAITING FOR PLAYERS</button>
+                        <button id="flip-btn" class="action-btn" disabled>ПОДБРОСИТЬ</button>
                         
                         <div id="dispute-result" class="result"></div>
+                    </div>
+                </div>
+                
+                <!-- Events Screen -->
+                <div id="events-screen" class="screen">
+                    <div class="game-header">
+                        <button class="back-btn">← Назад</button>
+                        <h2>События</h2>
+                    </div>
+                    <div class="events-container">
+                        <div class="events-description">
+                            <p>Здесь вы можете делать ставки на различные события.</p>
+                        </div>
+                        
+                        <div class="events-list">
+                            <div class="event-item">
+                                <div class="event-title">Чемпионат мира по футболу 2026</div>
+                                <div class="event-options">
+                                    <div class="event-option">
+                                        <span>Аргентина</span>
+                                        <span>3.5</span>
+                                    </div>
+                                    <div class="event-option">
+                                        <span>Бразилия</span>
+                                        <span>2.8</span>
+                                    </div>
+                                    <div class="event-option">
+                                        <span>Франция</span>
+                                        <span>4.2</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="event-item">
+                                <div class="event-title">Выборы 2026 года</div>
+                                <div class="event-options">
+                                    <div class="event-option">
+                                        <span>Кандидат А</span>
+                                        <span>1.9</span>
+                                    </div>
+                                    <div class="event-option">
+                                        <span>Кандидат Б</span>
+                                        <span>2.1</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="event-item">
+                                <div class="event-title">Курс BTC к концу года</div>
+                                <div class="event-options">
+                                    <div class="event-option">
+                                        <span>Выше $100K</span>
+                                        <span>3.2</span>
+                                    </div>
+                                    <div class="event-option">
+                                        <span>Ниже $100K</span>
+                                        <span>1.4</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </main>
@@ -270,7 +317,7 @@
             <div id="history-modal" class="modal">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h2>Game History</h2>
+                        <h2>История</h2>
                         <span class="close-modal">&times;</span>
                     </div>
                     <div class="modal-body">
@@ -284,15 +331,15 @@
             <div id="profile-modal" class="modal">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h2>Profile</h2>
+                        <h2>Профиль</h2>
                         <span class="close-modal">&times;</span>
                     </div>
                     <div class="modal-body">
                         <div class="user-info">
-                            <h3>Welcome, <span id="user-name">Player</span>!</h3>
-                            <p>Balance: <span id="profile-balance">0</span> ⭐</p>
+                            <h3>Привет, <span id="user-name">Игрок</span>!</h3>
+                            <p>Баланс: <span id="profile-balance">0</span> ⭐</p>
                         </div>
-                        <h3>Transaction History</h3>
+                        <h3>История транзакций</h3>
                         <div id="transaction-list" class="transaction-list">
                             <!-- История транзакций будет добавлена динамически -->
                         </div>
@@ -304,15 +351,15 @@
             <nav class="bottom-nav">
                 <button id="history-btn" class="nav-btn">
                     <span class="nav-icon">📜</span>
-                    <span class="nav-label">History</span>
+                    <span class="nav-label">История</span>
                 </button>
                 <button id="home-btn" class="nav-btn active">
                     <span class="nav-icon">🏠</span>
-                    <span class="nav-label">Home</span>
+                    <span class="nav-label">Главная</span>
                 </button>
                 <button id="profile-btn" class="nav-btn">
                     <span class="nav-icon">👤</span>
-                    <span class="nav-label">Profile</span>
+                    <span class="nav-label">Профиль</span>
                 </button>
             </nav>
         </div>
@@ -336,20 +383,19 @@
                 errors: []
             },
             
-            // Хранилище для игр - добавляем dispute
+            // Хранилище для игр - убираем roulette и guessnumber, добавляем events
             games: {
                 slots: { loaded: false, instance: null },
-                roulette: { loaded: false, instance: null },
-                guessnumber: { loaded: false, instance: null },
                 miner: { loaded: false, instance: null },
                 crush: { loaded: false, instance: null },
-                dispute: { loaded: false, instance: null }
+                dispute: { loaded: false, instance: null },
+                events: { loaded: false, instance: null }
             },
             
             // Пользовательские данные
             user: {
                 telegramId: null,
-                firstName: 'Player',
+                firstName: 'Игрок',
                 lastName: '',
                 username: '',
                 balance: 1000
@@ -517,11 +563,10 @@
             
             const gameScripts = [
                 { name: 'slots', path: 'js/games/slots.js' },
-                { name: 'roulette', path: 'js/games/roulette.js' },
-                { name: 'guessnumber', path: 'js/games/guessnumber.js' },
                 { name: 'miner', path: 'js/games/miner.js' },
                 { name: 'crush', path: 'js/games/crush.js' },
-                { name: 'dispute', path: 'js/games/dispute.js' }
+                { name: 'dispute', path: 'js/games/dispute.js' },
+                { name: 'events', path: 'js/games/events.js' }
             ];
             
             gameScripts.forEach(gameInfo => {
@@ -623,6 +668,5 @@
         // Инициализация с обновлением прогресса
         updateLoadingProgress(10);
     </script>
-</head>
 </body>
 </html>
