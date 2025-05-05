@@ -1,13 +1,13 @@
 /**
- * roulette.js - Optimized roulette game with improved UI
+ * roulette.js - Optimized roulette game with proper wheel implementation
  * Version 2.0.0
  * 
  * Features:
  * - Non-blocking initialization
- * - Properly centered wheel and ball with improved animations
+ * - Properly centered wheel with numbers around the perimeter
+ * - Realistic ball and wheel animations in opposite directions
  * - Enhanced error handling and timeout protection
  * - Compatible with the game registration system
- * - Clean and intuitive user interface
  */
 
 // Prevent potential conflicts and provide an isolated environment
@@ -56,7 +56,7 @@
             selectedOddEven: null
         };
         
-        // Roulette wheel configuration
+        // Roulette wheel configuration - standard European roulette
         const numbers = [
             0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26
         ];
@@ -125,6 +125,9 @@
                         
                         // Create game container if needed
                         createGameContainer();
+                        
+                        // Add custom styles for proper wheel visualization
+                        addRouletteStyles();
                         
                         // Set up the wheel
                         setupWheel();
@@ -218,7 +221,7 @@
                     // Find parent container (roulette screen or game area)
                     let parentContainer = elements.rouletteScreen;
                     if (!parentContainer) {
-                        parentContainer = document.querySelector('.game-area');
+                        parentContainer = document.querySelector('#roulette-screen');
                     }
                     if (!parentContainer) {
                         const mainContent = document.querySelector('.main-content');
@@ -274,27 +277,25 @@
                     gameContainer.appendChild(wheelContainer);
                     elements.wheelContainer = wheelContainer;
                     
-                    // Create wheel outer container
+                    // Create wheel outer container (this is the border of the wheel)
                     const wheelOuter = document.createElement('div');
                     wheelOuter.className = 'wheel-outer';
                     wheelContainer.appendChild(wheelOuter);
                     elements.wheelOuter = wheelOuter;
                     
-                    // Create wheel inner and ball
+                    // Create wheel inner (this contains the numbers)
                     const wheelInner = document.createElement('div');
                     wheelInner.id = 'wheel-inner';
                     wheelInner.className = 'wheel-inner';
                     wheelOuter.appendChild(wheelInner);
                     elements.wheelInner = wheelInner;
                     
+                    // Create ball (must be a sibling of wheelInner to spin independently)
                     const rouletteBall = document.createElement('div');
                     rouletteBall.id = 'roulette-ball';
                     rouletteBall.className = 'ball';
                     wheelOuter.appendChild(rouletteBall);
                     elements.rouletteBall = rouletteBall;
-                    
-                    // Create betting controls if not already present
-                    createBettingControls(gameContainer);
                     
                     // Create result display if not already present
                     if (!elements.rouletteResult) {
@@ -305,8 +306,8 @@
                         elements.rouletteResult = resultDisplay;
                     }
                     
-                    // Add custom CSS styles
-                    addRouletteStyles();
+                    // Create betting controls if not already present
+                    createBettingControls(gameContainer);
                     
                     app.log('Roulette', 'Game container and elements created successfully');
                 }
@@ -402,7 +403,7 @@
                 const styleEl = document.createElement('style');
                 styleEl.id = 'roulette-custom-styles';
                 
-                // Add CSS rules
+                // Add CSS rules for proper wheel visualization
                 styleEl.textContent = `
                     /* Roulette Container */
                     .roulette-container {
@@ -426,6 +427,8 @@
                     
                     .wheel-outer {
                         position: absolute;
+                        top: 0;
+                        left: 0;
                         width: 100%;
                         height: 100%;
                         border-radius: 50%;
@@ -439,27 +442,31 @@
                     }
                     
                     .wheel-inner {
-                        width: 90%;
-                        height: 90%;
+                        width: 92%;
+                        height: 92%;
                         border-radius: 50%;
                         background-color: #222;
                         position: relative;
                         transform-origin: center;
                         border: 2px solid #444;
+                        will-change: transform;
                     }
                     
                     .wheel-number {
                         position: absolute;
-                        width: 30px;
-                        height: 30px;
+                        top: 0;
+                        left: 0;
+                        width: 24px;
+                        height: 24px;
                         border-radius: 50%;
                         display: flex;
                         justify-content: center;
                         align-items: center;
-                        font-size: 0.9rem;
+                        font-size: 11px;
                         font-weight: bold;
                         transform-origin: center;
                         color: white;
+                        box-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
                         z-index: 2;
                     }
                     
@@ -477,15 +484,13 @@
                     
                     .ball {
                         position: absolute;
-                        width: 14px;
-                        height: 14px;
+                        width: 12px;
+                        height: 12px;
                         background: white;
                         border-radius: 50%;
                         transform-origin: center;
-                        z-index: 5;
+                        z-index: 10;
                         box-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
-                        left: calc(50% - 7px);
-                        top: calc(50% - 7px);
                     }
                     
                     /* Betting Controls */
@@ -663,22 +668,13 @@
                         }
                         
                         .wheel-number {
-                            width: 25px;
-                            height: 25px;
-                            font-size: 0.8rem;
+                            width: 20px;
+                            height: 20px;
+                            font-size: 10px;
                         }
                         
                         .bet-options {
                             flex-direction: column;
-                        }
-                        
-                        .bet-option-container {
-                            flex-direction: column;
-                            align-items: center;
-                        }
-                        
-                        .color-btn, .odd-even-btn {
-                            width: 100%;
                         }
                     }
                 `;
@@ -693,7 +689,7 @@
         };
         
         /**
-         * Set up wheel with numbers
+         * Set up wheel with numbers properly positioned around the perimeter
          */
         const setupWheel = function() {
             try {
@@ -705,57 +701,47 @@
                 // Clear current wheel
                 elements.wheelInner.innerHTML = '';
                 
-                // Calculate wheel radius and center for precise positioning
-                const wheelRadius = 110; // Pixels from center to number position
+                // Calculate size of wheel
+                const wheelSize = elements.wheelOuter.clientWidth;
+                const radius = wheelSize * 0.45; // Radius for the numbers (a bit less than half the wheel)
                 
-                // Create number cells
+                // Create number cells arranged around the circle
                 numbers.forEach((number, index) => {
                     // Calculate position on the wheel - precise angle calculation
-                    const angle = (index * 360 / numbers.length);
+                    const angleInDegrees = (index * (360 / numbers.length));
+                    const angleInRadians = (angleInDegrees - 90) * (Math.PI / 180); // Start from top (-90 degrees)
                     const color = numberColors[number.toString()];
                     
-                    // Create number element with fixed dimensions
+                    // Create number element
                     const numberElement = document.createElement('div');
                     numberElement.className = `wheel-number ${color}`;
                     numberElement.textContent = number;
                     
-                    // Position numbers in perfect circle without overlap
-                    // Convert angle to radians for precise positioning
-                    const radians = (angle - 90) * (Math.PI / 180);
-                    const x = Math.cos(radians) * wheelRadius;
-                    const y = Math.sin(radians) * wheelRadius;
+                    // Position using absolute coordinates from center
+                    const x = Math.cos(angleInRadians) * radius;
+                    const y = Math.sin(angleInRadians) * radius;
                     
-                    // Use translate3d for better performance and to ensure numbers stay in position
+                    // Fix to ensure they're positioned correctly from center
                     numberElement.style.position = 'absolute';
-                    numberElement.style.left = '50%';
-                    numberElement.style.top = '50%';
-                    numberElement.style.transform = `translate3d(${x}px, ${y}px, 0) rotate(${angle}deg)`;
-                    numberElement.style.transformOrigin = 'center center';
+                    numberElement.style.top = `calc(50% + ${y}px)`;
+                    numberElement.style.left = `calc(50% + ${x}px)`;
+                    numberElement.style.transform = 'translate(-50%, -50%)';
                     
                     elements.wheelInner.appendChild(numberElement);
                 });
                 
-                // Ensure the ball is properly visible and positioned
+                // Position the ball correctly at the top of the wheel
                 if (elements.rouletteBall) {
-                    // Make sure ball starts visible outside the wheel
-                    elements.rouletteBall.style.display = 'block';
-                    elements.rouletteBall.style.opacity = '1';
-                    elements.rouletteBall.style.width = '14px';
-                    elements.rouletteBall.style.height = '14px';
-                    elements.rouletteBall.style.backgroundColor = 'white';
-                    elements.rouletteBall.style.boxShadow = '0 0 10px rgba(255, 255, 255, 0.8)';
+                    // Calculate ball position (just inside the wheel radius)
+                    const ballRadius = radius * 1.08; // Slightly larger than number radius
                     
-                    // Position the ball at starting point
-                    const ballRadius = 140; // Slightly larger than number radius
-                    elements.rouletteBall.style.position = 'absolute';
+                    // Position ball at top of wheel
+                    elements.rouletteBall.style.top = `calc(50% - ${ballRadius}px)`;
                     elements.rouletteBall.style.left = '50%';
-                    elements.rouletteBall.style.top = '50%';
-                    elements.rouletteBall.style.transform = `translate(-50%, -50%) rotate(0deg) translateY(-${ballRadius}px)`;
-                    elements.rouletteBall.style.transformOrigin = 'center center';
-                    elements.rouletteBall.style.zIndex = '10';
+                    elements.rouletteBall.style.transform = 'translate(-50%, -50%)';
                 }
                 
-                app.log('Roulette', 'Wheel set up successfully with precise positioning');
+                app.log('Roulette', 'Wheel set up successfully with all numbers correctly positioned');
             } catch (error) {
                 app.log('Roulette', `Error setting up wheel: ${error.message}`, true);
             }
@@ -848,6 +834,11 @@
                 elements.colorBtns.forEach(btn => btn.classList.remove('selected'));
                 elements.oddEvenBtns.forEach(btn => btn.classList.remove('selected'));
                 
+                // Tactile feedback
+                if (window.casinoApp && window.casinoApp.provideTactileFeedback) {
+                    window.casinoApp.provideTactileFeedback('light');
+                }
+                
             } catch (error) {
                 app.log('Roulette', `Error changing bet type: ${error.message}`, true);
             }
@@ -902,10 +893,10 @@
         };
         
         /**
-         * Spin the wheel
+         * Spin the wheel - main game function
          */
         const spin = async function() {
-            app.log('Roulette', 'Starting spin');
+            app.log('Roulette', 'Starting wheel spin');
             
             // Check initialization
             if (!state.initialized) {
@@ -949,7 +940,8 @@
                 }
                 
                 // Check if enough funds
-                if (betAmount > window.GreenLightApp.user.balance) {
+                if (window.GreenLightApp && window.GreenLightApp.user && 
+                    betAmount > window.GreenLightApp.user.balance) {
                     window.casinoApp.showNotification('Insufficient funds for this bet');
                     return;
                 }
@@ -1043,10 +1035,12 @@
                     window.casinoApp.showNotification('An error occurred. Please try again.');
                 } finally {
                     // Reset state in any case
-                    state.isSpinning = false;
-                    if (elements.spinWheelBtn) {
-                        elements.spinWheelBtn.disabled = false;
-                    }
+                    setTimeout(() => {
+                        state.isSpinning = false;
+                        if (elements.spinWheelBtn) {
+                            elements.spinWheelBtn.disabled = false;
+                        }
+                    }, 1000); // Short delay to prevent rapid clicking
                 }
                 
             } catch (error) {
@@ -1075,73 +1069,117 @@
         };
         
         /**
-         * Spin wheel animation
+         * Spin wheel animation with realistic physics
+         * Wheel and ball animate in opposite directions for realism
          */
         const spinWheel = function() {
             return new Promise((resolve) => {
                 try {
-                    // Get a random result from the wheel
+                    // Get random result
                     const randomIndex = Math.floor(Math.random() * numbers.length);
                     const winningNumber = numbers[randomIndex];
                     
-                    // Calculate the final position
-                    const rotations = 3 + Math.floor(Math.random() * 3); // 3-5 full rotations
-                    const finalAngle = rotations * 360 + (randomIndex * 360 / numbers.length);
-                    
-                    if (!elements.wheelInner || !elements.rouletteBall) {
+                    if (!elements.wheelInner || !elements.rouletteBall || !elements.wheelOuter) {
                         app.log('Roulette', 'Wheel elements not found', true);
                         // Return result even without animation
                         setTimeout(() => resolve(winningNumber), 1000);
                         return;
                     }
                     
-                    // Calculate ball movement parameters
-                    const ballRadius = 140; // Same as in setupWheel
+                    // Calculate the wheel size
+                    const wheelSize = elements.wheelOuter.clientWidth;
+                    const wheelRadius = wheelSize / 2;
                     
-                    // Make sure wheel and ball are visible
-                    elements.wheelInner.style.opacity = '1';
-                    elements.rouletteBall.style.opacity = '1';
-                    elements.rouletteBall.style.display = 'block';
+                    // Calculate ball orbit parameters (just inside wheel perimeter)
+                    const ballOrbitRadius = wheelRadius * 0.85;
                     
-                    // First reset positions to ensure clean animation
+                    // Calculate final positions based on winning number
+                    // Each number's angle on the wheel
+                    const numberAngle = 360 / numbers.length;
+                    const finalWheelAngle = randomIndex * numberAngle + (Math.random() * (numberAngle * 0.6));
+                    
+                    // Calculate complete spins plus the final position
+                    // Wheel spins counter-clockwise (negative angle)
+                    const wheelRotations = 3 + Math.floor(Math.random() * 2); // 3-4 rotations
+                    const wheelAngle = -(wheelRotations * 360 + finalWheelAngle);
+                    
+                    // Ball spins clockwise (positive angle), slightly more rotations than wheel
+                    const ballRotations = wheelRotations + 1 + Math.random();
+                    const ballAngle = ballRotations * 360 + finalWheelAngle;
+                    
+                    // Reset elements to initial state for clean animation
                     elements.wheelInner.style.transition = 'none';
                     elements.rouletteBall.style.transition = 'none';
                     elements.wheelInner.style.transform = 'rotate(0deg)';
-                    elements.rouletteBall.style.transform = `translate(-50%, -50%) rotate(0deg) translateY(-${ballRadius}px)`;
                     
-                    // Force reflow to apply immediate changes
+                    // Position ball at top
+                    elements.rouletteBall.style.top = `calc(50% - ${ballOrbitRadius}px)`;
+                    elements.rouletteBall.style.left = '50%';
+                    elements.rouletteBall.style.transform = 'translate(-50%, -50%)';
+                    
+                    // Force layout reflow to apply immediate changes
                     void elements.wheelInner.offsetWidth;
                     void elements.rouletteBall.offsetWidth;
                     
-                    // Then set up smooth animation
+                    // Set up realistic physics-based animation
+                    // First rapid acceleration then gradual deceleration
                     setTimeout(() => {
-                        // Use enhanced easing for realistic physics
-                        elements.wheelInner.style.transition = 'transform 4s cubic-bezier(0.32, 0.94, 0.60, 1)';
-                        elements.rouletteBall.style.transition = 'transform 4s cubic-bezier(0.34, 0.82, 0.60, 1)';
+                        // Wheel animation (counter-clockwise)
+                        elements.wheelInner.style.transition = 'transform 4.5s cubic-bezier(0.2, 0.8, 0.2, 1)';
+                        elements.wheelInner.style.transform = `rotate(${wheelAngle}deg)`;
                         
-                        // Animate wheel counter-clockwise
-                        elements.wheelInner.style.transform = `rotate(${-finalAngle}deg)`;
-                        
-                        // Animate ball in opposite direction (clockwise)
-                        elements.rouletteBall.style.transform = `translate(-50%, -50%) rotate(${finalAngle}deg) translateY(-${ballRadius}px)`;
-                        
-                        // Add slight bounce effect to ball at the end
+                        // Ball animation (clockwise)
+                        // Complex animation in 3 phases:
+                        // 1. Ball rapidly spins in a large orbit
+                        elements.rouletteBall.style.transition = 'all 2s cubic-bezier(0.2, 0.8, 0.2, 1)';
                         setTimeout(() => {
-                            elements.rouletteBall.style.transition = 'transform 0.3s ease-out';
-                            const bounceDistance = ballRadius - 5;
-                            elements.rouletteBall.style.transform = `translate(-50%, -50%) rotate(${finalAngle}deg) translateY(-${bounceDistance}px)`;
+                            // Calculate ball position using parametric equations
+                            const angle = Math.random() * 360;
+                            const radians = angle * Math.PI / 180;
+                            const x = Math.cos(radians) * ballOrbitRadius;
+                            const y = Math.sin(radians) * ballOrbitRadius;
                             
+                            elements.rouletteBall.style.top = `calc(50% + ${y}px)`;
+                            elements.rouletteBall.style.left = `calc(50% + ${x}px)`;
+                            
+                            // 2. Then ball gradually slows and moves toward final position
                             setTimeout(() => {
-                                elements.rouletteBall.style.transition = 'transform 0.2s ease-in';
-                                elements.rouletteBall.style.transform = `translate(-50%, -50%) rotate(${finalAngle}deg) translateY(-${ballRadius}px)`;
-                            }, 300);
-                        }, 3800);
+                                elements.rouletteBall.style.transition = 'all 2.5s cubic-bezier(0.3, 0.2, 0.2, 1)';
+                                
+                                // Calculate final ball position
+                                const finalRadians = finalWheelAngle * Math.PI / 180;
+                                const finalX = Math.cos(finalRadians) * ballOrbitRadius;
+                                const finalY = Math.sin(finalRadians) * ballOrbitRadius;
+                                
+                                elements.rouletteBall.style.top = `calc(50% + ${finalY}px)`;
+                                elements.rouletteBall.style.left = `calc(50% + ${finalX}px)`;
+                                
+                                // 3. Finally, small bounce effect as ball settles
+                                setTimeout(() => {
+                                    elements.rouletteBall.style.transition = 'all 0.3s ease-out';
+                                    // Small jiggle at the final position
+                                    const bounceRadians = (finalWheelAngle + 3) * Math.PI / 180;
+                                    const bounceX = Math.cos(bounceRadians) * (ballOrbitRadius - 2);
+                                    const bounceY = Math.sin(bounceRadians) * (ballOrbitRadius - 2);
+                                    
+                                    elements.rouletteBall.style.top = `calc(50% + ${bounceY}px)`;
+                                    elements.rouletteBall.style.left = `calc(50% + ${bounceX}px)`;
+                                    
+                                    // Finally come to rest
+                                    setTimeout(() => {
+                                        elements.rouletteBall.style.transition = 'all 0.2s ease-in';
+                                        elements.rouletteBall.style.top = `calc(50% + ${finalY}px)`;
+                                        elements.rouletteBall.style.left = `calc(50% + ${finalX}px)`;
+                                    }, 300);
+                                }, 2500);
+                            }, 1000);
+                        }, 500);
                     }, 50);
                     
                     // Return result after animation completes
                     setTimeout(() => {
                         resolve(winningNumber);
-                    }, 4500);
+                    }, 5000);
                 } catch (error) {
                     app.log('Roulette', `Error during wheel animation: ${error.message}`, true);
                     // Generate random number even if animation fails
@@ -1251,7 +1289,7 @@
             init: init,
             spin: spin,
             
-            // Get game status
+            // Method for checking game state
             getStatus: function() {
                 return {
                     initialized: state.initialized,
@@ -1306,4 +1344,4 @@
     } catch (error) {
         app.log('Roulette', `Error registering game: ${error.message}`, true);
     }
-  })();
+})();
