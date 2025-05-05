@@ -705,27 +705,57 @@
                 // Clear current wheel
                 elements.wheelInner.innerHTML = '';
                 
+                // Calculate wheel radius and center for precise positioning
+                const wheelRadius = 110; // Pixels from center to number position
+                
                 // Create number cells
                 numbers.forEach((number, index) => {
-                    // Calculate position on the wheel
+                    // Calculate position on the wheel - precise angle calculation
                     const angle = (index * 360 / numbers.length);
                     const color = numberColors[number.toString()];
                     
-                    // Create number element
+                    // Create number element with fixed dimensions
                     const numberElement = document.createElement('div');
                     numberElement.className = `wheel-number ${color}`;
                     numberElement.textContent = number;
-                    numberElement.style.transform = `rotate(${angle}deg) translateY(-120px)`;
+                    
+                    // Position numbers in perfect circle without overlap
+                    // Convert angle to radians for precise positioning
+                    const radians = (angle - 90) * (Math.PI / 180);
+                    const x = Math.cos(radians) * wheelRadius;
+                    const y = Math.sin(radians) * wheelRadius;
+                    
+                    // Use translate3d for better performance and to ensure numbers stay in position
+                    numberElement.style.position = 'absolute';
+                    numberElement.style.left = '50%';
+                    numberElement.style.top = '50%';
+                    numberElement.style.transform = `translate3d(${x}px, ${y}px, 0) rotate(${angle}deg)`;
+                    numberElement.style.transformOrigin = 'center center';
                     
                     elements.wheelInner.appendChild(numberElement);
                 });
                 
-                // Center and position the ball
+                // Ensure the ball is properly visible and positioned
                 if (elements.rouletteBall) {
-                    elements.rouletteBall.style.transform = 'rotate(0deg) translateY(-130px)';
+                    // Make sure ball starts visible outside the wheel
+                    elements.rouletteBall.style.display = 'block';
+                    elements.rouletteBall.style.opacity = '1';
+                    elements.rouletteBall.style.width = '14px';
+                    elements.rouletteBall.style.height = '14px';
+                    elements.rouletteBall.style.backgroundColor = 'white';
+                    elements.rouletteBall.style.boxShadow = '0 0 10px rgba(255, 255, 255, 0.8)';
+                    
+                    // Position the ball at starting point
+                    const ballRadius = 140; // Slightly larger than number radius
+                    elements.rouletteBall.style.position = 'absolute';
+                    elements.rouletteBall.style.left = '50%';
+                    elements.rouletteBall.style.top = '50%';
+                    elements.rouletteBall.style.transform = `translate(-50%, -50%) rotate(0deg) translateY(-${ballRadius}px)`;
+                    elements.rouletteBall.style.transformOrigin = 'center center';
+                    elements.rouletteBall.style.zIndex = '10';
                 }
                 
-                app.log('Roulette', 'Wheel set up successfully');
+                app.log('Roulette', 'Wheel set up successfully with precise positioning');
             } catch (error) {
                 app.log('Roulette', `Error setting up wheel: ${error.message}`, true);
             }
@@ -1065,12 +1095,48 @@
                         return;
                     }
                     
-                    // Animate wheel and ball
-                    elements.wheelInner.style.transition = 'transform 4s cubic-bezier(0.2, 0.8, 0.2, 1)';
-                    elements.rouletteBall.style.transition = 'transform 4s cubic-bezier(0.2, 0.8, 0.2, 1)';
+                    // Calculate ball movement parameters
+                    const ballRadius = 140; // Same as in setupWheel
                     
-                    elements.wheelInner.style.transform = `rotate(${-finalAngle}deg)`;
-                    elements.rouletteBall.style.transform = `rotate(${finalAngle}deg) translateY(-130px)`;
+                    // Make sure wheel and ball are visible
+                    elements.wheelInner.style.opacity = '1';
+                    elements.rouletteBall.style.opacity = '1';
+                    elements.rouletteBall.style.display = 'block';
+                    
+                    // First reset positions to ensure clean animation
+                    elements.wheelInner.style.transition = 'none';
+                    elements.rouletteBall.style.transition = 'none';
+                    elements.wheelInner.style.transform = 'rotate(0deg)';
+                    elements.rouletteBall.style.transform = `translate(-50%, -50%) rotate(0deg) translateY(-${ballRadius}px)`;
+                    
+                    // Force reflow to apply immediate changes
+                    void elements.wheelInner.offsetWidth;
+                    void elements.rouletteBall.offsetWidth;
+                    
+                    // Then set up smooth animation
+                    setTimeout(() => {
+                        // Use enhanced easing for realistic physics
+                        elements.wheelInner.style.transition = 'transform 4s cubic-bezier(0.32, 0.94, 0.60, 1)';
+                        elements.rouletteBall.style.transition = 'transform 4s cubic-bezier(0.34, 0.82, 0.60, 1)';
+                        
+                        // Animate wheel counter-clockwise
+                        elements.wheelInner.style.transform = `rotate(${-finalAngle}deg)`;
+                        
+                        // Animate ball in opposite direction (clockwise)
+                        elements.rouletteBall.style.transform = `translate(-50%, -50%) rotate(${finalAngle}deg) translateY(-${ballRadius}px)`;
+                        
+                        // Add slight bounce effect to ball at the end
+                        setTimeout(() => {
+                            elements.rouletteBall.style.transition = 'transform 0.3s ease-out';
+                            const bounceDistance = ballRadius - 5;
+                            elements.rouletteBall.style.transform = `translate(-50%, -50%) rotate(${finalAngle}deg) translateY(-${bounceDistance}px)`;
+                            
+                            setTimeout(() => {
+                                elements.rouletteBall.style.transition = 'transform 0.2s ease-in';
+                                elements.rouletteBall.style.transform = `translate(-50%, -50%) rotate(${finalAngle}deg) translateY(-${ballRadius}px)`;
+                            }, 300);
+                        }, 3800);
+                    }, 50);
                     
                     // Return result after animation completes
                     setTimeout(() => {
