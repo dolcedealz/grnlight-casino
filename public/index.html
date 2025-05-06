@@ -366,6 +366,48 @@
         .telegram-text {
             font-size: 18px;
         }
+        
+        /* Стили для Coin Flip */
+        .coinflip-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2rem;
+            width: 100%;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        .coin-area {
+            width: 200px;
+            height: 200px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 20px auto;
+        }
+
+        .coin {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            background: linear-gradient(45deg, #FFD700, #FFC107);
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 2s ease-out;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+
+        .bet-options {
+            display: flex;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .bet-option {
+            flex: 1;
+        }
     </style>
     
     <!-- Загружаем основной CSS асинхронно -->
@@ -479,7 +521,23 @@
                         <button class="back-btn">← Назад</button>
                         <h2>Coin Flip</h2>
                     </div>
-                    <!-- Содержимое игры Coin Flip -->
+                    <div class="coinflip-container">
+                        <div class="coin-area">
+                            <!-- Здесь будет отображаться монета -->
+                            <div id="coin" class="coin"></div>
+                        </div>
+                        <div id="coinflip-result" class="result"></div>
+                        <div class="bet-controls">
+                            <div class="bet-amount">
+                                <label for="coinflip-bet">Ставка:</label>
+                                <input type="number" id="coinflip-bet" min="1" value="10">
+                            </div>
+                            <div class="bet-options">
+                                <button id="bet-heads" class="action-btn bet-option">ОРЁЛ</button>
+                                <button id="bet-tails" class="action-btn bet-option">РЕШКА</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 
                 <!-- Crush Game Screen -->

@@ -259,6 +259,46 @@ input, button, textarea, select {
 }
 
 /* 8. Updated game card with gold border */
+
+/* Стиль карточки Coinflip в главном меню с GIF-фоном */
+.game-card[data-game="coinflip"] {
+  position: relative;
+  overflow: hidden;
+  background: url('/images/coins-animation.gif') center center no-repeat;
+  background-size: cover;
+}
+
+/* Полупрозрачный слой для улучшения читаемости текста */
+.game-card[data-game="coinflip"]::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5); /* Затемнение для лучшей видимости иконки и текста */
+  z-index: 0;
+}
+
+/* Размещаем иконку и текст поверх фона */
+.game-card[data-game="coinflip"] .game-icon,
+.game-card[data-game="coinflip"] .game-name {
+  position: relative;
+  z-index: 1;
+  color: var(--gold); /* Сделаем текст золотым для лучшей видимости */
+}
+
+/* Дополнительный эффект для иконки */
+.game-card[data-game="coinflip"] .game-icon {
+  text-shadow: 0 0 10px rgba(255, 215, 0, 0.7); /* Золотистое свечение */
+}
+
+/* Улучшенный эффект при наведении */
+.game-card[data-game="coinflip"]:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 5px 15px rgba(255, 215, 0, 0.3);
+}
+
 .game-card {
   background: var(--medium-gray);
   border-radius: var(--radius-md);

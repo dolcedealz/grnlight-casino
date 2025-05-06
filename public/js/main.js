@@ -47,7 +47,7 @@ const casinoApp = (function() {
     let profileInitialized = false;
     
     // Поддерживаемые игры
-    const supportedGames = ['slots', 'miner', 'coinflip', 'crush', 'events'];
+    const supportedGames = ['slots', 'roulette', 'guessnumber', 'miner', 'crush'];
     
     // Инициализация приложения - основная точка входа
     const init = async function() {
@@ -418,11 +418,10 @@ const casinoApp = (function() {
         // Запускаем в таймауте, чтобы UI успел обновиться
         setTimeout(function() {
             try {
-                // Инициализируем каждую игру
-                supportedGames.forEach(function(gameType) {
-                    // Пропускаем "events", так как это не реальная игра
-                    if (gameType === 'events') return;
-                    
+                const gameTypes = ['slots', 'roulette', 'guessnumber', 'miner', 'crush'];
+                
+                // Проверяем каждую игру
+                gameTypes.forEach(function(gameType) {
                     const objectName = gameType + 'Game';
                     
                     // Безопасно инициализируем игру
@@ -550,7 +549,7 @@ const casinoApp = (function() {
         
         try {
             // Обработчики для карточек игр
-            const gameCards = document.querySelectorAll('.game-card, .events-card');
+            const gameCards = document.querySelectorAll('.game-card');
             gameCards.forEach(function(card) {
                 card.addEventListener('click', function(e) {
                     const game = card.getAttribute('data-game');
@@ -575,9 +574,6 @@ const casinoApp = (function() {
                     const targetScreen = document.getElementById(`${game}-screen`);
                     if (targetScreen) {
                         targetScreen.classList.add('active');
-                    } else {
-                        app.log('Main', `Экран для ${game} не найден`, true);
-                        showNotification('Экран игры не найден');
                     }
                 });
             });
@@ -603,7 +599,7 @@ const casinoApp = (function() {
             
             if (homeBtn) {
                 homeBtn.addEventListener('click', function() {
-                    app.log('Main', 'Нажата кнопка "Главная"');
+                    app.log('Main', 'Нажата кнопка "Home"');
                     provideTactileFeedback('light');
                     
                     activateWelcomeScreen();
@@ -613,7 +609,7 @@ const casinoApp = (function() {
             
             if (historyBtn) {
                 historyBtn.addEventListener('click', function() {
-                    app.log('Main', 'Нажата кнопка "История"');
+                    app.log('Main', 'Нажата кнопка "History"');
                     provideTactileFeedback('light');
                     
                     // Загружаем историю игр
@@ -634,19 +630,19 @@ const casinoApp = (function() {
             
             if (profileBtn) {
                 profileBtn.addEventListener('click', function() {
-                    app.log('Main', 'Нажата кнопка "Профиль"');
+                    app.log('Main', 'Нажата кнопка "Profile"');
                     provideTactileFeedback('light');
                     
-                    // Скрываем все экраны
-                    document.querySelectorAll('.screen').forEach(screen => {
-                        screen.classList.remove('active');
-                    });
+                    // Загружаем историю транзакций
+                    getTransactionHistory()
+                        .catch(function(error) {
+                            app.log('Main', `Ошибка загрузки транзакций: ${error.message}`, true);
+                        });
                     
-                    // Показываем экран профиля
-                    const profileScreen = document.getElementById('profile-screen');
-                    if (profileScreen) {
-                        profileScreen.classList.add('active');
-                        updateBalanceDisplay();
+                    // Показываем модальное окно профиля
+                    const profileModal = document.getElementById('profile-modal');
+                    if (profileModal) {
+                        showModal(profileModal);
                     }
                     
                     updateActiveNavButton(profileBtn);
@@ -830,6 +826,8 @@ const casinoApp = (function() {
     const updateBalance = function() {
         try {
             const balanceAmount = document.getElementById('balance-amount');
+            const profileBalance = document.getElementById('profile-balance');
+            const userName = document.getElementById('user-name');
             
             if (balanceAmount) {
                 balanceAmount.textContent = app.user.balance;
@@ -839,6 +837,14 @@ const casinoApp = (function() {
                 setTimeout(function() {
                     balanceAmount.classList.remove('balance-updated');
                 }, 500);
+            }
+            
+            if (profileBalance) {
+                profileBalance.textContent = app.user.balance;
+            }
+            
+            if (userName) {
+                userName.textContent = app.user.firstName;
             }
             
             // Обновляем отображение баланса в профиле
@@ -1043,7 +1049,7 @@ const casinoApp = (function() {
             
             const data = await response.json();
             
-            // Обновляем отображение истории транзакций
+            // Обновляем отображение транзакций
             updateTransactionList(data);
             
             app.log('Main', 'История транзакций получена успешно');
@@ -1146,8 +1152,9 @@ const casinoApp = (function() {
                 let gameIcon = '🎮';
                 switch (item.gameType) {
                     case 'slots': gameIcon = '🎰'; break;
+                    case 'roulette': gameIcon = '🎲'; break;
+                    case 'guessnumber': gameIcon = '🔢'; break;
                     case 'miner': gameIcon = '💣'; break;
-                    case 'coinflip': gameIcon = '🪙'; break;
                     case 'crush': gameIcon = '📈'; break;
                 }
                 
@@ -1285,10 +1292,10 @@ const casinoApp = (function() {
         // Метод для проверки состояния приложения
         getStatus: function() {
             return {
-                initialized: initialized,
-                uiInitialized: uiInitialized,
-                telegramInitialized: telegramInitialized,
-                profileInitialized: profileInitialized,
+                initialized,
+                uiInitialized,
+                telegramInitialized,
+                profileInitialized,
                 gamesLoaded: app.loading.gamesInitialized
             };
         }
@@ -1305,7 +1312,7 @@ setTimeout(function() {
         app.log('Main', 'Автоматический запуск инициализации');
         
         casinoApp.init().catch(function(error) {
-            app.log('Main', `Ошибка инициализации: ${error.message}`, true);
+            app.log('Main', `Ошибка при инициализации: ${error.message}`, true);
             
             // В случае ошибки, принудительно удаляем экран загрузки
             if (window.appLoader && typeof window.appLoader.forceRemoveLoading === 'function') {
