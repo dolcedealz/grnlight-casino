@@ -1,17 +1,18 @@
 /**
- * coinflip.js - Optimized Coin Flip game with dispute functionality
+ * coinflip.js - Implementation of Coin Flip game
  * Version 1.0.0
  * 
  * Features:
- * - Standard coin flip game
- * - Dispute resolution system
- * - Telegram Mini App integration
- * - Animation and tactile feedback
+ * - Non-blocking initialization
+ * - Error handling
+ * - Timeouts for all async operations
+ * - Compatibility with the game registration system
+ * - Dynamic DOM element creation if needed
  */
 
-// Prevent conflicts with isolated environment
+// Prevent potential conflicts and provide isolated environment
 (function() {
-    // Check for app object
+    // Check for main app object
     if (!window.GreenLightApp) {
         console.error('[CoinFlip] GreenLightApp not initialized!');
         window.GreenLightApp = {
@@ -27,16 +28,14 @@
     
     // Game logic in closure for isolation
     const coinFlipGame = (function() {
-        // UI elements
+        // Game elements
         let elements = {
-            coinFlipContainer: null,
-            coin: null,
-            headsBtn: null,
-            tailsBtn: null,
             flipBtn: null,
-            betAmount: null,
-            resultDisplay: null,
-            balanceDisplay: null
+            coinBet: null,
+            coinElement: null,
+            coinChoice: null,
+            coinResult: null,
+            container: null
         };
         
         // Game state
@@ -44,16 +43,301 @@
             isFlipping: false,
             initialized: false,
             initializationStarted: false,
-            selectedSide: null, // 'heads' or 'tails'
-            disputeId: null,    // If game is running as part of a dispute
-            disputeData: null,  // Dispute data if available
-            playerSide: null,   // Player's side in dispute ('heads' or 'tails')
-            opponentSide: null  // Opponent's side in dispute
+            chosenSide: null,
+            betAmount: 0,
+            soundEnabled: true
+        };
+        
+        // Sound effects
+        let sounds = {
+            flip: null,
+            win: null,
+            lose: null
         };
         
         /**
-         * Game initialization
-         * Protected from repeated initialization and with timeout
+         * Create main container for the game
+         */
+        const createGameContainer = function() {
+            try {
+                // Check if container already exists
+                let container = document.querySelector('.coinflip-container');
+                if (container) {
+                    elements.container = container;
+                    return container;
+                }
+                
+                // Find placement area
+                let gameArea = document.querySelector('.games-area');
+                if (!gameArea) {
+                    // If game area doesn't exist, create it
+                    gameArea = document.createElement('div');
+                    gameArea.className = 'games-area';
+                    
+                    // Find app container
+                    const appContainer = document.querySelector('.app-container');
+                    if (appContainer) {
+                        appContainer.appendChild(gameArea);
+                    } else {
+                        // If no special container, add to body
+                        document.body.appendChild(gameArea);
+                    }
+                    
+                    app.log('CoinFlip', 'Created game area');
+                }
+                
+                // Create game container
+                container = document.createElement('div');
+                container.className = 'coinflip-container game-container';
+                gameArea.appendChild(container);
+                
+                elements.container = container;
+                app.log('CoinFlip', 'Created main game container');
+                
+                return container;
+            } catch (error) {
+                app.log('CoinFlip', `Error creating container: ${error.message}`, true);
+                return null;
+            }
+        };
+        
+        /**
+         * Create game interface
+         */
+        const createGameInterface = function() {
+            try {
+                const container = elements.container || createGameContainer();
+                if (!container) {
+                    app.log('CoinFlip', 'Cannot create interface: container not found', true);
+                    return false;
+                }
+                
+                // Check if interface already exists
+                if (container.querySelector('#coin')) {
+                    app.log('CoinFlip', 'Interface already created');
+                    return true;
+                }
+                
+                // Create HTML markup for the game
+                container.innerHTML = `
+                    <h2>Coin Flip</h2>
+                    <div class="game-controls">
+                        <div class="bet-control">
+                            <label for="coin-bet">Bet Amount:</label>
+                            <input type="number" id="coin-bet" min="1" max="1000" value="10">
+                        </div>
+                        
+                        <div class="coin-choice">
+                            <label>Choose your side:</label>
+                            <div class="choice-buttons">
+                                <button id="choose-heads" class="choice-btn">HEADS</button>
+                                <button id="choose-tails" class="choice-btn">TAILS</button>
+                            </div>
+                        </div>
+                        
+                        <div class="flip-controls">
+                            <button id="flip-btn" class="action-btn">FLIP COIN</button>
+                        </div>
+                        
+                        <div class="sound-controls">
+                            <button id="toggle-sound" class="toggle-btn">
+                                <span id="sound-icon">🔊</span>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="coin-container">
+                        <div id="coin">
+                            <div class="heads"></div>
+                            <div class="tails"></div>
+                        </div>
+                    </div>
+                    
+                    <div id="coin-result" class="result"></div>
+                `;
+                
+                // Create styles if they don't exist yet
+                if (!document.getElementById('coinflip-styles')) {
+                    const styleElement = document.createElement('style');
+                    styleElement.id = 'coinflip-styles';
+                    styleElement.textContent = `
+                        .coinflip-container {
+                            padding: 15px;
+                            margin: 10px auto;
+                            border: 1px solid #ccc;
+                            border-radius: 8px;
+                            max-width: 500px;
+                            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+                        }
+                        
+                        .game-controls {
+                            margin-bottom: 15px;
+                            display: flex;
+                            flex-direction: column;
+                            gap: 10px;
+                        }
+                        
+                        .action-btn {
+                            padding: 10px 15px;
+                            background-color: #4CAF50;
+                            color: white;
+                            border: none;
+                            border-radius: 4px;
+                            cursor: pointer;
+                            font-weight: bold;
+                            width: 100%;
+                        }
+                        
+                        .action-btn:disabled {
+                            background-color: #cccccc;
+                            cursor: not-allowed;
+                        }
+                        
+                        .choice-buttons {
+                            display: flex;
+                            justify-content: space-between;
+                            gap: 10px;
+                            margin-top: 5px;
+                        }
+                        
+                        .choice-btn {
+                            flex: 1;
+                            padding: 8px;
+                            border: 2px solid #ccc;
+                            background-color: #f1f1f1;
+                            border-radius: 4px;
+                            cursor: pointer;
+                            font-weight: bold;
+                            color: #333;
+                            transition: all 0.2s;
+                        }
+                        
+                        .choice-btn.selected {
+                            border-color: #4CAF50;
+                            background-color: #e8f5e9;
+                        }
+                        
+                        .coin-container {
+                            height: 200px;
+                            display: flex;
+                            justify-content: center;
+                            align-items: center;
+                            margin: 20px 0;
+                            perspective: 1000px;
+                        }
+                        
+                        #coin {
+                            position: relative;
+                            width: 150px;
+                            height: 150px;
+                            transform-style: preserve-3d;
+                            transition: transform 1s ease-in;
+                            cursor: pointer;
+                        }
+                        
+                        #coin .heads, 
+                        #coin .tails {
+                            position: absolute;
+                            width: 100%;
+                            height: 100%;
+                            border-radius: 50%;
+                            backface-visibility: hidden;
+                            display: flex;
+                            justify-content: center;
+                            align-items: center;
+                            font-size: 48px;
+                            color: #333;
+                            user-select: none;
+                        }
+                        
+                        #coin .heads {
+                            background: radial-gradient(#FFD700, #B8860B);
+                            z-index: 100;
+                        }
+                        
+                        #coin .heads::before {
+                            content: "H";
+                        }
+                        
+                        #coin .tails {
+                            background: radial-gradient(#C0C0C0, #808080);
+                            transform: rotateY(180deg);
+                        }
+                        
+                        #coin .tails::before {
+                            content: "T";
+                        }
+                        
+                        #coin.heads {
+                            transform: rotateY(0deg);
+                        }
+                        
+                        #coin.tails {
+                            transform: rotateY(180deg);
+                        }
+                        
+                        #coin.flipping {
+                            animation: flip 2s ease-in-out;
+                        }
+                        
+                        @keyframes flip {
+                            0% { transform: rotateY(0); }
+                            100% { transform: rotateY(1800deg); }
+                        }
+                        
+                        .result {
+                            margin-top: 15px;
+                            padding: 10px;
+                            border-radius: 4px;
+                            text-align: center;
+                            display: none;
+                        }
+                        
+                        .result.win {
+                            background-color: rgba(76, 175, 80, 0.2);
+                            color: #4CAF50;
+                            display: block;
+                        }
+                        
+                        .result.lose {
+                            background-color: rgba(244, 67, 54, 0.2);
+                            color: #F44336;
+                            display: block;
+                        }
+                        
+                        .toggle-btn {
+                            background: none;
+                            border: none;
+                            font-size: 24px;
+                            cursor: pointer;
+                            padding: 5px;
+                            border-radius: 4px;
+                            transition: background 0.2s;
+                        }
+                        
+                        .toggle-btn:hover {
+                            background: rgba(255, 255, 255, 0.1);
+                        }
+                        
+                        .sound-controls {
+                            display: flex;
+                            justify-content: flex-end;
+                        }
+                    `;
+                    document.head.appendChild(styleElement);
+                }
+                
+                app.log('CoinFlip', 'Game interface successfully created');
+                return true;
+            } catch (error) {
+                app.log('CoinFlip', `Error creating interface: ${error.message}`, true);
+                return false;
+            }
+        };
+        
+        /**
+         * Initialize the game
+         * With protection against repeated initialization and timeout
          */
         const init = async function() {
             // Prevent repeated initialization
@@ -69,16 +353,23 @@
                 // Set timeout for initialization
                 const initPromise = new Promise(async (resolve) => {
                     try {
-                        // Create UI elements if they don't exist
-                        ensureUIElements();
+                        // First create interface
+                        if (!createGameInterface()) {
+                            app.log('CoinFlip', 'Failed to create game interface', true);
+                            resolve(false);
+                            return;
+                        }
                         
-                        // Get DOM elements
+                        // Load audio
+                        await loadAudio();
+                        
+                        // Then get DOM elements
                         await findDOMElements();
                         
-                        // Check URL parameters for dispute
-                        checkDisputeParams();
+                        // Check UI elements
+                        app.log('CoinFlip', 'Checking UI elements');
                         
-                        // Set up event listeners
+                        // Add event listeners
                         setupEventListeners();
                         
                         state.initialized = true;
@@ -110,478 +401,133 @@
         };
         
         /**
-         * Check URL parameters for dispute ID
-         */
-        const checkDisputeParams = function() {
-            try {
-                const urlParams = new URLSearchParams(window.location.search);
-                const disputeId = urlParams.get('dispute');
-                
-                if (disputeId) {
-                    state.disputeId = disputeId;
-                    app.log('CoinFlip', `Dispute ID found: ${disputeId}`);
-                    
-                    // Load dispute data
-                    loadDisputeData(disputeId).then(dispute => {
-                        if (dispute) {
-                            setupDisputeMode(dispute);
-                        }
-                    });
-                }
-            } catch (error) {
-                app.log('CoinFlip', `Error checking URL parameters: ${error.message}`, true);
-            }
-        };
-        
-        /**
-         * Load dispute data from server
-         */
-        const loadDisputeData = async function(disputeId) {
-            try {
-                app.log('CoinFlip', `Loading dispute data for ${disputeId}`);
-                
-                // In real implementation, this would be an API call
-                // For demo, using static data
-                const disputeData = {
-                    id: disputeId,
-                    creator: {
-                        telegramId: 123456789,
-                        username: 'user1',
-                        side: 'heads'
-                    },
-                    opponent: {
-                        telegramId: 987654321,
-                        username: 'user2',
-                        side: 'tails'
-                    },
-                    amount: 100,
-                    subject: 'Who will win the match?',
-                    status: 'accepted',
-                    result: null
-                };
-                
-                // Store data in state
-                state.disputeData = disputeData;
-                
-                return disputeData;
-            } catch (error) {
-                app.log('CoinFlip', `Error loading dispute data: ${error.message}`, true);
-                return null;
-            }
-        };
-        
-        /**
-         * Configure dispute mode
-         */
-        const setupDisputeMode = function(dispute) {
-            try {
-                app.log('CoinFlip', 'Setting up dispute mode');
-                
-                // Determine player's side
-                const currentUserId = window.GreenLightApp.user.telegramId;
-                const isCreator = currentUserId === dispute.creator.telegramId;
-                
-                state.playerSide = isCreator ? dispute.creator.side : dispute.opponent.side;
-                state.opponentSide = isCreator ? dispute.opponent.side : dispute.creator.side;
-                
-                // Update UI
-                if (elements.coinFlipContainer) {
-                    // Add class for dispute mode
-                    elements.coinFlipContainer.classList.add('dispute-mode');
-                    
-                    // Add dispute info
-                    const disputeInfo = document.createElement('div');
-                    disputeInfo.className = 'dispute-info';
-                    disputeInfo.innerHTML = `
-                        <h3>Dispute: ${dispute.subject}</h3>
-                        <div class="dispute-details">
-                            <p>Amount: ${dispute.amount} ⭐</p>
-                            <p>Your side: ${state.playerSide === 'heads' ? 'Heads' : 'Tails'}</p>
-                            <p>Opponent: @${isCreator ? dispute.opponent.username : dispute.creator.username}</p>
-                        </div>
-                    `;
-                    
-                    // Insert before coin
-                    if (elements.coin) {
-                        elements.coin.parentNode.insertBefore(disputeInfo, elements.coin);
-                    } else {
-                        elements.coinFlipContainer.prepend(disputeInfo);
-                    }
-                    
-                    // Fix side selection
-                    state.selectedSide = state.playerSide;
-                    
-                    // Disable side selection buttons
-                    if (elements.headsBtn) {
-                        elements.headsBtn.disabled = true;
-                        if (state.playerSide === 'heads') {
-                            elements.headsBtn.classList.add('selected');
-                        }
-                    }
-                    
-                    if (elements.tailsBtn) {
-                        elements.tailsBtn.disabled = true;
-                        if (state.playerSide === 'tails') {
-                            elements.tailsBtn.classList.add('selected');
-                        }
-                    }
-                    
-                    // Set bet amount
-                    if (elements.betAmount) {
-                        elements.betAmount.value = dispute.amount;
-                        elements.betAmount.disabled = true;
-                    }
-                }
-                
-            } catch (error) {
-                app.log('CoinFlip', `Error setting up dispute mode: ${error.message}`, true);
-            }
-        };
-        
-        /**
-         * Ensure UI elements exist
-         */
-        const ensureUIElements = function() {
-            try {
-                app.log('CoinFlip', 'Checking UI elements');
-                
-                // Find or create main game container
-                let container = document.getElementById('coinflip-screen');
-                
-                if (!container) {
-                    app.log('CoinFlip', 'Creating game container');
-                    
-                    // Find insertion point
-                    const mainContent = document.querySelector('.main-content');
-                    
-                    if (!mainContent) {
-                        app.log('CoinFlip', 'main-content container not found', true);
-                        return;
-                    }
-                    
-                    // Create game screen
-                    container = document.createElement('div');
-                    container.id = 'coinflip-screen';
-                    container.className = 'screen';
-                    
-                    // Add HTML markup
-                    container.innerHTML = `
-                        <div class="game-header">
-                            <button class="back-btn">← Back</button>
-                            <h2>Coin Flip</h2>
-                        </div>
-                        <div class="coinflip-container">
-                            <div class="coin-wrapper">
-                                <div id="coin" class="coin">
-                                    <div class="heads-side">
-                                        <div class="coin-design">
-                                            <span>H</span>
-                                        </div>
-                                    </div>
-                                    <div class="tails-side">
-                                        <div class="coin-design">
-                                            <span>T</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div id="result-display" class="result"></div>
-                            
-                            <div class="selection-buttons">
-                                <button id="heads-btn" class="side-btn">Heads</button>
-                                <button id="tails-btn" class="side-btn">Tails</button>
-                            </div>
-                            
-                            <div class="bet-controls">
-                                <div class="bet-amount">
-                                    <label for="coinflip-bet">Bet Amount:</label>
-                                    <input type="number" id="coinflip-bet" min="1" value="10">
-                                </div>
-                                <button id="flip-btn" class="action-btn">FLIP</button>
-                            </div>
-                        </div>
-                    `;
-                    
-                    // Add to DOM
-                    mainContent.appendChild(container);
-                    
-                    // Add game card to main screen
-                    addGameCard();
-                    
-                    // Add styles
-                    addStyles();
-                }
-            } catch (error) {
-                app.log('CoinFlip', `Error checking interface: ${error.message}`, true);
-            }
-        };
-        
-        /**
-         * Add game card to main screen
-         */
-        const addGameCard = function() {
-            try {
-                const gameGrid = document.querySelector('.game-grid');
-                
-                if (!gameGrid) {
-                    app.log('CoinFlip', 'Game grid not found', true);
-                    return;
-                }
-                
-                // Check if card already exists
-                if (document.querySelector('.game-card[data-game="coinflip"]')) {
-                    return;
-                }
-                
-                // Create card
-                const card = document.createElement('div');
-                card.className = 'game-card';
-                card.setAttribute('data-game', 'coinflip');
-                
-                card.innerHTML = `
-                    <div class="game-icon">🪙</div>
-                    <div class="game-name">Coin Flip</div>
-                `;
-                
-                // Add to grid
-                gameGrid.appendChild(card);
-                
-                // Update card handlers
-                const gameCards = document.querySelectorAll('.game-card');
-                gameCards.forEach(card => {
-                    card.addEventListener('click', (e) => {
-                        const game = card.getAttribute('data-game');
-                        if (!game) return;
-                        
-                        // Tactile feedback
-                        if (window.casinoApp && window.casinoApp.provideTactileFeedback) {
-                            window.casinoApp.provideTactileFeedback('light');
-                        }
-                        
-                        // Pressed animation
-                        card.classList.add('card-pressed');
-                        setTimeout(() => {
-                            card.classList.remove('card-pressed');
-                        }, 150);
-                        
-                        // Switch screens
-                        document.querySelectorAll('.screen').forEach(screen => {
-                            screen.classList.remove('active');
-                        });
-                        
-                        const targetScreen = document.getElementById(`${game}-screen`);
-                        if (targetScreen) {
-                            targetScreen.classList.add('active');
-                        }
-                    });
-                });
-            } catch (error) {
-                app.log('CoinFlip', `Error adding card: ${error.message}`, true);
-            }
-        };
-        
-        /**
-         * Add styles for the game
-         */
-        const addStyles = function() {
-            try {
-                // Check if styles already exist
-                if (document.getElementById('coinflip-styles')) {
-                    return;
-                }
-                
-                // Create style element
-                const style = document.createElement('style');
-                style.id = 'coinflip-styles';
-                
-                // Add CSS
-                style.textContent = `
-                    .coinflip-container {
-                        display: flex;
-                        flex-direction: column;
-                        align-items: center;
-                        gap: 2rem;
-                        width: 100%;
-                        max-width: 500px;
-                        margin: 0 auto;
-                        padding: 1rem;
-                    }
-                    
-                    .coin-wrapper {
-                        perspective: 800px;
-                        width: 200px;
-                        height: 200px;
-                        display: flex;
-                        justify-content: center;
-                        align-items: center;
-                        margin: 2rem 0;
-                    }
-                    
-                    .coin {
-                        position: relative;
-                        width: 150px;
-                        height: 150px;
-                        transform-style: preserve-3d;
-                        transition: transform 1s ease-in-out;
-                    }
-                    
-                    .coin.flipping {
-                        animation: flip-coin 3s forwards;
-                    }
-                    
-                    .coin .heads-side,
-                    .coin .tails-side {
-                        position: absolute;
-                        width: 100%;
-                        height: 100%;
-                        border-radius: 50%;
-                        backface-visibility: hidden;
-                        display: flex;
-                        justify-content: center;
-                        align-items: center;
-                        font-size: 2rem;
-                        font-weight: bold;
-                    }
-                    
-                    .coin .heads-side {
-                        background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
-                        z-index: 2;
-                    }
-                    
-                    .coin .tails-side {
-                        background: linear-gradient(135deg, #C0C0C0 0%, #A0A0A0 100%);
-                        transform: rotateY(180deg);
-                    }
-                    
-                    .coin-design {
-                        width: 80%;
-                        height: 80%;
-                        border-radius: 50%;
-                        border: 3px solid rgba(0,0,0,0.2);
-                        display: flex;
-                        justify-content: center;
-                        align-items: center;
-                        color: rgba(0,0,0,0.6);
-                    }
-                    
-                    .selection-buttons {
-                        display: flex;
-                        gap: 1rem;
-                        margin-bottom: 1rem;
-                    }
-                    
-                    .side-btn {
-                        padding: 0.8rem 2rem;
-                        border: 2px solid var(--primary-green);
-                        background: var(--dark-gray);
-                        color: var(--white);
-                        border-radius: 50px;
-                        cursor: pointer;
-                        font-weight: bold;
-                        transition: all 0.3s;
-                    }
-                    
-                    .side-btn:hover {
-                        background: rgba(0, 168, 107, 0.2);
-                    }
-                    
-                    .side-btn.selected {
-                        background: var(--primary-green);
-                        color: var(--white);
-                    }
-                    
-                    .bet-controls {
-                        width: 100%;
-                        display: flex;
-                        flex-direction: column;
-                        gap: 1rem;
-                    }
-                    
-                    .dispute-info {
-                        background: rgba(0, 0, 0, 0.2);
-                        border-radius: 10px;
-                        padding: 1rem;
-                        margin-bottom: 1rem;
-                        border: 1px solid var(--primary-green);
-                        width: 100%;
-                    }
-                    
-                    .dispute-details {
-                        margin-top: 0.5rem;
-                        font-size: 0.9rem;
-                    }
-                    
-                    @keyframes flip-coin {
-                        0% {
-                            transform: rotateY(0);
-                        }
-                        100% {
-                            transform: rotateY(1800deg);
-                        }
-                    }
-                    
-                    @keyframes flip-to-heads {
-                        0% {
-                            transform: rotateY(0);
-                        }
-                        100% {
-                            transform: rotateY(1800deg);
-                        }
-                    }
-                    
-                    @keyframes flip-to-tails {
-                        0% {
-                            transform: rotateY(0);
-                        }
-                        100% {
-                            transform: rotateY(1980deg);
-                        }
-                    }
-                    
-                    .coin.heads-result {
-                        animation: flip-to-heads 3s forwards;
-                    }
-                    
-                    .coin.tails-result {
-                        animation: flip-to-tails 3s forwards;
-                    }
-                `;
-                
-                // Add to DOM
-                document.head.appendChild(style);
-                
-            } catch (error) {
-                app.log('CoinFlip', `Error adding styles: ${error.message}`, true);
-            }
-        };
-        
-        /**
-         * Find DOM elements
+         * Find DOM elements with null protection
          */
         const findDOMElements = async function() {
-            return new Promise((resolve) => {
-                setTimeout(() => {
-                    elements.coinFlipContainer = document.querySelector('.coinflip-container');
-                    elements.coin = document.getElementById('coin');
-                    elements.headsBtn = document.getElementById('heads-btn');
-                    elements.tailsBtn = document.getElementById('tails-btn');
-                    elements.flipBtn = document.getElementById('flip-btn');
-                    elements.betAmount = document.getElementById('coinflip-bet');
-                    elements.resultDisplay = document.getElementById('result-display');
-                    
-                    // Check if elements exist
-                    if (!elements.coin) {
-                        app.log('CoinFlip', 'Coin element not found', true);
-                    }
-                    
-                    if (!elements.flipBtn) {
-                        app.log('CoinFlip', 'Flip button not found', true);
-                    }
-                    
-                    resolve();
-                }, 100);
+            // Use Promise for asynchronicity
+            return new Promise((resolve, reject) => {
+                try {
+                    // Timeout for waiting for DOM to be ready
+                    setTimeout(() => {
+                        elements.flipBtn = document.getElementById('flip-btn');
+                        elements.coinBet = document.getElementById('coin-bet');
+                        elements.coinElement = document.getElementById('coin');
+                        elements.coinResult = document.getElementById('coin-result');
+                        elements.chooseHeads = document.getElementById('choose-heads');
+                        elements.chooseTails = document.getElementById('choose-tails');
+                        elements.toggleSound = document.getElementById('toggle-sound');
+                        
+                        // Check critical elements
+                        if (!elements.coinElement) {
+                            app.log('CoinFlip', 'Coin element not found', true);
+                        }
+                        
+                        if (!elements.flipBtn) {
+                            app.log('CoinFlip', 'Flip button not found', true);
+                        }
+                        
+                        resolve();
+                    }, 100);
+                } catch (error) {
+                    app.log('CoinFlip', `Error finding DOM elements: ${error.message}`, true);
+                    reject(error);
+                }
             });
+        };
+        
+        /**
+         * Load audio files
+         */
+        const loadAudio = async function() {
+            try {
+                // Create audio objects
+                sounds.flip = new Audio('sounds/flip.mp3');
+                sounds.win = new Audio('sounds/win.mp3');
+                sounds.lose = new Audio('sounds/lose.mp3');
+                
+                // Preload audio
+                const preloadPromises = [
+                    preloadAudio(sounds.flip),
+                    preloadAudio(sounds.win),
+                    preloadAudio(sounds.lose)
+                ];
+                
+                // Wait for all preloads with a timeout
+                await Promise.race([
+                    Promise.all(preloadPromises),
+                    new Promise(resolve => setTimeout(resolve, 1000))
+                ]);
+                
+                app.log('CoinFlip', 'Audio loaded successfully');
+                return true;
+            } catch (error) {
+                app.log('CoinFlip', `Error loading audio: ${error.message}`, true);
+                // Continue without audio
+                return false;
+            }
+        };
+        
+        /**
+         * Preload audio with promise
+         */
+        const preloadAudio = function(audioElement) {
+            return new Promise((resolve) => {
+                if (!audioElement) {
+                    resolve();
+                    return;
+                }
+                
+                audioElement.addEventListener('canplaythrough', () => {
+                    resolve();
+                }, { once: true });
+                
+                audioElement.addEventListener('error', () => {
+                    resolve();
+                }, { once: true });
+                
+                // Force load attempt
+                if (audioElement.readyState >= 3) {
+                    resolve();
+                } else {
+                    audioElement.load();
+                }
+                
+                // Safety timeout
+                setTimeout(resolve, 500);
+            });
+        };
+        
+        /**
+         * Play sound effect with safety checks
+         */
+        const playSound = function(sound) {
+            if (!state.soundEnabled || !sounds[sound]) return;
+            
+            try {
+                // Reset to beginning if already playing
+                sounds[sound].currentTime = 0;
+                sounds[sound].play().catch(error => {
+                    // Ignore play errors (common on mobile)
+                    app.log('CoinFlip', `Audio play error: ${error.message}`, false);
+                });
+            } catch (error) {
+                // Ignore any audio errors
+            }
+        };
+        
+        /**
+         * Toggle sound on/off
+         */
+        const toggleSound = function() {
+            state.soundEnabled = !state.soundEnabled;
+            
+            // Update icon
+            const soundIcon = document.getElementById('sound-icon');
+            if (soundIcon) {
+                soundIcon.textContent = state.soundEnabled ? '🔊' : '🔇';
+            }
+            
+            app.log('CoinFlip', `Sound ${state.soundEnabled ? 'enabled' : 'disabled'}`);
         };
         
         /**
@@ -589,48 +535,32 @@
          */
         const setupEventListeners = function() {
             try {
-                // Heads button
-                if (elements.headsBtn) {
-                    elements.headsBtn.addEventListener('click', () => selectSide('heads'));
-                }
-                
-                // Tails button
-                if (elements.tailsBtn) {
-                    elements.tailsBtn.addEventListener('click', () => selectSide('tails'));
-                }
-                
                 // Flip button
                 if (elements.flipBtn) {
+                    // Clear current listeners (prevent duplication)
                     const newFlipBtn = elements.flipBtn.cloneNode(true);
                     if (elements.flipBtn.parentNode) {
                         elements.flipBtn.parentNode.replaceChild(newFlipBtn, elements.flipBtn);
                     }
                     elements.flipBtn = newFlipBtn;
                     
+                    // Add handler
                     elements.flipBtn.addEventListener('click', flipCoin);
                 }
                 
-                // Back button handler
-                const backBtn = document.querySelector('#coinflip-screen .back-btn');
-                if (backBtn) {
-                    backBtn.addEventListener('click', () => {
-                        if (state.disputeId) {
-                            // If this is a dispute, return to bot
-                            if (window.Telegram && window.Telegram.WebApp) {
-                                window.Telegram.WebApp.close();
-                            }
-                        } else {
-                            // Otherwise return to main screen
-                            document.querySelectorAll('.screen').forEach(screen => {
-                                screen.classList.remove('active');
-                            });
-                            
-                            const welcomeScreen = document.getElementById('welcome-screen');
-                            if (welcomeScreen) {
-                                welcomeScreen.classList.add('active');
-                            }
-                        }
-                    });
+                // Choose heads button
+                if (elements.chooseHeads) {
+                    elements.chooseHeads.addEventListener('click', () => chooseOption('heads'));
+                }
+                
+                // Choose tails button
+                if (elements.chooseTails) {
+                    elements.chooseTails.addEventListener('click', () => chooseOption('tails'));
+                }
+                
+                // Toggle sound button
+                if (elements.toggleSound) {
+                    elements.toggleSound.addEventListener('click', toggleSound);
                 }
                 
                 app.log('CoinFlip', 'Event listeners set up');
@@ -640,24 +570,19 @@
         };
         
         /**
-         * Select coin side
+         * Choose heads or tails
          */
-        const selectSide = function(side) {
+        const chooseOption = function(option) {
             try {
-                // Check if side change is allowed
-                if (state.disputeId) {
-                    return; // In dispute mode, side is fixed
+                state.chosenSide = option;
+                
+                // Update UI
+                if (elements.chooseHeads) {
+                    elements.chooseHeads.classList.toggle('selected', option === 'heads');
                 }
                 
-                state.selectedSide = side;
-                
-                // Update visual display
-                if (elements.headsBtn) {
-                    elements.headsBtn.classList.toggle('selected', side === 'heads');
-                }
-                
-                if (elements.tailsBtn) {
-                    elements.tailsBtn.classList.toggle('selected', side === 'tails');
+                if (elements.chooseTails) {
+                    elements.chooseTails.classList.toggle('selected', option === 'tails');
                 }
                 
                 // Tactile feedback
@@ -665,287 +590,278 @@
                     window.casinoApp.provideTactileFeedback('light');
                 }
                 
-                app.log('CoinFlip', `Side selected: ${side}`);
+                app.log('CoinFlip', `Option selected: ${option}`);
             } catch (error) {
-                app.log('CoinFlip', `Error selecting side: ${error.message}`, true);
+                app.log('CoinFlip', `Error selecting option: ${error.message}`, true);
             }
         };
         
         /**
-         * Flip coin
+         * Check and initialize casinoApp object if it doesn't exist
+         */
+        const ensureCasinoApp = function() {
+            if (window.casinoApp) return true;
+            
+            // Create minimal casinoApp implementation if object is missing
+            app.log('CoinFlip', 'casinoApp not found, creating temporary implementation', true);
+            window.casinoApp = {
+                showNotification: function(message) {
+                    alert(message);
+                },
+                provideTactileFeedback: function() {
+                    // Vibration stub
+                },
+                processGameResult: function(gameType, bet, result, win, data) {
+                    app.log('CoinFlip', `Game: ${gameType}, Bet: ${bet}, Result: ${result}, Win: ${win}`, false);
+                    return Promise.resolve({success: true});
+                }
+            };
+            
+            return true;
+        };
+        
+        /**
+         * Flip the coin
          */
         const flipCoin = async function() {
+            app.log('CoinFlip', 'Starting coin flip');
+            
+            // Check initialization
+            if (!state.initialized) {
+                app.log('CoinFlip', 'Game not initialized, starting initialization', true);
+                await init();
+                
+                // If initialization failed, exit
+                if (!state.initialized) {
+                    app.log('CoinFlip', 'Failed to start game: initialization error', true);
+                    return;
+                }
+            }
+            
             try {
-                // Check if already flipping
-                if (state.isFlipping) {
+                // Check casinoApp presence
+                if (!ensureCasinoApp()) {
                     return;
                 }
                 
-                // Check if side is selected
-                if (!state.selectedSide && !state.disputeId) {
-                    app.log('CoinFlip', 'No side selected');
-                    
-                    if (window.casinoApp && window.casinoApp.showNotification) {
-                        window.casinoApp.showNotification('Please select Heads or Tails');
-                    } else {
-                        alert('Please select Heads or Tails');
-                    }
+                // Check if already flipping
+                if (state.isFlipping) {
+                    app.log('CoinFlip', 'Coin already flipping');
+                    return;
+                }
+                
+                // Check if side selected
+                if (!state.chosenSide) {
+                    window.casinoApp.showNotification('Please choose Heads or Tails first');
                     return;
                 }
                 
                 // Get bet amount
-                const bet = parseInt(elements.betAmount.value);
-                
-                // Check bet validity
-                if (isNaN(bet) || bet <= 0) {
-                    app.log('CoinFlip', 'Invalid bet', true);
-                    
-                    if (window.casinoApp && window.casinoApp.showNotification) {
-                        window.casinoApp.showNotification('Please enter a valid bet amount');
-                    } else {
-                        alert('Please enter a valid bet amount');
-                    }
+                if (!elements.coinBet) {
+                    app.log('CoinFlip', 'Bet element not found', true);
                     return;
                 }
                 
-                // Check balance
-                if (window.GreenLightApp && window.GreenLightApp.user && bet > window.GreenLightApp.user.balance) {
-                    app.log('CoinFlip', 'Insufficient funds', true);
-                    
-                    if (window.casinoApp && window.casinoApp.showNotification) {
-                        window.casinoApp.showNotification('Insufficient funds for this bet');
-                    } else {
-                        alert('Insufficient funds for this bet');
-                    }
+                state.betAmount = parseInt(elements.coinBet.value);
+                
+                // Check bet
+                if (isNaN(state.betAmount) || state.betAmount <= 0) {
+                    window.casinoApp.showNotification('Please enter a valid bet amount');
                     return;
                 }
                 
-                // Set state
+                // Check if enough funds
+                if (window.GreenLightApp && window.GreenLightApp.user && 
+                    state.betAmount > window.GreenLightApp.user.balance) {
+                    window.casinoApp.showNotification('Insufficient funds for this bet');
+                    return;
+                }
+                
+                // Set flipping state
                 state.isFlipping = true;
                 
-                // Disable buttons during flip
-                if (elements.flipBtn) elements.flipBtn.disabled = true;
-                if (elements.headsBtn) elements.headsBtn.disabled = true;
-                if (elements.tailsBtn) elements.tailsBtn.disabled = true;
+                // Update UI
+                if (elements.flipBtn) {
+                    elements.flipBtn.disabled = true;
+                }
+                
+                if (elements.chooseHeads) {
+                    elements.chooseHeads.disabled = true;
+                }
+                
+                if (elements.chooseTails) {
+                    elements.chooseTails.disabled = true;
+                }
+                
+                if (elements.coinResult) {
+                    elements.coinResult.className = 'result';
+                    elements.coinResult.textContent = '';
+                }
                 
                 // Tactile feedback
-                if (window.casinoApp && window.casinoApp.provideTactileFeedback) {
+                if (window.casinoApp.provideTactileFeedback) {
                     window.casinoApp.provideTactileFeedback('medium');
                 }
                 
-                // Clear previous result
-                if (elements.resultDisplay) {
-                    elements.resultDisplay.textContent = '';
-                    elements.resultDisplay.classList.remove('win', 'lose');
-                    elements.resultDisplay.style.display = 'none';
+                // Process bet
+                await window.casinoApp.processGameResult(
+                    'coinflip',
+                    state.betAmount,
+                    'bet',
+                    0,
+                    { chosenSide: state.chosenSide }
+                );
+                
+                // Play flip sound
+                playSound('flip');
+                
+                // Flip the coin with fair randomness
+                const result = await flipCoinWithAnimation();
+                
+                // Determine win/lose
+                const isWin = result === state.chosenSide;
+                
+                // Calculate win amount (2x for win)
+                const winAmount = isWin ? state.betAmount * 2 : 0;
+                
+                // Show result
+                displayResult(isWin, winAmount, result);
+                
+                // Tactile feedback based on result
+                if (isWin) {
+                    if (window.casinoApp.provideTactileFeedback) {
+                        window.casinoApp.provideTactileFeedback('success');
+                    }
+                    playSound('win');
+                } else {
+                    if (window.casinoApp.provideTactileFeedback) {
+                        window.casinoApp.provideTactileFeedback('warning');
+                    }
+                    playSound('lose');
                 }
                 
-                // Start coin animation
-                if (elements.coin) {
-                    // Remove previous result classes
-                    elements.coin.classList.remove('heads-result', 'tails-result');
+                // Process game result
+                await window.casinoApp.processGameResult(
+                    'coinflip',
+                    0, // No additional bet
+                    isWin ? 'win' : 'lose',
+                    winAmount,
+                    {
+                        chosenSide: state.chosenSide,
+                        result: result,
+                        betAmount: state.betAmount
+                    }
+                );
+                
+                // Reset state after a delay
+                setTimeout(() => {
+                    state.isFlipping = false;
                     
-                    // Determine flip result
-                    const result = await determineResult();
+                    if (elements.flipBtn) {
+                        elements.flipBtn.disabled = false;
+                    }
                     
-                    // Add appropriate class for animation
-                    elements.coin.classList.add(`${result}-result`);
+                    if (elements.chooseHeads) {
+                        elements.chooseHeads.disabled = false;
+                    }
                     
-                    // Show result after 3 seconds
-                    setTimeout(() => {
-                        showResult(result);
-                    }, 3000);
-                } else {
-                    // If coin element not found, just get result
-                    const result = await determineResult();
-                    showResult(result);
-                }
+                    if (elements.chooseTails) {
+                        elements.chooseTails.disabled = false;
+                    }
+                }, 2500);
                 
             } catch (error) {
                 app.log('CoinFlip', `Error flipping coin: ${error.message}`, true);
                 
-                // Reset state
+                // Reset state in case of error
                 state.isFlipping = false;
-                if (elements.flipBtn) elements.flipBtn.disabled = false;
-                if (elements.headsBtn) elements.headsBtn.disabled = false;
-                if (elements.tailsBtn) elements.tailsBtn.disabled = false;
+                
+                if (elements.flipBtn) {
+                    elements.flipBtn.disabled = false;
+                }
+                
+                if (elements.chooseHeads) {
+                    elements.chooseHeads.disabled = false;
+                }
+                
+                if (elements.chooseTails) {
+                    elements.chooseTails.disabled = false;
+                }
             }
         };
         
         /**
-         * Determine flip result
+         * Animate the coin flip
          */
-        const determineResult = async function() {
-            try {
-                // In dispute mode, result is preset
-                if (state.disputeId && state.disputeData) {
-                    const expectedResult = await getPresetResult(state.disputeId);
-                    if (expectedResult) {
-                        return expectedResult;
+        const flipCoinWithAnimation = function() {
+            return new Promise((resolve) => {
+                try {
+                    const coin = elements.coinElement;
+                    if (!coin) {
+                        app.log('CoinFlip', 'Coin element not found for animation', true);
+                        // Return random result anyway
+                        setTimeout(() => {
+                            resolve(Math.random() < 0.5 ? 'heads' : 'tails');
+                        }, 1000);
+                        return;
                     }
-                }
-                
-                // Generate random result
-                return Math.random() < 0.5 ? 'heads' : 'tails';
-            } catch (error) {
-                app.log('CoinFlip', `Error determining result: ${error.message}`, true);
-                return Math.random() < 0.5 ? 'heads' : 'tails';
-            }
-        };
-        
-        /**
-         * Get preset result for dispute
-         */
-        const getPresetResult = async function(disputeId) {
-            try {
-                // In real implementation, this would be an API call
-                // For demo, using random value
-                return Math.random() < 0.5 ? 'heads' : 'tails';
-            } catch (error) {
-                app.log('CoinFlip', `Error getting preset result: ${error.message}`, true);
-                return null;
-            }
-        };
-        
-        /**
-         * Show result
-         */
-        const showResult = async function(result) {
-            try {
-                // Reset state
-                state.isFlipping = false;
-                
-                // Enable buttons
-                if (elements.flipBtn) elements.flipBtn.disabled = false;
-                
-                // In dispute mode, side selection buttons remain disabled
-                if (!state.disputeId) {
-                    if (elements.headsBtn) elements.headsBtn.disabled = false;
-                    if (elements.tailsBtn) elements.tailsBtn.disabled = false;
-                }
-                
-                // Get bet amount
-                const bet = parseInt(elements.betAmount.value);
-                
-                // Determine if player won
-                let isWin = false;
-                let winAmount = 0;
-                
-                if (state.disputeId) {
-                    // In dispute mode, compare with player's side
-                    isWin = (state.playerSide === result);
-                    winAmount = isWin ? Math.floor(bet * 2 * 0.95) : 0; // Account for 5% commission
-                } else {
-                    // In regular mode, compare with selected side
-                    isWin = (state.selectedSide === result);
-                    winAmount = isWin ? bet * 2 : 0;
-                }
-                
-                // Process game result
-                await processGameResult(bet, isWin, winAmount, result);
-                
-                // Show result
-                if (elements.resultDisplay) {
-                    elements.resultDisplay.innerHTML = isWin ? 
-                        `<div class="win-title">You won ${winAmount} ⭐!</div>` : 
-                        '<div class="lose-title">You lost. Try again!</div>';
                     
-                    elements.resultDisplay.classList.add(isWin ? 'win' : 'lose');
-                    elements.resultDisplay.style.display = 'block';
+                    // Generate random result
+                    const result = Math.random() < 0.5 ? 'heads' : 'tails';
+                    
+                    // Remove previous classes
+                    coin.className = '';
+                    
+                    // Force reflow
+                    void coin.offsetWidth;
+                    
+                    // Add flipping class
+                    coin.classList.add('flipping');
+                    
+                    // After animation completes, set final state
+                    setTimeout(() => {
+                        coin.className = result;
+                        resolve(result);
+                    }, 2000);
+                    
+                } catch (error) {
+                    app.log('CoinFlip', `Error in coin flip animation: ${error.message}`, true);
+                    // Return result even if animation fails
+                    resolve(Math.random() < 0.5 ? 'heads' : 'tails');
                 }
-                
-                // Tactile feedback
-                if (window.casinoApp && window.casinoApp.provideTactileFeedback) {
-                    if (isWin) {
-                        window.casinoApp.provideTactileFeedback('success');
-                    } else {
-                        window.casinoApp.provideTactileFeedback('warning');
-                    }
-                }
-                
-                // Update dispute data if applicable
-                if (state.disputeId) {
-                    updateDisputeResult(result, isWin);
-                }
-                
-                app.log('CoinFlip', `Result: ${result}, Win: ${isWin}`);
-            } catch (error) {
-                app.log('CoinFlip', `Error showing result: ${error.message}`, true);
-            }
+            });
         };
         
         /**
-         * Process game result
+         * Display game result
          */
-        const processGameResult = async function(bet, isWin, winAmount, result) {
+        const displayResult = function(isWin, amount, result) {
             try {
-                // Check for casinoApp
-                if (!window.casinoApp || !window.casinoApp.processGameResult) {
-                    app.log('CoinFlip', 'casinoApp.processGameResult not found', true);
+                if (!elements.coinResult) {
+                    app.log('CoinFlip', 'Result element not found', true);
                     return;
                 }
                 
-                // Send result to casinoApp
-                await window.casinoApp.processGameResult(
-                    'coinflip',
-                    bet,
-                    isWin ? 'win' : 'lose',
-                    winAmount,
-                    {
-                        selectedSide: state.selectedSide || state.playerSide,
-                        result: result,
-                        isDispute: !!state.disputeId,
-                        disputeId: state.disputeId
-                    }
-                );
+                const resultElement = elements.coinResult;
                 
-                // Update balance locally
-                if (window.GreenLightApp && window.GreenLightApp.user) {
-                    if (isWin) {
-                        window.GreenLightApp.user.balance += winAmount - bet;
-                    } else {
-                        window.GreenLightApp.user.balance -= bet;
-                    }
-                    
-                    // Update balance display
-                    if (window.casinoApp && window.casinoApp.updateBalance) {
-                        window.casinoApp.updateBalance();
-                    }
+                if (isWin) {
+                    resultElement.className = 'result win';
+                    resultElement.innerHTML = `
+                        <div class="win-icon">🎉</div>
+                        <div class="win-title">You won ${amount} Stars!</div>
+                        <div class="win-description">The coin landed on ${result.toUpperCase()}</div>
+                    `;
+                } else {
+                    resultElement.className = 'result lose';
+                    resultElement.innerHTML = `
+                        <div class="lose-icon">😢</div>
+                        <div class="lose-title">You lost!</div>
+                        <div class="lose-description">The coin landed on ${result.toUpperCase()}</div>
+                    `;
                 }
                 
             } catch (error) {
-                app.log('CoinFlip', `Error processing game result: ${error.message}`, true);
-            }
-        };
-        
-        /**
-         * Update dispute result
-         */
-        const updateDisputeResult = async function(result, isWin) {
-            try {
-                if (!state.disputeId) return;
-                
-                app.log('CoinFlip', `Updating dispute result ${state.disputeId}`);
-                
-                // In real implementation, this would be an API call
-                const disputeResult = {
-                    disputeId: state.disputeId,
-                    result: result,
-                    winnerId: isWin ? window.GreenLightApp.user.telegramId : 
-                        (state.disputeData.creator.telegramId === window.GreenLightApp.user.telegramId ? 
-                            state.disputeData.opponent.telegramId : 
-                            state.disputeData.creator.telegramId)
-                };
-                
-                // Close mini-app after 5 seconds
-                setTimeout(() => {
-                    if (window.Telegram && window.Telegram.WebApp) {
-                        window.Telegram.WebApp.close();
-                    }
-                }, 5000);
-                
-            } catch (error) {
-                app.log('CoinFlip', `Error updating dispute result: ${error.message}`, true);
+                app.log('CoinFlip', `Error displaying result: ${error.message}`, true);
             }
         };
         
@@ -954,7 +870,6 @@
             // Main methods
             init: init,
             flipCoin: flipCoin,
-            selectSide: selectSide,
             
             // Status check method
             getStatus: function() {
@@ -962,21 +877,20 @@
                     initialized: state.initialized,
                     initializationStarted: state.initializationStarted,
                     isFlipping: state.isFlipping,
-                    selectedSide: state.selectedSide,
-                    disputeId: state.disputeId,
-                    disputeMode: !!state.disputeId,
                     elementsFound: {
-                        coin: !!elements.coin,
                         flipBtn: !!elements.flipBtn,
-                        headsBtn: !!elements.headsBtn,
-                        tailsBtn: !!elements.tailsBtn
-                    }
+                        coinBet: !!elements.coinBet,
+                        coinElement: !!elements.coinElement,
+                        coinResult: !!elements.coinResult
+                    },
+                    soundEnabled: state.soundEnabled,
+                    chosenSide: state.chosenSide
                 };
             }
         };
     })();
     
-    // Register game in all formats for compatibility
+    // Register game in all formats for maximum compatibility
     try {
         // 1. Register through new system
         if (window.registerGame) {
@@ -988,7 +902,7 @@
         window.coinFlipGame = coinFlipGame;
         app.log('CoinFlip', 'Game exported to global namespace');
         
-        // 3. Log module loading completion
+        // 3. Log completion of module loading
         app.log('CoinFlip', 'Module loaded and ready for initialization');
         
         // 4. Auto-initialize on page load
