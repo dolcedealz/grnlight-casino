@@ -1,13 +1,13 @@
-/* Simplified CSS for Greenlight Casino */
+/* Greenlight Casino - Enhanced CSS */
 
-/* 1. Simplified CSS Variables */
+/* 1. Updated CSS Variables with your color scheme */
 :root {
   /* Core colors */
-  --primary-green: #00A86B;
-  --gold: #FFD700;
+  --primary-green: #3a5c3a;         /* New green color */
+  --gold: #d4af37;                 /* New gold/yellow for borders */
   --black: #000000;
-  --dark-gray: #121212;
-  --medium-gray: #2A2A2A;
+  --dark-gray: #333333;            /* New background color */
+  --medium-gray: #444444;          /* Adjusted to match new dark-gray */
   --light-gray: #888888; 
   --white: #FFFFFF;
   --red: #D50000;
@@ -40,13 +40,50 @@ html {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Updated body font to Impact */
 body {
-  font-family: 'Playfair Display', Georgia, serif;
+  font-family: 'Impact', 'Arial Narrow', sans-serif;
   background-color: var(--dark-gray);
   color: var(--white);
   line-height: 1.6;
   overflow-x: hidden;
   min-height: 100vh;
+}
+
+/* Import SF Pro Display for specific elements */
+@font-face {
+  font-family: 'SF Pro Display';
+  src: url('fonts/SF-Pro-Display-Light.woff2') format('woff2');
+  font-weight: 300;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'SF Pro Display';
+  src: url('fonts/SF-Pro-Display-LightItalic.woff2') format('woff2');
+  font-weight: 300;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: 'SF Pro Display';
+  src: url('fonts/SF-Pro-Display-Semibold.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'SF Pro Display';
+  src: url('fonts/SF-Pro-Display-SemiboldItalic.woff2') format('woff2');
+  font-weight: 600;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: 'Bauhaus 93';
+  src: url('fonts/BAUHS93.woff2') format('woff2');
+  font-weight: normal;
+  font-style: normal;
 }
 
 img, picture, video, canvas, svg {
@@ -58,32 +95,43 @@ input, button, textarea, select {
   font: inherit;
 }
 
-/* 3. Simplified layout */
+/* 3. Simplified layout with white-to-gray gradient effect */
 .app-container {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  background: var(--dark-gray);
+  background: linear-gradient(to bottom, #ffffff 0%, var(--dark-gray) 30%);
   position: relative;
 }
 
-/* 4. Simplified header */
+/* 4. Enhanced header with logo */
 .header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 1rem 1.5rem;
   background: var(--black);
-  border-bottom: 1px solid var(--primary-green);
+  border-bottom: 1px solid var(--gold);
   position: relative;
   z-index: 10;
 }
 
-/* Simplified logo styling */
+/* Logo styling */
 .logo {
   display: flex;
   align-items: center;
   gap: 12px;
+  position: relative;
+}
+
+/* Add placeholder for actual logo */
+.logo:before {
+  content: "";
+  display: block;
+  width: 40px;
+  height: 40px;
+  background: url('images/logo.png') no-repeat center/contain;
+  margin-right: 10px;
 }
 
 .logo h1 {
@@ -93,16 +141,17 @@ input, button, textarea, select {
   font-weight: 700;
 }
 
-/* Simplified green light */
+/* Updated green light */
 .green-light {
   width: 20px;
   height: 20px;
   background: var(--primary-green);
   border-radius: 50%;
   position: relative;
+  border: 1px solid var(--gold);
 }
 
-/* Simplified balance display */
+/* Updated balance display with Bauhaus 93 font */
 .balance {
   display: flex;
   align-items: center;
@@ -113,6 +162,7 @@ input, button, textarea, select {
   font-size: 1.2rem;
   font-weight: bold;
   color: var(--gold);
+  font-family: 'Bauhaus 93', sans-serif;
 }
 
 .star {
@@ -130,7 +180,7 @@ input, button, textarea, select {
   align-items: center;
 }
 
-/* 6. Simplified screen transitions */
+/* 6. Screen transitions */
 .screen {
   display: none;
   flex-direction: column;
@@ -169,7 +219,7 @@ input, button, textarea, select {
   gap: 1.5rem;
   cursor: pointer;
   transition: transform var(--transition-normal);
-  border: 1px solid var(--primary-green);
+  border: 1px solid var(--gold);
   width: 100%;
   height: 120px;
 }
@@ -208,7 +258,7 @@ input, button, textarea, select {
   width: 100%;
 }
 
-/* 8. Simplified game card */
+/* 8. Updated game card with gold border */
 .game-card {
   background: var(--medium-gray);
   border-radius: var(--radius-md);
@@ -219,7 +269,7 @@ input, button, textarea, select {
   justify-content: center;
   cursor: pointer;
   transition: transform var(--transition-normal);
-  border: 1px solid var(--primary-green);
+  border: 1px solid var(--gold);
   height: 160px;
 }
 
@@ -239,7 +289,7 @@ input, button, textarea, select {
   text-transform: uppercase;
 }
 
-/* 9. Action buttons */
+/* 9. Action buttons with new green color */
 .action-btn {
   background: var(--primary-green);
   color: white;
@@ -262,7 +312,7 @@ input, button, textarea, select {
   cursor: not-allowed;
 }
 
-/* 10. Form inputs */
+/* 10. Form inputs with gold focus */
 input[type="text"],
 input[type="number"],
 textarea,
@@ -291,7 +341,7 @@ select {
   padding-right: 40px;
 }
 
-/* 11. Simplified modal */
+/* 11. Modal styling */
 .modal {
   display: none;
   position: fixed;
@@ -312,7 +362,7 @@ select {
   max-width: 500px;
   border-radius: var(--radius-md);
   overflow: hidden;
-  border: 1px solid var(--primary-green);
+  border: 1px solid var(--gold);
 }
 
 .modal-header {
@@ -321,7 +371,7 @@ select {
   align-items: center;
   padding: 1.2rem 1.5rem;
   background: var(--black);
-  border-bottom: 1px solid var(--primary-green);
+  border-bottom: 1px solid var(--gold);
 }
 
 .modal-header h2 {
@@ -347,14 +397,14 @@ select {
   overflow-y: auto;
 }
 
-/* 12. Bottom navigation */
+/* 12. Bottom navigation with logo in circle */
 .bottom-nav {
   display: flex;
   justify-content: space-around;
   align-items: center;
   padding: 0.8rem 0;
   background: var(--black);
-  border-top: 1px solid var(--primary-green);
+  border-top: 1px solid var(--gold);
   position: relative;
   z-index: 5;
 }
@@ -376,6 +426,15 @@ select {
 
 .nav-btn:hover {
   color: var(--white);
+}
+
+/* Add logo to home button circle */
+.nav-btn#home-btn .nav-icon {
+  width: 40px;
+  height: 40px;
+  background: url('images/logo-small.png') no-repeat center/contain;
+  border-radius: 50%;
+  margin-bottom: 0.3rem;
 }
 
 .nav-icon {
@@ -450,7 +509,7 @@ select {
 
 .history-item:hover,
 .transaction-item:hover {
-  border-left: 2px solid var(--primary-green);
+  border-left: 2px solid var(--gold);
 }
 
 .history-game,
@@ -502,7 +561,7 @@ select {
   border: 1px dashed rgba(255, 255, 255, 0.1);
 }
 
-/* 15. CRITICAL: Simplified loading overlay */
+/* 15. Loading overlay */
 .loading-overlay {
   position: fixed;
   top: 0;
@@ -539,6 +598,34 @@ select {
   100% { transform: rotate(360deg); }
 }
 
+/* Profile specific styles */
+.user-info h3 {
+  font-family: 'Impact', sans-serif;
+}
+
+.account-balance-label {
+  font-family: 'SF Pro Display', sans-serif;
+  font-weight: 300;
+  font-style: italic;
+}
+
+.deposit-button {
+  font-family: 'SF Pro Display', sans-serif;
+  font-weight: 600;
+  font-style: italic;
+}
+
+.transaction-details-label {
+  font-family: 'Impact', sans-serif;
+}
+
+.promo-code-label {
+  font-family: 'SF Pro Display', sans-serif;
+  font-weight: 300;
+  font-style: italic;
+}
+
+/* The rest of the CSS from paste.txt follows - include all game-specific styles and utility classes */
 /* GAME-SPECIFIC STYLES - SIMPLIFIED */
 
 /* SLOTS GAME */
@@ -598,7 +685,7 @@ select {
   padding: 1rem 1.5rem;
   background: var(--medium-gray);
   border-radius: var(--radius-md);
-  border: 1px solid var(--primary-green);
+  border: 1px solid var(--gold);
 }
 
 .mines-count,
@@ -635,7 +722,7 @@ select {
 
 .grid-cell:hover {
   background: #444;
-  border-color: var(--primary-green);
+  border-color: var(--gold);
 }
 
 .grid-cell.revealed {
@@ -686,7 +773,7 @@ select {
   border-radius: var(--radius-md);
   position: relative;
   overflow: hidden;
-  border: 1px solid var(--primary-green);
+  border: 1px solid var(--gold);
 }
 
 /* COIN FLIP GAME STYLES (бывший Dispute) */
@@ -717,7 +804,7 @@ select {
 
 .coin-btn {
   background: var(--medium-gray);
-  border: 1px solid var(--primary-green);
+  border: 1px solid var(--gold);
   border-radius: var(--radius-md);
   padding: 1.5rem;
   display: flex;
@@ -730,11 +817,11 @@ select {
 
 .coin-btn:hover {
   transform: translateY(-5px);
-  background: rgba(0, 168, 107, 0.1);
+  background: rgba(58, 92, 58, 0.2);
 }
 
 .coin-btn.selected {
-  background: rgba(0, 168, 107, 0.2);
+  background: rgba(58, 92, 58, 0.3);
   border-color: var(--gold);
 }
 
@@ -813,68 +900,6 @@ select {
   }
 }
 
-/* EVENTS SCREEN STYLES */
-.events-container {
-  width: 100%;
-  max-width: 800px;
-}
-
-.events-description {
-  margin-bottom: 2rem;
-  text-align: center;
-  color: var(--light-gray);
-}
-
-.events-list {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-}
-
-.event-item {
-  background: var(--medium-gray);
-  border-radius: var(--radius-md);
-  padding: 1.5rem;
-  border: 1px solid var(--primary-green);
-  transition: transform var(--transition-normal);
-}
-
-.event-item:hover {
-  transform: translateY(-3px);
-}
-
-.event-title {
-  font-size: 1.2rem;
-  font-weight: bold;
-  color: var(--gold);
-  margin-bottom: 1rem;
-}
-
-.event-options {
-  display: flex;
-  flex-direction: column;
-  gap: 0.8rem;
-}
-
-.event-option {
-  display: flex;
-  justify-content: space-between;
-  padding: 0.8rem;
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: background-color var(--transition-normal);
-}
-
-.event-option:hover {
-  background: rgba(0, 0, 0, 0.4);
-}
-
-.event-option span:last-child {
-  font-weight: bold;
-  color: var(--gold);
-}
-
 /* Game header with back button */
 .game-header {
   display: flex;
@@ -892,7 +917,7 @@ select {
 
 .back-btn {
   background: var(--medium-gray);
-  border: 1px solid var(--primary-green);
+  border: 1px solid var(--gold);
   color: var(--white);
   padding: 0.5rem 1rem;
   border-radius: var(--radius-md);
@@ -1025,6 +1050,7 @@ select {
   animation: fadeOut 0.3s ease forwards;
 }
 
+/* Utility classes (keeping all these from the original) */
 /* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 8px;
