@@ -1,11 +1,11 @@
 /**
- * main.js - Core module of Greenlight Casino
- * Version 2.1.0 - Improved architecture with error resilience
+ * main.js - Основной модуль приложения Greenlight Casino
+ * Версия 2.1.0 - Улучшенная архитектура с отказоустойчивостью
  */
 
-// Check for main application object
+// Проверяем наличие основного объекта приложения
 if (!window.GreenLightApp) {
-    console.error('GreenLightApp not initialized!');
+    console.error('GreenLightApp не инициализирован!');
     window.GreenLightApp = {
         log: function(source, message, isError) {
             if (isError) console.error(`[${source}] ${message}`);
@@ -23,298 +23,417 @@ if (!window.GreenLightApp) {
     };
 }
 
-// Get reference to global application object
+// Получаем ссылку на глобальный объект приложения
 const app = window.GreenLightApp;
-app.log('Main', 'Starting core application module v2.1.0');
+app.log('Main', 'Запуск основного модуля приложения v2.1.0');
 
-// Main application structure - casinoApp module
+// Основная структура приложения - модуль casinoApp
 const casinoApp = (function() {
-    // API URL for backend interaction
+    // API URL для взаимодействия с бэкендом
     const API_URL = window.location.origin + '/api';
     
-    // Reference to Telegram WebApp
+    // Ссылка на Telegram WebApp
     let tgApp = null;
     
-    // Initialization flags
+    // Флаги инициализации
     let initialized = false;
     let uiInitialized = false;
     let telegramInitialized = false;
+    let profileInitialized = false;
     
-    // Supported games
+    // Поддерживаемые игры
     const supportedGames = ['slots', 'roulette', 'guessnumber', 'miner', 'crush'];
     
-    // Initialize the application - main entry point
+    // Инициализация приложения - основная точка входа
     const init = async function() {
-        app.log('Main', 'Starting application initialization');
+        app.log('Main', 'Начало инициализации приложения');
         
         try {
-            // Report loading progress
+            // Сообщаем о прогрессе загрузки
             updateProgress(30);
             
-            // IMPORTANT: Start critical processes in parallel
+            // ВАЖНО: Сразу запускаем параллельно важные процессы
             const uiPromise = initUI();
             const telegramPromise = initTelegram();
+            const profilePromise = initProfile();
             
-            // Wait for UI initialization (critical)
+            // Ждем завершения инициализации UI (критично)
             await uiPromise;
             
-            // UI ready - notify loader
+            // UI готов - сообщаем загрузчику
             if (window.appLoader && typeof window.appLoader.uiReady === 'function') {
                 window.appLoader.uiReady();
             }
             
-            // Update progress
+            // Обновляем прогресс
             updateProgress(60);
             
-            // IMPORTANT: Don't wait for initTelegram to complete to avoid blocking
-            // Just set up completion handler
+            // ВАЖНО: Не ожидаем завершения initTelegram, чтобы не блокировать загрузку
+            // Только устанавливаем обработчик завершения
             telegramPromise
                 .then(function() {
-                    app.log('Main', 'Telegram API initialized successfully');
+                    app.log('Main', 'Telegram API инициализирован успешно');
                     telegramInitialized = true;
                     app.loading.telegramInitialized = true;
-                    updateBalance(); // Update balance after receiving data
+                    updateBalance(); // Обновляем баланс после получения данных
                 })
                 .catch(function(error) {
-                    app.log('Main', `Telegram initialization error: ${error.message}`, true);
-                    // Continue in demo mode even after Telegram error
+                    app.log('Main', `Ошибка инициализации Telegram: ${error.message}`, true);
+                    // Продолжаем работу в демо-режиме даже при ошибке Telegram
                 });
             
-            // Mark main initialization as complete
+            // Обработчик для инициализации профиля
+            profilePromise
+                .then(function(success) {
+                    if (success) {
+                        app.log('Main', 'Профиль инициализирован успешно');
+                        profileInitialized = true;
+                        app.loading.profileInitialized = true;
+                    } else {
+                        app.log('Main', 'Ошибка инициализации профиля', true);
+                    }
+                })
+                .catch(function(error) {
+                    app.log('Main', `Ошибка инициализации профиля: ${error.message}`, true);
+                });
+            
+            // Отмечаем завершение основной инициализации
             initialized = true;
             app.loading.mainInitialized = true;
             
-            // Notify loader of completion
+            // Сообщаем загрузчику о завершении инициализации
             notifyLoaderReady();
             
-            // Start NON-CRITICAL game loading (in background)
+            // Запускаем НЕКРИТИЧНУЮ загрузку игр (в фоновом режиме)
             initGamesBackground();
             
-            // Return success
+            // Возвращаем успешный результат
             return true;
             
         } catch (error) {
-            app.log('Main', `Critical initialization error: ${error.message}`, true);
+            app.log('Main', `Критическая ошибка инициализации: ${error.message}`, true);
             
-            // Try to show interface even on error
+            // Даже при ошибке пытаемся показать интерфейс
             showEmergencyUI();
             
-            // Notify loader of completion
+            // Уведомляем загрузчик о завершении
             notifyLoaderReady();
             
             return false;
         }
     };
     
-    // UI initialization
+    // Инициализация пользовательского интерфейса
     const initUI = async function() {
-        app.log('Main', 'Initializing user interface');
+        app.log('Main', 'Инициализация пользовательского интерфейса');
         
         try {
-            // Set up event handlers
+            // Настройка обработчиков событий
             setupEventListeners();
             
-            // Activate initial screen
+            // Активация начального экрана
             activateWelcomeScreen();
             
-            // Initial balance update
+            // Начальное обновление баланса
             updateBalance();
             
-            // Mark UI initialization as successful
+            // Отмечаем успешную инициализацию UI
             uiInitialized = true;
             app.loading.uiReady = true;
             
-            app.log('Main', 'User interface successfully initialized');
+            app.log('Main', 'Пользовательский интерфейс успешно инициализирован');
             return true;
             
         } catch (error) {
-            app.log('Main', `UI initialization error: ${error.message}`, true);
-            throw error; // Propagate error as UI is critical
+            app.log('Main', `Ошибка инициализации UI: ${error.message}`, true);
+            throw error; // Пробрасываем ошибку, так как UI критичен
         }
     };
     
-    // Telegram WebApp initialization
+    // Инициализация Telegram WebApp
     const initTelegram = async function() {
-        app.log('Main', 'Initializing Telegram WebApp');
+        app.log('Main', 'Инициализация Telegram WebApp');
         
         try {
-            // Check Telegram API availability
+            // Проверяем доступность Telegram API
             if (!window.Telegram || !window.Telegram.WebApp) {
-                app.log('Main', 'Telegram WebApp API unavailable, using demo mode');
+                app.log('Main', 'Telegram WebApp API не доступен, используем демо-режим');
                 return false;
             }
             
-            // Save reference to Telegram WebApp
+            // Сохраняем ссылку на Telegram WebApp
             tgApp = window.Telegram.WebApp;
             
-            // Expand application window
+            // Расширяем окно приложения
             tgApp.expand();
-            app.log('Main', 'Telegram WebApp expanded');
+            app.log('Main', 'Telegram WebApp расширен');
             
-            // Get Telegram user data
+            // Получаем данные пользователя Telegram
             if (tgApp.initDataUnsafe && tgApp.initDataUnsafe.user) {
                 const user = tgApp.initDataUnsafe.user;
                 
-                // Update user data
+                // Обновляем данные пользователя
                 app.user.telegramId = user.id;
                 app.user.firstName = user.first_name || 'Player';
                 app.user.lastName = user.last_name || '';
                 app.user.username = user.username || '';
                 
-                app.log('Main', `Telegram user: ${app.user.firstName} (${app.user.telegramId})`);
+                app.log('Main', `Пользователь Telegram: ${app.user.firstName} (${app.user.telegramId})`);
                 
-                // Limit API operation wait time
+                // Ограничиваем время ожидания API операций
                 const registerPromise = Promise.race([
                     registerUser(),
                     new Promise(function(_, reject) {
                         setTimeout(function() {
-                            reject(new Error('Timeout'));
+                            reject(new Error('Таймаут'));
                         }, 5000);
                     })
                 ]);
                 
                 try {
-                    // Register user and get profile
+                    // Регистрируем пользователя и получаем его профиль
                     await registerPromise;
                     await getUserProfile();
                 } catch (apiError) {
-                    app.log('Main', `API error: ${apiError.message}. Using local data.`, true);
+                    app.log('Main', `Ошибка API: ${apiError.message}. Используем локальные данные.`, true);
                 }
             } else {
-                app.log('Main', 'Telegram user data unavailable, using defaults');
+                app.log('Main', 'Данные пользователя Telegram недоступны, используем дефолтные');
             }
             
-            // Mark Telegram initialization as successful
+            // Отмечаем успех инициализации Telegram
             telegramInitialized = true;
             app.loading.telegramInitialized = true;
             
             return true;
             
         } catch (error) {
-            app.log('Main', `Telegram WebApp error: ${error.message}`, true);
-            // Return false but don't throw error - continue in demo mode
+            app.log('Main', `Ошибка Telegram WebApp: ${error.message}`, true);
+            // Возвращаем false, но не выбрасываем ошибку - продолжаем в демо-режиме
             return false;
         }
     };
     
-    // Background game initialization (doesn't block main thread)
-    const initGamesBackground = function() {
-        app.log('Main', 'Starting background game initialization');
+    // Инициализация модуля профиля
+    const initProfile = async function() {
+        app.log('Main', 'Инициализация модуля профиля');
         
-        // Run in timeout to let UI update
+        try {
+            // Проверка наличия модуля профиля
+            if (window.profileManager) {
+                app.log('Main', 'Модуль профиля уже загружен');
+                
+                // Если есть метод init, вызываем его
+                if (typeof window.profileManager.init === 'function') {
+                    await window.profileManager.init();
+                    app.log('Main', 'Модуль профиля инициализирован');
+                }
+                
+                return true;
+            }
+            
+            // Динамическая загрузка скрипта profile.js
+            return new Promise((resolve) => {
+                app.log('Main', 'Загрузка скрипта profile.js');
+                
+                const script = document.createElement('script');
+                script.src = 'js/profile.js';
+                script.async = true;
+                
+                script.onload = async function() {
+                    app.log('Main', 'Скрипт profile.js загружен');
+                    
+                    // Проверяем наличие объекта и инициализируем его
+                    if (window.profileManager && typeof window.profileManager.init === 'function') {
+                        try {
+                            await window.profileManager.init();
+                            app.log('Main', 'Модуль профиля инициализирован успешно');
+                            resolve(true);
+                        } catch (initError) {
+                            app.log('Main', `Ошибка инициализации модуля профиля: ${initError.message}`, true);
+                            resolve(false);
+                        }
+                    } else {
+                        app.log('Main', 'Модуль profileManager не найден или не имеет метода init', true);
+                        resolve(false);
+                    }
+                };
+                
+                script.onerror = function() {
+                    app.log('Main', 'Ошибка загрузки скрипта profile.js', true);
+                    resolve(false);
+                };
+                
+                document.body.appendChild(script);
+            });
+            
+        } catch (error) {
+            app.log('Main', `Ошибка инициализации профиля: ${error.message}`, true);
+            return false;
+        }
+    };
+    
+    // Фоновая инициализация игр (не блокирует основной поток)
+    const initGamesBackground = function() {
+        app.log('Main', 'Запуск фоновой инициализации игр');
+        
+        // Запускаем в таймауте, чтобы UI успел обновиться
         setTimeout(function() {
             try {
+                // Инициализируем каждую игру
                 supportedGames.forEach(function(gameType) {
                     const objectName = gameType + 'Game';
                     
-                    // Safely initialize game
+                    // Безопасно инициализируем игру
                     safeInitGame(gameType, objectName)
                         .then(function(success) {
                             if (success) {
-                                app.log('Main', `Game ${gameType} successfully initialized`);
+                                app.log('Main', `Игра ${gameType} успешно инициализирована`);
                             } else {
-                                app.log('Main', `Game ${gameType} not initialized`, true);
+                                app.log('Main', `Игра ${gameType} не инициализирована`, true);
                             }
                         })
                         .catch(function(error) {
-                            app.log('Main', `Error initializing ${gameType}: ${error.message}`, true);
+                            app.log('Main', `Ошибка инициализации ${gameType}: ${error.message}`, true);
                         });
                 });
+                
+                // Загружаем модуль Game Helper
+                loadGameHelper()
+                    .then(function(success) {
+                        if (success) {
+                            app.log('Main', 'Модуль Game Helper успешно загружен');
+                        } else {
+                            app.log('Main', 'Модуль Game Helper не был загружен', true);
+                        }
+                    })
+                    .catch(function(error) {
+                        app.log('Main', `Ошибка загрузки Game Helper: ${error.message}`, true);
+                    });
                 
                 app.loading.gamesInitialized = true;
                 
             } catch (error) {
-                app.log('Main', `General game initialization error: ${error.message}`, true);
+                app.log('Main', `Общая ошибка инициализации игр: ${error.message}`, true);
             }
         }, 1000);
     };
     
-    // Safe game initialization with timeout
+    // Загрузка модуля Game Helper
+    const loadGameHelper = function() {
+        return new Promise((resolve) => {
+            // Проверяем, не загружен ли уже модуль
+            if (window.GameHelper) {
+                app.log('Main', 'Game Helper уже загружен');
+                resolve(true);
+                return;
+            }
+            
+            // Загружаем скрипт
+            const script = document.createElement('script');
+            script.src = 'js/game-helper.js';
+            script.async = true;
+            
+            script.onload = function() {
+                app.log('Main', 'Модуль Game Helper загружен успешно');
+                resolve(true);
+            };
+            
+            script.onerror = function() {
+                app.log('Main', 'Ошибка загрузки модуля Game Helper', true);
+                resolve(false);
+            };
+            
+            document.body.appendChild(script);
+        });
+    };
+    
+    // Безопасная инициализация игры с таймаутом
     const safeInitGame = async function(gameName, objectName) {
-        app.log('Main', `Attempting to initialize game ${gameName}`);
+        app.log('Main', `Попытка инициализации игры ${gameName}`);
         
-        // Set maximum wait time
+        // Устанавливаем максимальное время ожидания
         return Promise.race([
-            // Main initialization process
+            // Основной процесс инициализации
             (async function() {
                 try {
-                    // Check new format game storage
+                    // Проверяем новый формат хранения игры
                     if (app.games[gameName] && app.games[gameName].instance) {
                         const gameObject = app.games[gameName].instance;
                         if (typeof gameObject.init === 'function') {
                             await gameObject.init();
-                            app.log('Main', `Game ${gameName} initialized via app.games`);
+                            app.log('Main', `Игра ${gameName} инициализирована через app.games`);
                             return true;
                         }
                     }
                     
-                    // Check GreenLightGames (old format)
+                    // Проверяем GreenLightGames (старый формат)
                     if (window.GreenLightGames && window.GreenLightGames[objectName]) {
                         const gameObject = window.GreenLightGames[objectName];
                         if (typeof gameObject.init === 'function') {
                             await gameObject.init();
-                            app.log('Main', `Game ${gameName} initialized via GreenLightGames`);
+                            app.log('Main', `Игра ${gameName} инициализирована через GreenLightGames`);
                             return true;
                         }
                     }
                     
-                    // Check global namespace
+                    // Проверяем глобальное пространство имен
                     if (window[objectName] && typeof window[objectName].init === 'function') {
                         await window[objectName].init();
-                        app.log('Main', `Game ${gameName} initialized via global object`);
+                        app.log('Main', `Игра ${gameName} инициализирована через глобальный объект`);
                         return true;
                     }
                     
-                    app.log('Main', `Game ${gameName} not found or has no init method`);
+                    app.log('Main', `Игра ${gameName} не найдена или не имеет метода init`);
                     return false;
                     
                 } catch (error) {
-                    app.log('Main', `Error initializing ${gameName}: ${error.message}`, true);
+                    app.log('Main', `Ошибка инициализации ${gameName}: ${error.message}`, true);
                     return false;
                 }
             })(),
             
-            // Initialization timeout
+            // Таймаут инициализации
             new Promise(function(resolve) {
                 setTimeout(function() {
-                    app.log('Main', `Game initialization timeout for ${gameName}`, true);
+                    app.log('Main', `Превышено время инициализации игры ${gameName}`, true);
                     resolve(false);
-                }, 5000); // 5 seconds maximum
+                }, 5000); // 5 секунд максимум
             })
         ]);
     };
     
-    // Set up event listeners
+    // Настройка обработчиков событий
     const setupEventListeners = function() {
-        app.log('Main', 'Setting up event listeners');
+        app.log('Main', 'Настройка обработчиков событий');
         
         try {
-            // Event handlers for game cards
+            // Обработчики для карточек игр
             const gameCards = document.querySelectorAll('.game-card');
             gameCards.forEach(function(card) {
                 card.addEventListener('click', function(e) {
                     const game = card.getAttribute('data-game');
                     if (!game) return;
                     
-                    // Ignore non-supported games
+                    // Игнорируем неподдерживаемые игры
                     if (!supportedGames.includes(game)) {
-                        app.log('Main', `Game ${game} is not supported`, true);
-                        showNotification('This game is not available');
+                        app.log('Main', `Игра ${game} не поддерживается`, true);
+                        showNotification('Эта игра не доступна');
                         return;
                     }
                     
-                    app.log('Main', `Selected game: ${game}`);
+                    app.log('Main', `Выбрана игра: ${game}`);
                     
-                    // Tactile feedback
+                    // Тактильная обратная связь
                     provideTactileFeedback('light');
                     
-                    // Press animation
+                    // Анимация нажатия
                     card.classList.add('card-pressed');
                     setTimeout(function() {
                         card.classList.remove('card-pressed');
                     }, 150);
                     
-                    // Switch screens
+                    // Переключаем экраны
                     document.querySelectorAll('.screen').forEach(function(screen) {
                         screen.classList.remove('active');
                     });
@@ -323,34 +442,34 @@ const casinoApp = (function() {
                     if (targetScreen) {
                         targetScreen.classList.add('active');
                     } else {
-                        app.log('Main', `Screen for ${game} not found`, true);
-                        showNotification('Game screen not found');
+                        app.log('Main', `Экран для ${game} не найден`, true);
+                        showNotification('Экран игры не найден');
                     }
                 });
             });
             
-            // Handlers for "Back" buttons
+            // Обработчики для кнопок "Назад"
             const backButtons = document.querySelectorAll('.back-btn');
             backButtons.forEach(function(button) {
                 button.addEventListener('click', function() {
-                    app.log('Main', 'Back button clicked');
+                    app.log('Main', 'Нажата кнопка "Назад"');
                     
-                    // Tactile feedback
+                    // Тактильная обратная связь
                     provideTactileFeedback('light');
                     
-                    // Return to main screen
+                    // Возвращаемся на главный экран
                     activateWelcomeScreen();
                 });
             });
             
-            // Bottom navigation
+            // Нижняя навигация
             const homeBtn = document.getElementById('home-btn');
             const historyBtn = document.getElementById('history-btn');
             const profileBtn = document.getElementById('profile-btn');
             
             if (homeBtn) {
                 homeBtn.addEventListener('click', function() {
-                    app.log('Main', 'Home button clicked');
+                    app.log('Main', 'Нажата кнопка "Home"');
                     provideTactileFeedback('light');
                     
                     activateWelcomeScreen();
@@ -360,16 +479,16 @@ const casinoApp = (function() {
             
             if (historyBtn) {
                 historyBtn.addEventListener('click', function() {
-                    app.log('Main', 'History button clicked');
+                    app.log('Main', 'Нажата кнопка "History"');
                     provideTactileFeedback('light');
                     
-                    // Load game history
+                    // Загружаем историю игр
                     getGameHistory()
                         .catch(function(error) {
-                            app.log('Main', `Error loading history: ${error.message}`, true);
+                            app.log('Main', `Ошибка загрузки истории: ${error.message}`, true);
                         });
                     
-                    // Show history modal
+                    // Показываем модальное окно истории
                     const historyModal = document.getElementById('history-modal');
                     if (historyModal) {
                         showModal(historyModal);
@@ -381,26 +500,31 @@ const casinoApp = (function() {
             
             if (profileBtn) {
                 profileBtn.addEventListener('click', function() {
-                    app.log('Main', 'Profile button clicked');
+                    app.log('Main', 'Нажата кнопка "Profile"');
                     provideTactileFeedback('light');
                     
-                    // Load transaction history
-                    getTransactionHistory()
-                        .catch(function(error) {
-                            app.log('Main', `Error loading transactions: ${error.message}`, true);
-                        });
-                    
-                    // Show profile modal
-                    const profileModal = document.getElementById('profile-modal');
-                    if (profileModal) {
-                        showModal(profileModal);
+                    // Используем profileManager если он доступен
+                    if (window.profileManager && typeof window.profileManager.showProfile === 'function') {
+                        window.profileManager.showProfile();
+                    } else {
+                        // Запасной вариант - стандартная функциональность
+                        getTransactionHistory()
+                            .catch(function(error) {
+                                app.log('Main', `Ошибка загрузки транзакций: ${error.message}`, true);
+                            });
+                        
+                        // Показываем модальное окно профиля
+                        const profileModal = document.getElementById('profile-modal');
+                        if (profileModal) {
+                            showModal(profileModal);
+                        }
                     }
                     
                     updateActiveNavButton(profileBtn);
                 });
             }
             
-            // Modal close handlers
+            // Обработчики закрытия модальных окон
             const closeButtons = document.querySelectorAll('.close-modal');
             closeButtons.forEach(function(button) {
                 button.addEventListener('click', function() {
@@ -412,7 +536,7 @@ const casinoApp = (function() {
                 });
             });
             
-            // Close modals when clicking outside content
+            // Закрытие модальных окон при клике вне содержимого
             const modals = document.querySelectorAll('.modal');
             modals.forEach(function(modal) {
                 modal.addEventListener('click', function(event) {
@@ -423,60 +547,60 @@ const casinoApp = (function() {
                 });
             });
             
-            app.log('Main', 'Event listeners set up successfully');
+            app.log('Main', 'Обработчики событий успешно настроены');
             
         } catch (error) {
-            app.log('Main', `Error setting up event handlers: ${error.message}`, true);
-            // Continue even with handler errors
+            app.log('Main', `Ошибка настройки обработчиков: ${error.message}`, true);
+            // Продолжаем работу даже при ошибке обработчиков
         }
     };
     
-    // Activate welcome screen
+    // Активация приветственного экрана
     const activateWelcomeScreen = function() {
         try {
             const welcomeScreen = document.getElementById('welcome-screen');
             if (welcomeScreen) {
-                // First hide all screens
+                // Сначала скрываем все экраны
                 document.querySelectorAll('.screen').forEach(function(screen) {
                     screen.classList.remove('active');
                 });
                 
-                // Then show welcome screen
+                // Затем показываем приветственный экран
                 welcomeScreen.classList.add('active');
-                app.log('Main', 'Welcome screen activated');
+                app.log('Main', 'Приветственный экран активирован');
             } else {
-                app.log('Main', 'Welcome-screen element not found!', true);
+                app.log('Main', 'Элемент welcome-screen не найден!', true);
             }
         } catch (error) {
-            app.log('Main', `Error activating welcome-screen: ${error.message}`, true);
+            app.log('Main', `Ошибка при активации welcome-screen: ${error.message}`, true);
         }
     };
     
-    // Show emergency UI for critical errors
+    // Показ аварийного UI при критических ошибках
     const showEmergencyUI = function() {
-        app.log('Main', 'Activating emergency UI');
+        app.log('Main', 'Активация аварийного UI');
         
         try {
-            // Activate welcome screen
+            // Активируем приветственный экран
             activateWelcomeScreen();
             
-            // Show application
+            // Отображаем приложение
             const appContent = document.getElementById('app-content');
             if (appContent) {
                 appContent.classList.add('loaded');
             }
             
-            // Update balance
+            // Обновляем баланс
             updateBalance();
             
-            app.log('Main', 'Emergency UI activated successfully');
+            app.log('Main', 'Аварийный UI успешно активирован');
             
         } catch (error) {
-            app.log('Main', `Error activating emergency UI: ${error.message}`, true);
+            app.log('Main', `Ошибка при активации аварийного UI: ${error.message}`, true);
         }
     };
     
-    // Update active navigation button
+    // Обновление активной кнопки навигации
     const updateActiveNavButton = function(activeButton) {
         if (!activeButton) return;
         
@@ -487,16 +611,16 @@ const casinoApp = (function() {
         activeButton.classList.add('active');
     };
     
-    // Show modal window
+    // Отображение модального окна
     const showModal = function(modal) {
         if (!modal) return;
         
-        // Add tactile feedback
+        // Добавляем тактильную обратную связь
         provideTactileFeedback('light');
         
         modal.style.display = 'flex';
         
-        // Appearance animation
+        // Анимация появления
         setTimeout(function() {
             const content = modal.querySelector('.modal-content');
             if (content) {
@@ -506,7 +630,7 @@ const casinoApp = (function() {
         }, 10);
     };
     
-    // Hide modal window
+    // Скрытие модального окна
     const hideModal = function(modal) {
         if (!modal) return;
         
@@ -521,35 +645,35 @@ const casinoApp = (function() {
         }, 300);
     };
     
-    // Update loading progress
+    // Обновление прогресса загрузки
     const updateProgress = function(percent) {
         try {
             if (window.appLoader && typeof window.appLoader.updateProgress === 'function') {
                 window.appLoader.updateProgress(percent);
             }
         } catch (error) {
-            app.log('Main', `Error updating progress: ${error.message}`, true);
+            app.log('Main', `Ошибка обновления прогресса: ${error.message}`, true);
         }
     };
     
-    // Notify loader of readiness
+    // Уведомление загрузчика о готовности
     const notifyLoaderReady = function() {
         try {
-            app.log('Main', 'Notifying loader of core module readiness');
+            app.log('Main', 'Уведомление загрузчика о готовности основного модуля');
             
             if (window.appLoader && typeof window.appLoader.mainReady === 'function') {
                 window.appLoader.mainReady();
             } else {
-                app.log('Main', 'appLoader.mainReady not found, removing loading screen directly', true);
+                app.log('Main', 'appLoader.mainReady не найден, удаляем экран загрузки напрямую', true);
                 
-                // Emergency removal of loading screen
+                // Аварийное удаление экрана загрузки
                 const loadingOverlay = document.getElementById('loadingOverlay');
                 if (loadingOverlay) {
                     loadingOverlay.style.opacity = '0';
                     setTimeout(function() {
                         loadingOverlay.style.display = 'none';
                         
-                        // Show application content
+                        // Показываем контент приложения
                         const appContent = document.getElementById('app-content');
                         if (appContent) {
                             appContent.classList.add('loaded');
@@ -558,9 +682,9 @@ const casinoApp = (function() {
                 }
             }
         } catch (error) {
-            app.log('Main', `Error notifying loader: ${error.message}`, true);
+            app.log('Main', `Ошибка уведомления загрузчика: ${error.message}`, true);
             
-            // Emergency removal of loading screen on error
+            // Аварийное удаление экрана загрузки при ошибке
             const loadingOverlay = document.getElementById('loadingOverlay');
             if (loadingOverlay) {
                 loadingOverlay.style.display = 'none';
@@ -573,7 +697,7 @@ const casinoApp = (function() {
         }
     };
     
-    // Update user balance
+    // Обновление баланса пользователя
     const updateBalance = function() {
         try {
             const balanceAmount = document.getElementById('balance-amount');
@@ -583,7 +707,7 @@ const casinoApp = (function() {
             if (balanceAmount) {
                 balanceAmount.textContent = app.user.balance;
                 
-                // Add update animation
+                // Добавляем анимацию обновления
                 balanceAmount.classList.add('balance-updated');
                 setTimeout(function() {
                     balanceAmount.classList.remove('balance-updated');
@@ -597,17 +721,22 @@ const casinoApp = (function() {
             if (userName) {
                 userName.textContent = app.user.firstName;
             }
+            
+            // Уведомляем модуль профиля об обновлении баланса
+            if (window.profileManager && typeof window.profileManager.updateBalance === 'function') {
+                window.profileManager.updateBalance(app.user.balance);
+            }
         } catch (error) {
-            app.log('Main', `Error updating balance: ${error.message}`, true);
+            app.log('Main', `Ошибка обновления баланса: ${error.message}`, true);
         }
     };
     
-    // Show notification
+    // Показ уведомления
     const showNotification = function(message) {
-        app.log('Main', `Notification: ${message}`);
+        app.log('Main', `Уведомление: ${message}`);
         
         try {
-            // If Telegram WebApp API is available, use it
+            // Если доступен Telegram WebApp API, используем его
             if (tgApp && tgApp.showPopup) {
                 tgApp.showPopup({
                     title: 'Greenlight Casino',
@@ -615,22 +744,22 @@ const casinoApp = (function() {
                     buttons: [{type: 'ok'}]
                 });
             } else {
-                // Otherwise use standard alert
+                // Иначе используем стандартный alert
                 alert(message);
             }
         } catch (error) {
-            app.log('Main', `Error showing notification: ${error.message}`, true);
-            // Use alert in case of error
+            app.log('Main', `Ошибка при показе уведомления: ${error.message}`, true);
+            // В случае ошибки используем alert
             alert(message);
         }
     };
     
-    // Tactile feedback
+    // Тактильная обратная связь
     const provideTactileFeedback = function(type) {
         type = type || 'light';
         
         try {
-            // Use HapticFeedback API if available
+            // Используем HapticFeedback API если доступен
             if (tgApp && tgApp.HapticFeedback) {
                 switch (type) {
                     case 'light':
@@ -653,7 +782,7 @@ const casinoApp = (function() {
                         break;
                 }
             } else if ('vibrate' in navigator) {
-                // Use Vibration API for browsers
+                // Используем Vibration API для браузеров
                 switch (type) {
                     case 'light':
                         navigator.vibrate(5);
@@ -676,16 +805,16 @@ const casinoApp = (function() {
                 }
             }
         } catch (error) {
-            app.log('Main', `Tactile feedback error: ${error.message}`, true);
+            app.log('Main', `Ошибка тактильной обратной связи: ${error.message}`, true);
         }
     };
     
-    // ===== API Methods =====
+    // ===== API Методы =====
     
-    // User registration
+    // Регистрация пользователя
     const registerUser = async function() {
         try {
-            app.log('Main', `Registering user: ${app.user.telegramId}`);
+            app.log('Main', `Регистрация пользователя: ${app.user.telegramId}`);
             
             const response = await fetch(`${API_URL}/users/register`, {
                 method: 'POST',
@@ -699,111 +828,134 @@ const casinoApp = (function() {
             });
             
             if (!response.ok) {
-                throw new Error(`Registration error: ${response.status}`);
+                throw new Error(`Ошибка регистрации: ${response.status}`);
             }
             
             const data = await response.json();
-            app.log('Main', 'User registered successfully');
+            app.log('Main', 'Пользователь зарегистрирован успешно');
             
             return data;
         } catch (error) {
-            app.log('Main', `User registration error: ${error.message}`, true);
-            // Continue in demo mode
+            app.log('Main', `Ошибка регистрации пользователя: ${error.message}`, true);
+            // Продолжаем работу в демо-режиме
             return null;
         }
     };
     
-    // Get user profile
+    // Получение профиля пользователя
     const getUserProfile = async function() {
         try {
-            app.log('Main', `Requesting user profile: ${app.user.telegramId}`);
+            app.log('Main', `Запрос профиля пользователя: ${app.user.telegramId}`);
             
             const response = await fetch(`${API_URL}/users/profile/${app.user.telegramId}`);
             
             if (!response.ok) {
-                throw new Error(`Error getting profile: ${response.status}`);
+                throw new Error(`Ошибка получения профиля: ${response.status}`);
             }
             
             const data = await response.json();
             
-            // Update balance
+            // Обновляем баланс
             app.user.balance = data.balance;
             updateBalance();
             
-            app.log('Main', 'User profile retrieved successfully');
+            // Уведомляем модуль профиля об обновлении данных
+            if (window.profileManager && typeof window.profileManager.updateProfileData === 'function') {
+                window.profileManager.updateProfileData(data);
+            }
+            
+            app.log('Main', 'Профиль пользователя получен успешно');
             
             return data;
         } catch (error) {
-            app.log('Main', `Error getting profile: ${error.message}`, true);
-            // Continue with current data
+            app.log('Main', `Ошибка получения профиля: ${error.message}`, true);
+            // Продолжаем работу с текущими данными
             return null;
         }
     };
     
-    // Get game history
+    // Получение истории игр
     const getGameHistory = async function() {
         try {
-            app.log('Main', `Requesting game history: ${app.user.telegramId}`);
+            app.log('Main', `Запрос истории игр: ${app.user.telegramId}`);
             
             const response = await fetch(`${API_URL}/games/history/${app.user.telegramId}`);
             
             if (!response.ok) {
-                throw new Error(`Error getting history: ${response.status}`);
+                throw new Error(`Ошибка получения истории: ${response.status}`);
             }
             
             const data = await response.json();
             
-            // Update history display
-            updateHistoryList(data);
+            // Используем модуль профиля для отображения истории, если доступен
+            if (window.profileManager && typeof window.profileManager.updateGameHistory === 'function') {
+                window.profileManager.updateGameHistory(data);
+            } else {
+                // Иначе используем встроенную функцию
+                updateHistoryList(data);
+            }
             
-            app.log('Main', 'Game history retrieved successfully');
+            app.log('Main', 'История игр получена успешно');
             
             return data;
         } catch (error) {
-            app.log('Main', `Error getting game history: ${error.message}`, true);
+            app.log('Main', `Ошибка получения истории игр: ${error.message}`, true);
             
-            // Show empty history
-            updateHistoryList([]);
+            // Показываем пустую историю
+            if (window.profileManager && typeof window.profileManager.updateGameHistory === 'function') {
+                window.profileManager.updateGameHistory([]);
+            } else {
+                updateHistoryList([]);
+            }
             
             return [];
         }
     };
     
-    // Get transaction history
+    // Получение истории транзакций
     const getTransactionHistory = async function() {
         try {
-            app.log('Main', `Requesting transaction history: ${app.user.telegramId}`);
+            app.log('Main', `Запрос истории транзакций: ${app.user.telegramId}`);
             
             const response = await fetch(`${API_URL}/users/transactions/${app.user.telegramId}`);
             
             if (!response.ok) {
-                throw new Error(`Error getting transactions: ${response.status}`);
+                throw new Error(`Ошибка получения транзакций: ${response.status}`);
             }
             
             const data = await response.json();
             
-            // Update transaction display
-            updateTransactionList(data);
+            // Используем модуль профиля для отображения транзакций, если доступен
+            if (window.profileManager && typeof window.profileManager.updateTransactionHistory === 'function') {
+                window.profileManager.updateTransactionHistory(data);
+            } else {
+                // Иначе используем встроенную функцию
+                updateTransactionList(data);
+            }
             
-            app.log('Main', 'Transaction history retrieved successfully');
+            app.log('Main', 'История транзакций получена успешно');
             
             return data;
         } catch (error) {
-            app.log('Main', `Error getting transaction history: ${error.message}`, true);
+            app.log('Main', `Ошибка получения истории транзакций: ${error.message}`, true);
             
-            // Show empty transaction history
-            updateTransactionList([]);
+            // Показываем пустую историю транзакций
+            if (window.profileManager && typeof window.profileManager.updateTransactionHistory === 'function') {
+                window.profileManager.updateTransactionHistory([]);
+            } else {
+                updateTransactionList([]);
+            }
             
             return [];
         }
     };
     
-    // Process game result
+    // Обработка результата игры
     const processGameResult = async function(gameType, betAmount, outcome, winAmount, gameData) {
         try {
-            app.log('Main', `Processing game result: ${gameType}, outcome: ${outcome}`);
+            app.log('Main', `Обработка результата игры: ${gameType}, исход: ${outcome}`);
             
-            // Preliminary UI update for better UX
+            // Предварительное обновление UI для лучшего UX
             if (outcome === 'win') {
                 app.user.balance = app.user.balance + winAmount;
                 updateBalance();
@@ -812,7 +964,7 @@ const casinoApp = (function() {
                 updateBalance();
             }
             
-            // Send data to server with timeout limit
+            // Отправляем данные на сервер с ограничением времени ожидания
             const responsePromise = Promise.race([
                 fetch(`${API_URL}/games/play`, {
                     method: 'POST',
@@ -828,7 +980,7 @@ const casinoApp = (function() {
                 }),
                 new Promise(function(_, reject) {
                     setTimeout(function() {
-                        reject(new Error('API Timeout'));
+                        reject(new Error('Таймаут API'));
                     }, 5000);
                 })
             ]);
@@ -836,46 +988,46 @@ const casinoApp = (function() {
             const response = await responsePromise;
             
             if (!response.ok) {
-                throw new Error(`Error processing result: ${response.status}`);
+                throw new Error(`Ошибка обработки результата: ${response.status}`);
             }
             
             const data = await response.json();
             
-            // Update balance from server response
+            // Обновляем баланс из ответа сервера
             app.user.balance = data.user.balance;
             updateBalance();
             
-            app.log('Main', 'Game result processed successfully');
+            app.log('Main', 'Результат игры обработан успешно');
             
             return data;
         } catch (error) {
-            app.log('Main', `Error processing game result: ${error.message}`, true);
+            app.log('Main', `Ошибка обработки результата игры: ${error.message}`, true);
             
-            // In case of server error, UI already updated preliminarily
+            // В случае ошибки сервера, UI уже обновлен предварительно
             return null;
         }
     };
     
-    // Update game history list
+    // Обновление списка истории игр
     const updateHistoryList = function(historyData) {
         try {
             const historyList = document.getElementById('history-list');
             if (!historyList) return;
             
-            // Clear current list
+            // Очищаем текущий список
             historyList.innerHTML = '';
             
             if (!historyData || historyData.length === 0) {
-                historyList.innerHTML = '<div class="empty-message">No game history</div>';
+                historyList.innerHTML = '<div class="empty-message">Нет истории игр</div>';
                 return;
             }
             
-            // Add each history item
+            // Добавляем каждый элемент истории
             historyData.forEach(function(item) {
                 const historyItem = document.createElement('div');
                 historyItem.className = 'history-item';
                 
-                // Get game icon
+                // Получаем иконку игры
                 let gameIcon = '🎮';
                 switch (item.gameType) {
                     case 'slots': gameIcon = '🎰'; break;
@@ -885,13 +1037,13 @@ const casinoApp = (function() {
                     case 'crush': gameIcon = '📈'; break;
                 }
                 
-                // Format date
-                let formattedDate = 'Unknown date';
+                // Форматируем дату
+                let formattedDate = 'Неизвестная дата';
                 try {
                     const date = new Date(item.createdAt);
                     formattedDate = `${date.toLocaleDateString()} ${date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
                 } catch (dateError) {
-                    app.log('Main', `Date formatting error: ${dateError.message}`, true);
+                    app.log('Main', `Ошибка форматирования даты: ${dateError.message}`, true);
                 }
                 
                 historyItem.innerHTML = `
@@ -900,7 +1052,7 @@ const casinoApp = (function() {
                         <span>${item.gameType.charAt(0).toUpperCase() + item.gameType.slice(1)}</span>
                     </div>
                     <div class="history-details">
-                        <div class="history-bet">Bet: ${item.betAmount} ⭐</div>
+                        <div class="history-bet">Ставка: ${item.betAmount} ⭐</div>
                         <div class="history-outcome ${item.winAmount > 0 ? 'win' : 'loss'}">
                             ${item.winAmount > 0 ? `+${item.winAmount} ⭐` : '-' + item.betAmount + ' ⭐'}
                         </div>
@@ -911,69 +1063,69 @@ const casinoApp = (function() {
                 historyList.appendChild(historyItem);
             });
         } catch (error) {
-            app.log('Main', `Error updating history list: ${error.message}`, true);
+            app.log('Main', `Ошибка обновления списка истории: ${error.message}`, true);
             
-            // Show error message
+            // Показываем сообщение об ошибке
             const historyList = document.getElementById('history-list');
             if (historyList) {
-                historyList.innerHTML = '<div class="empty-message">Error loading history</div>';
+                historyList.innerHTML = '<div class="empty-message">Ошибка загрузки истории</div>';
             }
         }
     };
     
-    // Update transaction list
+    // Обновление списка транзакций
     const updateTransactionList = function(transactionData) {
         try {
             const transactionList = document.getElementById('transaction-list');
             if (!transactionList) return;
             
-            // Clear current list
+            // Очищаем текущий список
             transactionList.innerHTML = '';
             
             if (!transactionData || transactionData.length === 0) {
-                transactionList.innerHTML = '<div class="empty-message">No transactions</div>';
+                transactionList.innerHTML = '<div class="empty-message">Нет транзакций</div>';
                 return;
             }
             
-            // Add each transaction
+            // Добавляем каждую транзакцию
             transactionData.forEach(function(item) {
                 const transactionItem = document.createElement('div');
                 transactionItem.className = 'transaction-item';
                 
-                // Get transaction icon
+                // Получаем иконку транзакции
                 let transactionIcon = '💼';
                 let transactionType = '';
                 
                 switch (item.type) {
                     case 'deposit':
                         transactionIcon = '⬇️';
-                        transactionType = 'Deposit';
+                        transactionType = 'Пополнение';
                         break;
                     case 'withdrawal':
                         transactionIcon = '⬆️';
-                        transactionType = 'Withdrawal';
+                        transactionType = 'Вывод';
                         break;
                     case 'bet':
                         transactionIcon = '🎮';
-                        transactionType = 'Bet';
+                        transactionType = 'Ставка';
                         break;
                     case 'win':
                         transactionIcon = '🏆';
-                        transactionType = 'Win';
+                        transactionType = 'Выигрыш';
                         break;
                     case 'admin_adjustment':
                         transactionIcon = '⚙️';
-                        transactionType = 'Adjustment';
+                        transactionType = 'Корректировка';
                         break;
                 }
                 
-                // Format date
-                let formattedDate = 'Unknown date';
+                // Форматируем дату
+                let formattedDate = 'Неизвестная дата';
                 try {
                     const date = new Date(item.createdAt);
                     formattedDate = `${date.toLocaleDateString()} ${date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
                 } catch (dateError) {
-                    app.log('Main', `Date formatting error: ${dateError.message}`, true);
+                    app.log('Main', `Ошибка форматирования даты: ${dateError.message}`, true);
                 }
                 
                 transactionItem.innerHTML = `
@@ -990,17 +1142,17 @@ const casinoApp = (function() {
                 transactionList.appendChild(transactionItem);
             });
         } catch (error) {
-            app.log('Main', `Error updating transaction list: ${error.message}`, true);
+            app.log('Main', `Ошибка обновления списка транзакций: ${error.message}`, true);
             
-            // Show error message
+            // Показываем сообщение об ошибке
             const transactionList = document.getElementById('transaction-list');
             if (transactionList) {
-                transactionList.innerHTML = '<div class="empty-message">Error loading transactions</div>';
+                transactionList.innerHTML = '<div class="empty-message">Ошибка загрузки транзакций</div>';
             }
         }
     };
     
-    // Export public methods and properties
+    // Экспортируем публичные методы и свойства
     return {
         init: init,
         processGameResult: processGameResult,
@@ -1008,39 +1160,45 @@ const casinoApp = (function() {
         provideTactileFeedback: provideTactileFeedback,
         updateBalance: updateBalance,
         
-        // Method to check application state
+        // Методы для доступа к API
+        getUserProfile: getUserProfile,
+        getGameHistory: getGameHistory,
+        getTransactionHistory: getTransactionHistory,
+        
+        // Метод для проверки состояния приложения
         getStatus: function() {
             return {
                 initialized: initialized,
                 uiInitialized: uiInitialized,
                 telegramInitialized: telegramInitialized,
+                profileInitialized: profileInitialized,
                 gamesLoaded: app.loading.gamesInitialized
             };
         }
     };
 })();
 
-// Register casinoApp in global namespace
+// Регистрируем casinoApp в глобальном пространстве имен
 window.casinoApp = casinoApp;
 
-// Start application initialization automatically
-// (with safe error handling)
+// Запускаем инициализацию приложения автоматически
+// (с безопасной обработкой ошибок)
 setTimeout(function() {
     try {
-        app.log('Main', 'Automatic initialization start');
+        app.log('Main', 'Автоматический запуск инициализации');
         
         casinoApp.init().catch(function(error) {
-            app.log('Main', `Initialization error: ${error.message}`, true);
+            app.log('Main', `Ошибка инициализации: ${error.message}`, true);
             
-            // In case of error, forcibly remove loading screen
+            // В случае ошибки, принудительно удаляем экран загрузки
             if (window.appLoader && typeof window.appLoader.forceRemoveLoading === 'function') {
                 window.appLoader.forceRemoveLoading();
             }
         });
     } catch (error) {
-        app.log('Main', `Unhandled initialization error: ${error.message}`, true);
+        app.log('Main', `Необработанная ошибка инициализации: ${error.message}`, true);
         
-        // Last resort - remove loading screen directly
+        // Крайний случай - удаляем экран загрузки напрямую
         const loadingOverlay = document.getElementById('loadingOverlay');
         if (loadingOverlay) {
             loadingOverlay.style.display = 'none';
@@ -1051,4 +1209,4 @@ setTimeout(function() {
             appContent.classList.add('loaded');
         }
     }
-}, 100); // Small delay to complete DOM loading
+}, 100); // Небольшая задержка для завершения загрузки DOM
