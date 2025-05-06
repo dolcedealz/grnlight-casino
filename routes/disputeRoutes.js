@@ -2,37 +2,22 @@ const express = require('express');
 const router = express.Router();
 const disputeController = require('../controllers/disputeController');
 
-// Создание спора
+// Получение всех активных споров
+router.get('/all', disputeController.getAllDisputes);
+
+// Получение спора по ID
+router.get('/:id', disputeController.getDisputeById);
+
+// Создание нового спора
 router.post('/create', disputeController.createDispute);
 
 // Принятие спора
-router.post('/:disputeId/accept', disputeController.acceptDispute);
+router.post('/accept', disputeController.acceptDispute);
 
-// Отклонение спора
-router.post('/:disputeId/decline', disputeController.declineDispute);
+// Получение результата спора
+router.post('/result', disputeController.getDisputeResult);
 
-// Сделать выбор в споре (Да/Нет)
-router.post('/:disputeId/choose', disputeController.makeChoice);
-
-// Голосование
-router.post('/:disputeId/vote', disputeController.vote);
-
-// Завершение спора
-router.post('/:disputeId/resolve', disputeController.resolveDispute);
-
-// Получение активных голосований
-router.get('/active-votings', disputeController.getActiveVotings);
-
-// Получение информации о конкретном споре
-router.get('/:disputeId', disputeController.getDispute);
-
-// Получение споров пользователя
-router.get('/user/:userId', disputeController.getUserDisputes);
-
-// Отмена спора
-router.post('/:disputeId/cancel', disputeController.cancelDispute);
-
-// Проверка истекших голосований (можно вызывать по cron)
-router.post('/check-expired', disputeController.checkExpiredVotings);
+// Получение истории споров пользователя
+router.get('/history/:telegramId', disputeController.getUserDisputeHistory);
 
 module.exports = router;

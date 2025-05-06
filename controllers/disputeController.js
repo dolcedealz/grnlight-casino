@@ -1,193 +1,254 @@
-// controllers/disputeController.js
 const Dispute = require('../models/Dispute');
 const User = require('../models/User');
 const Transaction = require('../models/Transaction');
 
-// Get dispute by ID
+// Получение всех активных споров
+exports.getAllDisputes = async (req, res) => {
+    try {
+        const disputes = await Dispute.find({ status: 'active' })
+            .populate('creator', 'telegramId firstName lastName username')
+            .populate('opponent', 'telegramId firstName lastName username')
+            .sort({ createdAt: -1 });
+        
+        res.status(200).json(disputes);
+    } catch (error) {
+        console.error('Ошибка при получении списка споров:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
+// Получение спора по ID
 exports.getDisputeById = async (req, res) => {
-  try {
-    const { id } = req.params;
-    
-    const dispute = await Dispute.findById(id);
-    
-    if (!dispute) {
-      return res.status(404).json({ message: 'Dispute not found' });
+    try {
+        const { id } = req.params;
+        
+        const dispute = await Dispute.findById(id)
+            .populate('creator', 'telegramId firstName lastName username')
+            .populate('opponent', 'telegramId firstName lastName username');
+        
+        if (!dispute) {
+            return res.status(404).json({ message: 'Спор не найден' });
+        }
+        
+        res.status(200).json(dispute);
+    } catch (error) {
+        console.error('Ошибка при получении спора:', error);
+        res.status(500).json({ message: 'Server error' });
     }
-    
-    // Get creator and opponent details
-    const creator = await User.findOne({ telegramId: dispute.creatorTelegramId });
-    const opponent = await User.findOne({ telegramId: dispute.opponentTelegramId });
-    
-    // Format response
-    const response = {
-      id: dispute._id,
-      creator: {
-        telegramId: dispute.creatorTelegramId,
-        username: creator ? creator.username : 'Unknown',
-        side: dispute.creatorSide
-      },
-      opponent: {
-        telegramId: dispute.opponentTelegramId,
-        username: opponent ? opponent.username : 'Unknown',
-        side: dispute.opponentSide
-      },
-      amount: dispute.amount,
-      subject: dispute.subject,
-      status: dispute.status,
-      result: dispute.result,
-      winnerId: dispute.winnerTelegramId,
-      commissionAmount: dispute.commissionAmount,
-      createdAt: dispute.createdAt,
-      completedAt: dispute.completedAt
-    };
-    
-    res.status(200).json(response);
-    
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error' });
-  }
 };
 
-// Update dispute result
-exports.updateDisputeResult = async (req, res) => {
-  try {
-    const { disputeId, result, winnerId } = req.body;
-    
-    const dispute = await Dispute.findById(disputeId);
-    
-    if (!dispute) {
-      return res.status(404).json({ message: 'Dispute not found' });
+// Создание нового спора
+exports.createDispute = async (req, res) => {
+    try {
+        const { creatorTelegramId, question, betAmount } = req.body;
+        
+        // Проверяем создателя
+        const creator = await User.findOne({ telegramId: creatorTelegramId });
+        if (!creator) {
+            return res.status(404).json({ message: 'Пользователь не найден' });
+        }
+        
+        // Проверяем баланс
+        if (creator.balance < betAmount) {
+            return res.status(400).json({ message: 'Недостаточно средств' });
+        }
+        
+        // Создаем новый спор
+        const dispute = new Dispute({
+            creator: creator._id,
+            creatorTelegramId,
+            question,
+            bet: {
+                amount: betAmount,
+                creatorChoice: null,
+                opponentChoice: null
+            },
+            status: 'pending'
+        });
+        
+        await dispute.save();
+        
+        res.status(201).json(dispute);
+    } catch (error) {
+        console.error('Ошибка при создании спора:', error);
+        res.status(500).json({ message: 'Server error' });
     }
-    
-    // Only allow updating pending or accepted disputes
-    if (dispute.status !== 'accepted') {
-      return res.status(400).json({ message: 'This dispute cannot be updated' });
-    }
-    
-    // Validate result
-    if (result !== 'heads' && result !== 'tails') {
-      return res.status(400).json({ message: 'Invalid result' });
-    }
-    
-    // Validate winner
-    if (winnerId !== dispute.creatorTelegramId && winnerId !== dispute.opponentTelegramId) {
-      return res.status(400).json({ message: 'Invalid winner ID' });
-    }
-    
-    // Find winner and loser
-    const winner = await User.findOne({ telegramId: winnerId });
-    const loser = await User.findOne({ 
-      telegramId: winnerId === dispute.creatorTelegramId ? 
-        dispute.opponentTelegramId : dispute.creatorTelegramId 
-    });
-    
-    if (!winner || !loser) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-    
-    // Calculate win amount with 5% commission
-    const totalAmount = dispute.amount * 2;
-    const commission = Math.floor(totalAmount * 0.05);
-    const winAmount = totalAmount - commission;
-    
-    // Update dispute
-    dispute.result = result;
-    dispute.status = 'completed';
-    dispute.completedAt = new Date();
-    dispute.winnerId = winner._id;
-    dispute.winnerTelegramId = winnerId;
-    dispute.commissionAmount = commission;
-    
-    // Update winner's balance
-    winner.balance += winAmount;
-    await winner.save();
-    
-    // Record transaction
-    const winTransaction = new Transaction({
-      userId: winner._id,
-      telegramId: winnerId,
-      amount: winAmount,
-      type: 'win',
-      game: 'dispute'
-    });
-    
-    await winTransaction.save();
-    
-    // Save dispute
-    await dispute.save();
-    
-    res.status(200).json({ 
-      success: true,
-      dispute: {
-        id: dispute._id,
-        result,
-        winnerId,
-        winAmount,
-        commission
-      }
-    });
-    
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error' });
-  }
 };
 
-// Get user disputes
-exports.getUserDisputes = async (req, res) => {
-  try {
-    const { telegramId } = req.params;
-    
-    // Find user
-    const user = await User.findOne({ telegramId: parseInt(telegramId) });
-    
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+// Принятие спора
+exports.acceptDispute = async (req, res) => {
+    try {
+        const { disputeId, opponentTelegramId } = req.body;
+        
+        // Проверяем спор
+        const dispute = await Dispute.findById(disputeId);
+        if (!dispute) {
+            return res.status(404).json({ message: 'Спор не найден' });
+        }
+        
+        if (dispute.status !== 'pending') {
+            return res.status(400).json({ message: 'Спор уже принят или завершен' });
+        }
+        
+        // Проверяем оппонента
+        const opponent = await User.findOne({ telegramId: opponentTelegramId });
+        if (!opponent) {
+            return res.status(404).json({ message: 'Пользователь не найден' });
+        }
+        
+        // Проверяем, не пытается ли создатель принять свой же спор
+        if (dispute.creatorTelegramId === opponentTelegramId) {
+            return res.status(400).json({ message: 'Вы не можете принять свой собственный спор' });
+        }
+        
+        // Проверяем баланс
+        if (opponent.balance < dispute.bet.amount) {
+            return res.status(400).json({ message: 'Недостаточно средств' });
+        }
+        
+        // Создаем случайные стороны для спора
+        const creatorSide = Math.random() < 0.5 ? 'heads' : 'tails';
+        const opponentSide = creatorSide === 'heads' ? 'tails' : 'heads';
+        
+        // Обновляем спор
+        dispute.opponent = opponent._id;
+        dispute.opponentTelegramId = opponentTelegramId;
+        dispute.status = 'active';
+        dispute.creatorSide = creatorSide;
+        dispute.opponentSide = opponentSide;
+        
+        await dispute.save();
+        
+        // Блокируем средства обоих участников
+        const creator = await User.findById(dispute.creator);
+        creator.balance -= dispute.bet.amount;
+        opponent.balance -= dispute.bet.amount;
+        
+        await creator.save();
+        await opponent.save();
+        
+        // Записываем транзакции
+        const creatorTransaction = new Transaction({
+            userId: creator._id,
+            telegramId: creator.telegramId,
+            amount: -dispute.bet.amount,
+            type: 'bet',
+            game: 'dispute'
+        });
+        
+        const opponentTransaction = new Transaction({
+            userId: opponent._id,
+            telegramId: opponent.telegramId,
+            amount: -dispute.bet.amount,
+            type: 'bet',
+            game: 'dispute'
+        });
+        
+        await creatorTransaction.save();
+        await opponentTransaction.save();
+        
+        res.status(200).json(dispute);
+    } catch (error) {
+        console.error('Ошибка при принятии спора:', error);
+        res.status(500).json({ message: 'Server error' });
     }
-    
-    // Find disputes where user is creator or opponent
-    const disputes = await Dispute.find({
-      $or: [
-        { creatorTelegramId: parseInt(telegramId) },
-        { opponentTelegramId: parseInt(telegramId) }
-      ]
-    }).sort({ createdAt: -1 });
-    
-    // Format response
-    const formattedDisputes = await Promise.all(disputes.map(async (dispute) => {
-      // Determine if user won
-      const userWon = dispute.status === 'completed' && 
-        dispute.winnerTelegramId === parseInt(telegramId);
-      
-      // Get opponent info
-      const opponentId = parseInt(telegramId) === dispute.creatorTelegramId ? 
-        dispute.opponentTelegramId : dispute.creatorTelegramId;
-      
-      const opponent = await User.findOne({ telegramId: opponentId });
-      
-      return {
-        id: dispute._id,
-        subject: dispute.subject,
-        amount: dispute.amount,
-        status: dispute.status,
-        result: dispute.result,
-        userSide: parseInt(telegramId) === dispute.creatorTelegramId ? 
-          dispute.creatorSide : dispute.opponentSide,
-        opponent: {
-          telegramId: opponentId,
-          username: opponent ? opponent.username : 'Unknown'
-        },
-        userWon: userWon,
-        createdAt: dispute.createdAt,
-        completedAt: dispute.completedAt
-      };
-    }));
-    
-    res.status(200).json(formattedDisputes);
-    
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error' });
-  }
+};
+
+// Получение результата спора
+exports.getDisputeResult = async (req, res) => {
+    try {
+        const { disputeId } = req.body;
+        
+        // Проверяем спор
+        const dispute = await Dispute.findById(disputeId)
+            .populate('creator', 'telegramId firstName lastName username')
+            .populate('opponent', 'telegramId firstName lastName username');
+        
+        if (!dispute) {
+            return res.status(404).json({ message: 'Спор не найден' });
+        }
+        
+        if (dispute.status !== 'active') {
+            return res.status(400).json({ message: 'Спор не активен или уже завершен' });
+        }
+        
+        // Генерируем результат - "heads" или "tails"
+        const result = Math.random() < 0.5 ? 'heads' : 'tails';
+        
+        // Определяем победителя
+        const creatorWins = (dispute.creatorSide === result);
+        const winner = creatorWins ? dispute.creator : dispute.opponent;
+        const winnerId = creatorWins ? dispute.creator._id : dispute.opponent._id;
+        const winnerTelegramId = creatorWins ? dispute.creatorTelegramId : dispute.opponentTelegramId;
+        
+        // Вычисляем сумму выигрыша с комиссией 5%
+        const totalAmount = dispute.bet.amount * 2;
+        const commission = Math.floor(totalAmount * 0.05);
+        const winAmount = totalAmount - commission;
+        
+        // Обновляем спор
+        dispute.result = result;
+        dispute.winner = winnerId;
+        dispute.winnerTelegramId = winnerTelegramId;
+        dispute.commission = commission;
+        dispute.status = 'completed';
+        dispute.completedAt = new Date();
+        
+        await dispute.save();
+        
+        // Обновляем баланс победителя
+        const winnerUser = await User.findById(winnerId);
+        winnerUser.balance += winAmount;
+        await winnerUser.save();
+        
+        // Записываем транзакцию выигрыша
+        const winTransaction = new Transaction({
+            userId: winnerId,
+            telegramId: winnerTelegramId,
+            amount: winAmount,
+            type: 'win',
+            game: 'dispute'
+        });
+        
+        await winTransaction.save();
+        
+        res.status(200).json({
+            dispute,
+            result,
+            winnerTelegramId,
+            winAmount,
+            commission
+        });
+    } catch (error) {
+        console.error('Ошибка при получении результата спора:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
+// Получение истории споров пользователя
+exports.getUserDisputeHistory = async (req, res) => {
+    try {
+        const { telegramId } = req.params;
+        
+        const user = await User.findOne({ telegramId });
+        if (!user) {
+            return res.status(404).json({ message: 'Пользователь не найден' });
+        }
+        
+        // Находим все споры, где пользователь является создателем или оппонентом
+        const disputes = await Dispute.find({
+            $or: [
+                { creatorTelegramId: telegramId },
+                { opponentTelegramId: telegramId }
+            ]
+        })
+        .populate('creator', 'telegramId firstName lastName username')
+        .populate('opponent', 'telegramId firstName lastName username')
+        .sort({ createdAt: -1 });
+        
+        res.status(200).json(disputes);
+    } catch (error) {
+        console.error('Ошибка при получении истории споров:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
 };
