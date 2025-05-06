@@ -39,6 +39,7 @@ app.use('/api/games', require('./routes/gameRoutes'));
 app.use('/api/admin', require('./routes/adminRoutes'));
 app.use('/api/disputes', require('./routes/disputeRoutes')); // Добавляем новый роут для споров
 
+
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });

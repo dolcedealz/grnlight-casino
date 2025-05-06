@@ -1,273 +1,152 @@
 const mongoose = require('mongoose');
 
 const disputeSchema = new mongoose.Schema({
-  creator: {
+  creatorId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true
   },
-  opponent: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
+  creatorTelegramId: {
+    type: Number,
     required: true
   },
-  question: {
+  opponentId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  opponentTelegramId: {
+    type: Number,
+    default: null
+  },
+  creatorSide: {
     type: String,
-    required: true
+    enum: ['heads', 'tails'],
+    default: null
   },
-  bet: {
-    amount: {
-      type: Number,
-      required: true
-    },
-    creatorChoice: {
-      type: Boolean,
-      default: null
-    },
-    opponentChoice: {
-      type: Boolean,
-      default: null
-    }
+  opponentSide: {
+    type: String,
+    enum: ['heads', 'tails'],
+    default: null
+  },
+  amount: {
+    type: Number,
+    required: true,
+    min: 1
+  },
+  subject: {
+    type: String,
+    required: true,
+    trim: true,
+    maxlength: 200
   },
   status: {
     type: String,
-    enum: ['pending', 'active', 'voting', 'resolved', 'cancelled'],
+    enum: ['pending', 'accepted', 'rejected', 'completed', 'canceled'],
     default: 'pending'
   },
   result: {
-    winner: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-      default: null
-    },
-    loser: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-      default: null
-    },
-    isDraw: {
-      type: Boolean,
-      default: false
-    }
+    type: String,
+    enum: ['heads', 'tails', null],
+    default: null
   },
-  voting: {
-    startedAt: {
-      type: Date,
-      default: null
-    },
-    endedAt: {
-      type: Date,
-      default: null
-    },
-    votes: [{
-      voter: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User'
-      },
-      voteFor: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User'
-      },
-      votedAt: {
-        type: Date,
-        default: Date.now
-      }
-    }],
-    totalVotes: {
-      type: Number,
-      default: 0
-    }
+  winnerId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
   },
-  metadata: {
-    createdVia: {
-      type: String,
-      enum: ['inline', 'command', 'web'],
-      default: 'command'
-    },
-    inlineMessageId: String,
-    chatId: String
+  winnerTelegramId: {
+    type: Number,
+    default: null
+  },
+  messageId: {
+    type: Number,
+    default: null
+  },
+  chatId: {
+    type: Number,
+    default: null
+  },
+  commissionAmount: {
+    type: Number,
+    default: 0
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  },
+  completedAt: {
+    type: Date,
+    default: null
   }
-}, {
-  timestamps: true
 });
 
-// Индексы для оптимизации запросов
-disputeSchema.index({ creator: 1, opponent: 1 });
-disputeSchema.index({ status: 1 });
-disputeSchema.index({ 'voting.endedAt': 1 });
-
-// Виртуальные свойства
-disputeSchema.virtual('isActive').get(function() {
-  return this.status === 'active';
-});
-
-disputeSchema.virtual('isVoting').get(function() {
-  return this.status === 'voting';
-});
-
-disputeSchema.virtual('isResolved').get(function() {
-  return this.status === 'resolved';
-});
-
-disputeSchema.virtual('canVote').get(function() {
-  return this.status === 'voting' && (!this.voting.endedAt || this.voting.endedAt > new Date());
-});
-
-// Методы экземпляра
-disputeSchema.methods.activate = async function() {
-  this.status = 'active';
-  await this.save();
-  return this;
+// Helper methods for the dispute model
+disputeSchema.methods.accept = function(opponentId, opponentTelegramId, opponentSide) {
+  this.opponentId = opponentId;
+  this.opponentTelegramId = opponentTelegramId;
+  this.opponentSide = opponentSide;
+  this.status = 'accepted';
+  return this.save();
 };
 
-disputeSchema.methods.startVoting = async function(duration = 24) {
-  this.status = 'voting';
-  this.voting.startedAt = new Date();
-  this.voting.endedAt = new Date(Date.now() + duration * 60 * 60 * 1000); // duration в часах
-  await this.save();
-  return this;
+disputeSchema.methods.reject = function() {
+  this.status = 'rejected';
+  return this.save();
 };
 
-disputeSchema.methods.addVote = async function(voterId, voteForId) {
-  // Проверяем, может ли голосовать
-  if (!this.canVote) {
-    throw new Error('Голосование завершено или не начато');
-  }
-
-  // Проверяем, не голосовал ли уже
-  const existingVote = this.voting.votes.find(v => 
-    v.voter.toString() === voterId.toString()
-  );
-
-  if (existingVote) {
-    throw new Error('Вы уже голосовали');
-  }
-
-  // Проверяем, что голос за одного из участников
-  if (voteForId.toString() !== this.creator.toString() && 
-      voteForId.toString() !== this.opponent.toString()) {
-    throw new Error('Можно голосовать только за участников спора');
-  }
-
-  // Добавляем голос
-  this.voting.votes.push({
-    voter: voterId,
-    voteFor: voteForId,
-    votedAt: new Date()
-  });
-
-  this.voting.totalVotes += 1;
-  await this.save();
-  return this;
+disputeSchema.methods.cancel = function() {
+  this.status = 'canceled';
+  return this.save();
 };
 
-disputeSchema.methods.resolveByVoting = async function() {
-  if (this.status !== 'voting') {
-    throw new Error('Спор не находится в статусе голосования');
-  }
-
-  // Подсчитываем голоса
-  const votesForCreator = this.voting.votes.filter(v => 
-    v.voteFor.toString() === this.creator.toString()
-  ).length;
-
-  const votesForOpponent = this.voting.votes.filter(v => 
-    v.voteFor.toString() === this.opponent.toString()
-  ).length;
-
-  // Определяем победителя
-  if (votesForCreator > votesForOpponent) {
-    this.result.winner = this.creator;
-    this.result.loser = this.opponent;
-  } else if (votesForOpponent > votesForCreator) {
-    this.result.winner = this.opponent;
-    this.result.loser = this.creator;
-  } else {
-    this.result.isDraw = true;
-  }
-
-  this.status = 'resolved';
-  this.voting.endedAt = new Date();
-
-  await this.save();
-  return this;
-};
-
-disputeSchema.methods.cancel = async function() {
-  if (this.status === 'resolved') {
-    throw new Error('Нельзя отменить завершенный спор');
+disputeSchema.methods.complete = function(result) {
+  if (result !== 'heads' && result !== 'tails') {
+    throw new Error('Result must be either heads or tails');
   }
   
-  this.status = 'cancelled';
-  await this.save();
-  return this;
+  this.result = result;
+  this.status = 'completed';
+  this.completedAt = new Date();
+  
+  // Determine the winner
+  if (this.creatorSide === result) {
+    this.winnerId = this.creatorId;
+    this.winnerTelegramId = this.creatorTelegramId;
+  } else if (this.opponentSide === result) {
+    this.winnerId = this.opponentId;
+    this.winnerTelegramId = this.opponentTelegramId;
+  }
+  
+  return this.save();
 };
 
-// Статические методы
-disputeSchema.statics.findActive = function() {
-  return this.find({ status: 'active' });
-};
-
-disputeSchema.statics.findByParticipant = function(userId) {
+// Static methods
+disputeSchema.statics.findPendingForUser = function(telegramId) {
   return this.find({
     $or: [
-      { creator: userId },
-      { opponent: userId }
+      { creatorTelegramId: telegramId, status: 'pending' },
+      { opponentTelegramId: telegramId, status: 'pending' }
     ]
   });
 };
 
-disputeSchema.statics.findPendingForUser = function(userId) {
+disputeSchema.statics.findActiveForUser = function(telegramId) {
   return this.find({
-    opponent: userId,
-    status: 'pending'
+    $or: [
+      { creatorTelegramId: telegramId, status: 'accepted' },
+      { opponentTelegramId: telegramId, status: 'accepted' }
+    ]
   });
 };
 
-disputeSchema.statics.findActiveVotings = function() {
+disputeSchema.statics.findCompletedForUser = function(telegramId) {
   return this.find({
-    status: 'voting',
-    'voting.endedAt': { $gt: new Date() }
+    $or: [
+      { creatorTelegramId: telegramId, status: 'completed' },
+      { opponentTelegramId: telegramId, status: 'completed' }
+    ]
   });
 };
-
-// Автоматическое завершение голосования
-disputeSchema.statics.checkAndResolveExpiredVotings = async function() {
-  const expiredVotings = await this.find({
-    status: 'voting',
-    'voting.endedAt': { $lte: new Date() }
-  });
-
-  for (const dispute of expiredVotings) {
-    try {
-      await dispute.resolveByVoting();
-    } catch (error) {
-      console.error(`Failed to resolve dispute ${dispute._id}:`, error);
-    }
-  }
-};
-
-// Middleware для проверки баланса перед сохранением
-disputeSchema.pre('save', async function(next) {
-  if (this.isNew) {
-    const User = mongoose.model('User');
-    
-    // Проверяем баланс создателя
-    const creator = await User.findById(this.creator);
-    if (!creator || creator.balance < this.bet.amount) {
-      throw new Error('Недостаточно средств у создателя');
-    }
-
-    // Если спор уже принят, проверяем баланс оппонента
-    if (this.status === 'active') {
-      const opponent = await User.findById(this.opponent);
-      if (!opponent || opponent.balance < this.bet.amount) {
-        throw new Error('Недостаточно средств у оппонента');
-      }
-    }
-  }
-  
-  next();
-});
 
 module.exports = mongoose.model('Dispute', disputeSchema);
