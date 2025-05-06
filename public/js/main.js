@@ -15,10 +15,15 @@ if (!window.GreenLightApp) {
         games: {},
         user: {
             telegramId: null,
-            firstName: 'Player',
+            firstName: 'Игрок',
             lastName: '',
             username: '',
-            balance: 1000
+            balance: 1000,
+            activity: {
+                points: 215,
+                dailyRolled: 0,
+                lastReset: null
+            }
         }
     };
 }
@@ -42,7 +47,7 @@ const casinoApp = (function() {
     let profileInitialized = false;
     
     // Поддерживаемые игры
-    const supportedGames = ['slots', 'roulette', 'guessnumber', 'miner', 'crush'];
+    const supportedGames = ['slots', 'miner', 'coinflip', 'crush', 'events'];
     
     // Инициализация приложения - основная точка входа
     const init = async function() {
@@ -137,6 +142,9 @@ const casinoApp = (function() {
             // Начальное обновление баланса
             updateBalance();
             
+            // Инициализация шкалы активности
+            initActivityBar();
+            
             // Отмечаем успешную инициализацию UI
             uiInitialized = true;
             app.loading.uiReady = true;
@@ -147,6 +155,33 @@ const casinoApp = (function() {
         } catch (error) {
             app.log('Main', `Ошибка инициализации UI: ${error.message}`, true);
             throw error; // Пробрасываем ошибку, так как UI критичен
+        }
+    };
+    
+    // Инициализация шкалы активности
+    const initActivityBar = function() {
+        try {
+            const activityBar = document.getElementById('activity-progress');
+            if (activityBar) {
+                // Загружаем данные из localStorage
+                const savedRolled = localStorage.getItem('dailyRolled');
+                if (savedRolled) {
+                    app.user.activity.dailyRolled = parseInt(savedRolled);
+                }
+                
+                // Максимальное количество для заполнения шкалы
+                const maxDailyActivity = 15000;
+                
+                // Рассчитываем процент заполнения
+                const percentage = Math.min(100, (app.user.activity.dailyRolled / maxDailyActivity) * 100);
+                
+                // Обновляем ширину полосы
+                activityBar.style.width = percentage + '%';
+                
+                app.log('Main', `Шкала активности инициализирована: ${percentage}%`);
+            }
+        } catch (error) {
+            app.log('Main', `Ошибка инициализации шкалы активности: ${error.message}`, true);
         }
     };
     
@@ -174,7 +209,7 @@ const casinoApp = (function() {
                 
                 // Обновляем данные пользователя
                 app.user.telegramId = user.id;
-                app.user.firstName = user.first_name || 'Player';
+                app.user.firstName = user.first_name || 'Игрок';
                 app.user.lastName = user.last_name || '';
                 app.user.username = user.username || '';
                 
@@ -219,57 +254,160 @@ const casinoApp = (function() {
         app.log('Main', 'Инициализация модуля профиля');
         
         try {
-            // Проверка наличия модуля профиля
-            if (window.profileManager) {
-                app.log('Main', 'Модуль профиля уже загружен');
-                
-                // Если есть метод init, вызываем его
-                if (typeof window.profileManager.init === 'function') {
-                    await window.profileManager.init();
-                    app.log('Main', 'Модуль профиля инициализирован');
-                }
-                
-                return true;
+            // Загружаем данные активности из localStorage
+            const activityPoints = localStorage.getItem('activityPoints');
+            if (activityPoints) {
+                app.user.activity.points = parseInt(activityPoints);
             }
             
-            // Динамическая загрузка скрипта profile.js
-            return new Promise((resolve) => {
-                app.log('Main', 'Загрузка скрипта profile.js');
-                
-                const script = document.createElement('script');
-                script.src = 'js/profile.js';
-                script.async = true;
-                
-                script.onload = async function() {
-                    app.log('Main', 'Скрипт profile.js загружен');
-                    
-                    // Проверяем наличие объекта и инициализируем его
-                    if (window.profileManager && typeof window.profileManager.init === 'function') {
-                        try {
-                            await window.profileManager.init();
-                            app.log('Main', 'Модуль профиля инициализирован успешно');
-                            resolve(true);
-                        } catch (initError) {
-                            app.log('Main', `Ошибка инициализации модуля профиля: ${initError.message}`, true);
-                            resolve(false);
-                        }
-                    } else {
-                        app.log('Main', 'Модуль profileManager не найден или не имеет метода init', true);
-                        resolve(false);
-                    }
-                };
-                
-                script.onerror = function() {
-                    app.log('Main', 'Ошибка загрузки скрипта profile.js', true);
-                    resolve(false);
-                };
-                
-                document.body.appendChild(script);
-            });
+            // Проверяем дату последнего сброса
+            const today = new Date().toDateString();
+            const lastReset = localStorage.getItem('lastActivityReset');
+            
+            // Если новый день или первый запуск, сбрасываем счетчик
+            if (lastReset !== today) {
+                app.user.activity.dailyRolled = 0;
+                localStorage.setItem('lastActivityReset', today);
+                localStorage.setItem('dailyRolled', '0');
+            } else {
+                // Иначе загружаем сохраненное значение
+                const savedRolled = localStorage.getItem('dailyRolled');
+                app.user.activity.dailyRolled = savedRolled ? parseInt(savedRolled) : 0;
+            }
+            
+            // Обновляем отображение точек активности
+            const activityPointsEl = document.getElementById('activity-points');
+            if (activityPointsEl) {
+                activityPointsEl.textContent = app.user.activity.points;
+            }
+            
+            // Настройка обработчиков событий профиля
+            setupProfileHandlers();
+            
+            app.log('Main', 'Профиль инициализирован успешно');
+            return true;
             
         } catch (error) {
             app.log('Main', `Ошибка инициализации профиля: ${error.message}`, true);
             return false;
+        }
+    };
+    
+    // Настройка обработчиков для элементов профиля
+    const setupProfileHandlers = function() {
+        try {
+            // Обработчик кнопки пополнения
+            const depositBtn = document.querySelector('.deposit-button');
+            if (depositBtn) {
+                depositBtn.addEventListener('click', function() {
+                    showNotification('Функция пополнения будет доступна в ближайшее время');
+                });
+            }
+            
+            // Обработчик кнопки вывода
+            const withdrawBtn = document.querySelector('.withdraw-button');
+            if (withdrawBtn) {
+                withdrawBtn.addEventListener('click', function() {
+                    showNotification('Функция вывода будет доступна в ближайшее время');
+                });
+            }
+            
+            // Обработчик ввода промокода
+            const promoInput = document.getElementById('promo-code');
+            if (promoInput) {
+                promoInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        applyPromoCode(this.value);
+                    }
+                });
+            }
+            
+            app.log('Main', 'Обработчики профиля настроены');
+        } catch (error) {
+            app.log('Main', `Ошибка настройки обработчиков профиля: ${error.message}`, true);
+        }
+    };
+    
+    // Применение промокода
+    const applyPromoCode = function(code) {
+        if (!code) return;
+        
+        try {
+            // Здесь должна быть логика проверки промокода
+            // Для демонстрации используем фиксированные коды
+            const promoCodes = {
+                'WELCOME': 500,
+                'BONUS50': 50,
+                'VIP100': 100
+            };
+            
+            if (promoCodes[code]) {
+                // Добавляем бонус к балансу
+                app.user.balance += promoCodes[code];
+                
+                // Обновляем отображаемый баланс
+                updateBalance();
+                
+                // Добавляем активность
+                const bonusActivity = addActivityPoints(promoCodes[code]);
+                
+                showNotification(`Промокод ${code} успешно применен! Вы получили ${promoCodes[code]} звезд и ${bonusActivity} очков активности.`);
+            } else {
+                showNotification('Неверный промокод или срок его действия истек');
+            }
+            
+            // Очищаем поле ввода
+            document.getElementById('promo-code').value = '';
+        } catch (error) {
+            app.log('Main', `Ошибка применения промокода: ${error.message}`, true);
+            showNotification('Произошла ошибка при применении промокода');
+        }
+    };
+    
+    // Добавление активности (при вращении звезд)
+    const addActivityPoints = function(amount) {
+        try {
+            // Добавляем к дневному счетчику прокрученных звезд
+            app.user.activity.dailyRolled += amount;
+            localStorage.setItem('dailyRolled', app.user.activity.dailyRolled.toString());
+            
+            // Рассчитываем бонусные очки (1 очко за каждые 100 звезд)
+            const bonusPoints = Math.floor(amount / 100);
+            app.user.activity.points += bonusPoints;
+            localStorage.setItem('activityPoints', app.user.activity.points.toString());
+            
+            // Обновляем отображение
+            updateActivityDisplay();
+            
+            return bonusPoints;
+        } catch (error) {
+            app.log('Main', `Ошибка добавления активности: ${error.message}`, true);
+            return 0;
+        }
+    };
+    
+    // Обновление отображения активности
+    const updateActivityDisplay = function() {
+        try {
+            const activityPoints = document.getElementById('activity-points');
+            const activityProgress = document.getElementById('activity-progress');
+            
+            if (activityPoints) {
+                activityPoints.textContent = app.user.activity.points;
+            }
+            
+            if (activityProgress) {
+                // Максимальное количество для заполнения шкалы (15000 звезд)
+                const maxDailyActivity = 15000;
+                
+                // Рассчитываем процент заполнения
+                const percentage = Math.min(100, (app.user.activity.dailyRolled / maxDailyActivity) * 100);
+                
+                // Обновляем ширину полосы
+                activityProgress.style.width = percentage + '%';
+            }
+        } catch (error) {
+            app.log('Main', `Ошибка обновления отображения активности: ${error.message}`, true);
         }
     };
     
@@ -282,6 +420,9 @@ const casinoApp = (function() {
             try {
                 // Инициализируем каждую игру
                 supportedGames.forEach(function(gameType) {
+                    // Пропускаем "events", так как это не реальная игра
+                    if (gameType === 'events') return;
+                    
                     const objectName = gameType + 'Game';
                     
                     // Безопасно инициализируем игру
@@ -409,18 +550,11 @@ const casinoApp = (function() {
         
         try {
             // Обработчики для карточек игр
-            const gameCards = document.querySelectorAll('.game-card');
+            const gameCards = document.querySelectorAll('.game-card, .events-card');
             gameCards.forEach(function(card) {
                 card.addEventListener('click', function(e) {
                     const game = card.getAttribute('data-game');
                     if (!game) return;
-                    
-                    // Игнорируем неподдерживаемые игры
-                    if (!supportedGames.includes(game)) {
-                        app.log('Main', `Игра ${game} не поддерживается`, true);
-                        showNotification('Эта игра не доступна');
-                        return;
-                    }
                     
                     app.log('Main', `Выбрана игра: ${game}`);
                     
@@ -469,7 +603,7 @@ const casinoApp = (function() {
             
             if (homeBtn) {
                 homeBtn.addEventListener('click', function() {
-                    app.log('Main', 'Нажата кнопка "Home"');
+                    app.log('Main', 'Нажата кнопка "Главная"');
                     provideTactileFeedback('light');
                     
                     activateWelcomeScreen();
@@ -479,7 +613,7 @@ const casinoApp = (function() {
             
             if (historyBtn) {
                 historyBtn.addEventListener('click', function() {
-                    app.log('Main', 'Нажата кнопка "History"');
+                    app.log('Main', 'Нажата кнопка "История"');
                     provideTactileFeedback('light');
                     
                     // Загружаем историю игр
@@ -500,24 +634,19 @@ const casinoApp = (function() {
             
             if (profileBtn) {
                 profileBtn.addEventListener('click', function() {
-                    app.log('Main', 'Нажата кнопка "Profile"');
+                    app.log('Main', 'Нажата кнопка "Профиль"');
                     provideTactileFeedback('light');
                     
-                    // Используем profileManager если он доступен
-                    if (window.profileManager && typeof window.profileManager.showProfile === 'function') {
-                        window.profileManager.showProfile();
-                    } else {
-                        // Запасной вариант - стандартная функциональность
-                        getTransactionHistory()
-                            .catch(function(error) {
-                                app.log('Main', `Ошибка загрузки транзакций: ${error.message}`, true);
-                            });
-                        
-                        // Показываем модальное окно профиля
-                        const profileModal = document.getElementById('profile-modal');
-                        if (profileModal) {
-                            showModal(profileModal);
-                        }
+                    // Скрываем все экраны
+                    document.querySelectorAll('.screen').forEach(screen => {
+                        screen.classList.remove('active');
+                    });
+                    
+                    // Показываем экран профиля
+                    const profileScreen = document.getElementById('profile-screen');
+                    if (profileScreen) {
+                        profileScreen.classList.add('active');
+                        updateBalanceDisplay();
                     }
                     
                     updateActiveNavButton(profileBtn);
@@ -701,8 +830,6 @@ const casinoApp = (function() {
     const updateBalance = function() {
         try {
             const balanceAmount = document.getElementById('balance-amount');
-            const profileBalance = document.getElementById('profile-balance');
-            const userName = document.getElementById('user-name');
             
             if (balanceAmount) {
                 balanceAmount.textContent = app.user.balance;
@@ -714,20 +841,25 @@ const casinoApp = (function() {
                 }, 500);
             }
             
-            if (profileBalance) {
-                profileBalance.textContent = app.user.balance;
-            }
+            // Обновляем отображение баланса в профиле
+            updateBalanceDisplay();
             
-            if (userName) {
-                userName.textContent = app.user.firstName;
-            }
-            
-            // Уведомляем модуль профиля об обновлении баланса
-            if (window.profileManager && typeof window.profileManager.updateBalance === 'function') {
-                window.profileManager.updateBalance(app.user.balance);
-            }
         } catch (error) {
             app.log('Main', `Ошибка обновления баланса: ${error.message}`, true);
+        }
+    };
+    
+    // Обновление отображения баланса в профиле
+    const updateBalanceDisplay = function() {
+        try {
+            const balanceValue = document.getElementById('profile-balance-value');
+            
+            if (balanceValue) {
+                // Отображаем баланс в формате 2.02 (деление на 100)
+                balanceValue.textContent = (app.user.balance / 100).toFixed(2);
+            }
+        } catch (error) {
+            app.log('Main', `Ошибка обновления отображения баланса: ${error.message}`, true);
         }
     };
     
@@ -859,11 +991,6 @@ const casinoApp = (function() {
             app.user.balance = data.balance;
             updateBalance();
             
-            // Уведомляем модуль профиля об обновлении данных
-            if (window.profileManager && typeof window.profileManager.updateProfileData === 'function') {
-                window.profileManager.updateProfileData(data);
-            }
-            
             app.log('Main', 'Профиль пользователя получен успешно');
             
             return data;
@@ -887,13 +1014,8 @@ const casinoApp = (function() {
             
             const data = await response.json();
             
-            // Используем модуль профиля для отображения истории, если доступен
-            if (window.profileManager && typeof window.profileManager.updateGameHistory === 'function') {
-                window.profileManager.updateGameHistory(data);
-            } else {
-                // Иначе используем встроенную функцию
-                updateHistoryList(data);
-            }
+            // Обновляем отображение истории
+            updateHistoryList(data);
             
             app.log('Main', 'История игр получена успешно');
             
@@ -902,11 +1024,7 @@ const casinoApp = (function() {
             app.log('Main', `Ошибка получения истории игр: ${error.message}`, true);
             
             // Показываем пустую историю
-            if (window.profileManager && typeof window.profileManager.updateGameHistory === 'function') {
-                window.profileManager.updateGameHistory([]);
-            } else {
-                updateHistoryList([]);
-            }
+            updateHistoryList([]);
             
             return [];
         }
@@ -925,13 +1043,8 @@ const casinoApp = (function() {
             
             const data = await response.json();
             
-            // Используем модуль профиля для отображения транзакций, если доступен
-            if (window.profileManager && typeof window.profileManager.updateTransactionHistory === 'function') {
-                window.profileManager.updateTransactionHistory(data);
-            } else {
-                // Иначе используем встроенную функцию
-                updateTransactionList(data);
-            }
+            // Обновляем отображение истории транзакций
+            updateTransactionList(data);
             
             app.log('Main', 'История транзакций получена успешно');
             
@@ -940,11 +1053,7 @@ const casinoApp = (function() {
             app.log('Main', `Ошибка получения истории транзакций: ${error.message}`, true);
             
             // Показываем пустую историю транзакций
-            if (window.profileManager && typeof window.profileManager.updateTransactionHistory === 'function') {
-                window.profileManager.updateTransactionHistory([]);
-            } else {
-                updateTransactionList([]);
-            }
+            updateTransactionList([]);
             
             return [];
         }
@@ -959,9 +1068,15 @@ const casinoApp = (function() {
             if (outcome === 'win') {
                 app.user.balance = app.user.balance + winAmount;
                 updateBalance();
+                
+                // Добавляем активность за выигрыш
+                addActivityPoints(winAmount);
             } else if (outcome === 'bet' || outcome === 'lose') {
                 app.user.balance = app.user.balance - betAmount;
                 updateBalance();
+                
+                // Добавляем активность за ставку
+                addActivityPoints(betAmount);
             }
             
             // Отправляем данные на сервер с ограничением времени ожидания
@@ -1031,9 +1146,8 @@ const casinoApp = (function() {
                 let gameIcon = '🎮';
                 switch (item.gameType) {
                     case 'slots': gameIcon = '🎰'; break;
-                    case 'roulette': gameIcon = '🎲'; break;
-                    case 'guessnumber': gameIcon = '🔢'; break;
                     case 'miner': gameIcon = '💣'; break;
+                    case 'coinflip': gameIcon = '🪙'; break;
                     case 'crush': gameIcon = '📈'; break;
                 }
                 
@@ -1164,6 +1278,9 @@ const casinoApp = (function() {
         getUserProfile: getUserProfile,
         getGameHistory: getGameHistory,
         getTransactionHistory: getTransactionHistory,
+        
+        // Методы для активности
+        addActivityPoints: addActivityPoints,
         
         // Метод для проверки состояния приложения
         getStatus: function() {

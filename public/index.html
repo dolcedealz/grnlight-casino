@@ -88,6 +88,84 @@
             opacity: 1;
         }
         
+        /* Новый стиль для режима события, верхний прямоугольник */
+        .events-card {
+            width: 100%;
+            background: linear-gradient(135deg, #314755 0%, #26a0da 100%);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+        
+        .events-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect x="0" y="0" width="50" height="50" fill="rgba(255,255,255,0.05)"/><rect x="50" y="50" width="50" height="50" fill="rgba(255,255,255,0.05)"/></svg>');
+            opacity: 0.3;
+        }
+        
+        .events-icon {
+            font-size: 30px;
+            margin-bottom: 10px;
+        }
+        
+        .events-name {
+            font-size: 18px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        /* Новая сетка с играми 2x2 */
+        .game-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+        
+        .game-card {
+            background-color: var(--medium-gray, #2A2A2A);
+            border-radius: 12px;
+            padding: 20px 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            height: 130px;
+        }
+        
+        .game-card:hover, .game-card:active {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+        
+        .game-icon {
+            font-size: 36px;
+            margin-bottom: 15px;
+        }
+        
+        .game-name {
+            font-size: 16px;
+            font-weight: bold;
+            color: var(--gold);
+            text-transform: uppercase;
+        }
+        
         /* Стили для профиля */
         .profile-header {
             display: flex;
@@ -333,22 +411,29 @@
                 <div id="welcome-screen" class="screen active">
                     <div class="game-selection">
                         <h2>Выберите игру</h2>
+                        
+                        <!-- Верхний прямоугольник для ставок на события -->
+                        <div class="events-card" data-game="events">
+                            <div class="events-icon">📊</div>
+                            <div class="events-name">Ставки на события</div>
+                        </div>
+                        
+                        <!-- Сетка 2x2 для игр -->
                         <div class="game-grid">
+                            <!-- Верхний ряд -->
                             <div class="game-card" data-game="slots">
                                 <div class="game-icon">🎰</div>
                                 <div class="game-name">Слоты</div>
                             </div>
-                            <div class="game-card" data-game="roulette">
-                                <div class="game-icon">🎲</div>
-                                <div class="game-name">Рулетка</div>
-                            </div>
-                            <div class="game-card" data-game="guessnumber">
-                                <div class="game-icon">🔢</div>
-                                <div class="game-name">Угадай число</div>
-                            </div>
                             <div class="game-card" data-game="miner">
                                 <div class="game-icon">💣</div>
                                 <div class="game-name">Майнер</div>
+                            </div>
+                            
+                            <!-- Нижний ряд -->
+                            <div class="game-card" data-game="coinflip">
+                                <div class="game-icon">🪙</div>
+                                <div class="game-name">Coin Flip</div>
                             </div>
                             <div class="game-card" data-game="crush">
                                 <div class="game-icon">📈</div>
@@ -379,24 +464,6 @@
                     </div>
                 </div>
                 
-                <!-- Roulette Game Screen -->
-                <div id="roulette-screen" class="screen">
-                    <div class="game-header">
-                        <button class="back-btn">← Назад</button>
-                        <h2>Рулетка</h2>
-                    </div>
-                    <!-- Содержимое для рулетки -->
-                </div>
-                
-                <!-- Guess Number Game Screen -->
-                <div id="guessnumber-screen" class="screen">
-                    <div class="game-header">
-                        <button class="back-btn">← Назад</button>
-                        <h2>Угадай число</h2>
-                    </div>
-                    <!-- Содержимое игры Guess Number -->
-                </div>
-                
                 <!-- Miner Game Screen -->
                 <div id="miner-screen" class="screen">
                     <div class="game-header">
@@ -404,6 +471,15 @@
                         <h2>Майнер</h2>
                     </div>
                     <!-- Содержимое игры Miner -->
+                </div>
+                
+                <!-- Coin Flip Game Screen -->
+                <div id="coinflip-screen" class="screen">
+                    <div class="game-header">
+                        <button class="back-btn">← Назад</button>
+                        <h2>Coin Flip</h2>
+                    </div>
+                    <!-- Содержимое игры Coin Flip -->
                 </div>
                 
                 <!-- Crush Game Screen -->
@@ -415,7 +491,18 @@
                     <!-- Содержимое игры Crush -->
                 </div>
                 
-                <!-- Профиль - новый экран -->
+                <!-- События Screen -->
+                <div id="events-screen" class="screen">
+                    <div class="game-header">
+                        <button class="back-btn">← Назад</button>
+                        <h2>Ставки на события</h2>
+                    </div>
+                    <div class="events-container">
+                        <p class="coming-soon">Функционал ставок на события будет доступен в ближайшее время</p>
+                    </div>
+                </div>
+                
+                <!-- Профиль - экран -->
                 <div id="profile-screen" class="screen">
                     <!-- Header с ID и брендом -->
                     <div class="profile-header">
@@ -529,10 +616,10 @@
             // Хранилище для игр
             games: {
                 slots: { loaded: false, instance: null },
-                roulette: { loaded: false, instance: null },
-                guessnumber: { loaded: false, instance: null },
                 miner: { loaded: false, instance: null },
-                crush: { loaded: false, instance: null }
+                coinflip: { loaded: false, instance: null },
+                crush: { loaded: false, instance: null },
+                events: { loaded: false, instance: null }
             },
             
             // Пользовательские данные
@@ -711,9 +798,8 @@
             
             const gameScripts = [
                 { name: 'slots', path: 'js/games/slots.js' },
-                { name: 'roulette', path: 'js/games/roulette.js' },
-                { name: 'guessnumber', path: 'js/games/guessnumber.js' },
                 { name: 'miner', path: 'js/games/miner.js' },
+                { name: 'coinflip', path: 'js/games/coinflip.js' },
                 { name: 'crush', path: 'js/games/crush.js' }
             ];
             
