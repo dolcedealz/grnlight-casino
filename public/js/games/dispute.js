@@ -1111,26 +1111,7 @@
             }
         };
         
-        /**
-         * Периодическая проверка статуса комнаты
-         */
-        const startRoomStatusCheck = function() {
-            if (state.roomStatusInterval) {
-                clearInterval(state.roomStatusInterval);
-            }
-            
-            // Проверяем статус комнаты каждые 3 секунды
-            state.roomStatusInterval = setInterval(() => {
-                checkRoomStatus();
-            }, 3000);
-            
-            // Первая проверка сразу
-            checkRoomStatus();
-        };
-        
-        /**
-         * Проверка статуса комнаты
-         */
+       
         // Проверка статуса комнаты
 const checkRoomStatus = function() {
     try {
