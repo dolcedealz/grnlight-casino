@@ -1,34 +1,58 @@
-/* Greenlight Casino - Enhanced CSS */
 
-/* 1. Updated CSS Variables with your color scheme */
+/* Greenlight Casino - Современный дизайн v1.0 */
+
+/* 1. Переработанные CSS переменные */
 :root {
-  /* Core colors */
-  --primary-green: #3a5c3a;         /* New green color */
-  --gold: #d4af37;                 /* New gold/yellow for borders */
-  --black: #000000;
-  --dark-gray: #333333;            /* New background color */
-  --medium-gray: #444444;          /* Adjusted to match new dark-gray */
-  --light-gray: #888888; 
-  --white: #FFFFFF;
-  --red: #D50000;
-  --win-color: #4CAF50;
-  --lose-color: #F44336;
+  /* Основные цвета с современной палитрой */
+  --primary-green: #1db954;         /* Модерновый зеленый */
+  --primary-green-light: #1ed760;   /* Светлая версия */
+  --primary-green-dark: #169c46;    /* Темная версия */
+  --primary-gradient: linear-gradient(135deg, var(--primary-green), var(--primary-green-dark));
   
-  /* Simplified spacing system */
+  /* Золотые акценты */
+  --gold: #f2c94c;                 /* Яркое золото */
+  --gold-light: #f7dc6f;           /* Светлое золото */
+  --gold-dark: #dba628;            /* Темное золото */
+  --gold-gradient: linear-gradient(135deg, var(--gold), var(--gold-dark));
+  
+  /* Основные тоны */
+  --black: #000000;
+  --dark-gray: #121212;            /* Темный фон как в современных приложениях */
+  --medium-gray: #1e1e1e;          /* Средний тон для карточек */
+  --light-gray: #a0a0a0;           /* Светлый серый для текста */
+  --white: #ffffff;
+  --red: #ff4d4d;
+  
+  /* Цвета статусов */
+  --win-color: #4cd964;
+  --lose-color: #ff453a;
+  
+  /* Системные переменные */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-round: 50px;
+  
+  /* Тени */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.15);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.2);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.3);
+  --shadow-green: 0 0 20px rgba(29, 185, 84, 0.3);
+  --shadow-gold: 0 0 20px rgba(242, 201, 76, 0.3);
+  
+  /* Переходы */
+  --transition-fast: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  
+  /* Интервалы */
   --space-sm: 0.5rem;
   --space-md: 1rem;
   --space-lg: 1.5rem;
-  
-  /* Simplified border radius */
-  --radius-sm: 5px;
-  --radius-md: 10px;
-  --radius-lg: 20px;
-  
-  /* Simplified transitions */
-  --transition-normal: 0.3s ease;
+  --space-xl: 2rem;
 }
 
-/* 2. Basic reset with better defaults */
+/* 2. Базовые сбросы и улучшения */
 *, *::before, *::after {
   margin: 0;
   padding: 0;
@@ -38,11 +62,11 @@
 html {
   font-size: 16px;
   -webkit-tap-highlight-color: transparent;
+  scroll-behavior: smooth;
 }
 
-/* Updated body font to Impact */
 body {
-  font-family: 'Impact', 'Arial Narrow', sans-serif;
+  font-family: 'Montserrat', 'Arial', sans-serif;
   background-color: var(--dark-gray);
   color: var(--white);
   line-height: 1.6;
@@ -50,40 +74,29 @@ body {
   min-height: 100vh;
 }
 
-/* Import SF Pro Display for specific elements */
+/* Импорт дополнительных шрифтов */
 @font-face {
-  font-family: 'SF Pro Display';
-  src: url('fonts/SF-Pro-Display-Light.woff2') format('woff2');
-  font-weight: 300;
+  font-family: 'Montserrat';
+  src: url('fonts/Montserrat-Regular.woff2') format('woff2');
+  font-weight: 400;
   font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
-  font-family: 'SF Pro Display';
-  src: url('fonts/SF-Pro-Display-LightItalic.woff2') format('woff2');
-  font-weight: 300;
-  font-style: italic;
-}
-
-@font-face {
-  font-family: 'SF Pro Display';
-  src: url('fonts/SF-Pro-Display-Semibold.woff2') format('woff2');
-  font-weight: 600;
+  font-family: 'Montserrat';
+  src: url('fonts/Montserrat-Bold.woff2') format('woff2');
+  font-weight: 700;
   font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
-  font-family: 'SF Pro Display';
-  src: url('fonts/SF-Pro-Display-SemiboldItalic.woff2') format('woff2');
-  font-weight: 600;
-  font-style: italic;
-}
-
-@font-face {
-  font-family: 'Bauhaus 93';
-  src: url('fonts/BAUHS93.woff2') format('woff2');
-  font-weight: normal;
+  font-family: 'Montserrat';
+  src: url('fonts/Montserrat-Medium.woff2') format('woff2');
+  font-weight: 500;
   font-style: normal;
+  font-display: swap;
 }
 
 img, picture, video, canvas, svg {
@@ -92,31 +105,52 @@ img, picture, video, canvas, svg {
 }
 
 input, button, textarea, select {
-  font: inherit;
+  font-family: inherit;
+  font-size: inherit;
 }
 
-/* 3. Simplified layout with white-to-gray gradient effect */
+/* 3. Основной контейнер с эффектами */
 .app-container {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  background: linear-gradient(to bottom, #ffffff 0%, var(--dark-gray) 30%);
+  background: linear-gradient(to bottom, var(--dark-gray) 0%, #0a0a0a 100%);
   position: relative;
+  overflow: hidden;
+  z-index: 0;
 }
 
-/* 4. Enhanced header with logo */
+/* Стильный фоновый эффект */
+.app-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle at 10% 30%, rgba(29, 185, 84, 0.05) 0%, transparent 40%), 
+              radial-gradient(circle at 90% 70%, rgba(242, 201, 76, 0.05) 0%, transparent 40%);
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* 4. Современная шапка */
 .header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 1rem 1.5rem;
-  background: var(--black);
-  border-bottom: 1px solid var(--gold);
-  position: relative;
-  z-index: 10;
+  background: rgba(18, 18, 18, 0.8);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(242, 201, 76, 0.2);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
 }
 
-/* Logo styling */
+/* Стильный логотип */
 .logo {
   display: flex;
   align-items: center;
@@ -124,45 +158,54 @@ input, button, textarea, select {
   position: relative;
 }
 
-/* Add placeholder for actual logo */
-.logo:before {
-  content: "";
-  display: block;
-  width: 40px;
-  height: 40px;
-  background: url('images/logo.png') no-repeat center/contain;
-  margin-right: 10px;
-}
-
 .logo h1 {
   margin: 0;
   font-size: 1.8rem;
   color: var(--gold);
   font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  background: var(--gold-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
-/* Updated green light */
+/* Улучшенный зеленый индикатор */
 .green-light {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   background: var(--primary-green);
   border-radius: 50%;
   position: relative;
-  border: 1px solid var(--gold);
+  box-shadow: 0 0 10px var(--primary-green);
+  animation: pulse 3s infinite;
 }
 
-/* Updated balance display with Bauhaus 93 font */
+@keyframes pulse {
+  0% { box-shadow: 0 0 10px var(--primary-green); opacity: 0.8; }
+  50% { box-shadow: 0 0 20px var(--primary-green); opacity: 1; }
+  100% { box-shadow: 0 0 10px var(--primary-green); opacity: 0.8; }
+}
+
+/* Современный индикатор баланса */
 .balance {
   display: flex;
   align-items: center;
-  background: var(--black);
-  border: 1px solid var(--gold);
-  padding: 0.5rem 1.2rem;
-  border-radius: 50px;
+  background: rgba(30, 30, 30, 0.7);
+  border: 1px solid rgba(242, 201, 76, 0.3);
+  padding: 0.6rem 1.2rem;
+  border-radius: var(--radius-round);
   font-size: 1.2rem;
-  font-weight: bold;
+  font-weight: 600;
   color: var(--gold);
-  font-family: 'Bauhaus 93', sans-serif;
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-normal);
+}
+
+.balance:hover {
+  box-shadow: var(--shadow-gold);
+  border-color: rgba(242, 201, 76, 0.6);
 }
 
 .star {
@@ -170,7 +213,17 @@ input, button, textarea, select {
   font-size: 1.3rem;
 }
 
-/* 5. Simplified content area */
+/* Анимация обновления баланса */
+.balance-updated {
+  animation: balancePulse 0.5s ease;
+}
+
+@keyframes balancePulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); color: var(--gold-light); }
+}
+
+/* 5. Основная область контента */
 .main-content {
   flex: 1;
   padding: 1.5rem;
@@ -180,7 +233,7 @@ input, button, textarea, select {
   align-items: center;
 }
 
-/* 6. Screen transitions */
+/* 6. Экраны с плавными переходами */
 .screen {
   display: none;
   flex-direction: column;
@@ -189,16 +242,51 @@ input, button, textarea, select {
   max-width: 1200px;
   margin: 0 auto;
   padding: 1.5rem;
+  animation: fadeIn 0.3s ease-out forwards;
 }
 
 .screen.active {
   display: flex;
 }
 
-/* 7. Game selection - новый макет */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 7. Выбор игр */
 .game-selection {
   width: 100%;
   max-width: 800px;
+}
+
+.game-selection h2 {
+  font-size: 2.2rem;
+  margin-bottom: 2.5rem;
+  text-align: center;
+  color: var(--gold);
+  position: relative;
+  display: inline-block;
+  width: 100%;
+}
+
+.game-selection h2::after {
+  content: '';
+  position: absolute;
+  bottom: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60px;
+  height: 3px;
+  background: var(--primary-gradient);
+  border-radius: 3px;
+}
+
+.game-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 1.5rem;
+  width: 100%;
 }
 
 /* Новый макет главного меню */
@@ -211,26 +299,32 @@ input, button, textarea, select {
 
 /* Карточка события (верхний прямоугольник) */
 .event-card {
-  background: var(--medium-gray);
+  background: rgba(30, 30, 30, 0.6);
   border-radius: var(--radius-md);
   padding: 1.5rem;
   display: flex;
   align-items: center;
   gap: 1.5rem;
   cursor: pointer;
-  transition: transform var(--transition-normal);
-  border: 1px solid var(--gold);
+  transition: all var(--transition-normal);
+  border: 1px solid rgba(242, 201, 76, 0.2);
   width: 100%;
   height: 120px;
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
 }
 
 .event-card:hover {
   transform: translateY(-5px);
+  box-shadow: var(--shadow-md);
+  border-color: rgba(242, 201, 76, 0.5);
 }
 
 .event-icon {
   font-size: 3.5rem;
   color: var(--gold);
+  text-shadow: 0 0 10px rgba(242, 201, 76, 0.3);
 }
 
 .event-details {
@@ -258,49 +352,9 @@ input, button, textarea, select {
   width: 100%;
 }
 
-/* 8. Updated game card with gold border */
-
-/* Стиль карточки Coinflip в главном меню с GIF-фоном */
-.game-card[data-game="coinflip"] {
-  position: relative;
-  overflow: hidden;
-  background: url('/images/coins-animation.gif') center center no-repeat;
-  background-size: cover;
-}
-
-/* Полупрозрачный слой для улучшения читаемости текста */
-.game-card[data-game="coinflip"]::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.5); /* Затемнение для лучшей видимости иконки и текста */
-  z-index: 0;
-}
-
-/* Размещаем иконку и текст поверх фона */
-.game-card[data-game="coinflip"] .game-icon,
-.game-card[data-game="coinflip"] .game-name {
-  position: relative;
-  z-index: 1;
-  color: var(--gold); /* Сделаем текст золотым для лучшей видимости */
-}
-
-/* Дополнительный эффект для иконки */
-.game-card[data-game="coinflip"] .game-icon {
-  text-shadow: 0 0 10px rgba(255, 215, 0, 0.7); /* Золотистое свечение */
-}
-
-/* Улучшенный эффект при наведении */
-.game-card[data-game="coinflip"]:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 5px 15px rgba(255, 215, 0, 0.3);
-}
-
+/* 8. Современные карточки игр */
 .game-card {
-  background: var(--medium-gray);
+  background: rgba(30, 30, 30, 0.6);
   border-radius: var(--radius-md);
   padding: 1.5rem 1rem;
   display: flex;
@@ -308,18 +362,49 @@ input, button, textarea, select {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: transform var(--transition-normal);
-  border: 1px solid var(--gold);
+  transition: all var(--transition-normal);
+  border: 1px solid rgba(242, 201, 76, 0.2);
   height: 160px;
+  box-shadow: var(--shadow-sm);
+  position: relative;
+  overflow: hidden;
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+}
+
+.game-card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, transparent 0%, rgba(29, 185, 84, 0.05) 100%);
+  z-index: 0;
+  opacity: 0;
+  transition: opacity var(--transition-normal);
 }
 
 .game-card:hover {
   transform: translateY(-5px);
+  box-shadow: var(--shadow-md);
+  border-color: rgba(242, 201, 76, 0.5);
+}
+
+.game-card:hover::after {
+  opacity: 1;
 }
 
 .game-icon {
   font-size: 3rem;
   margin-bottom: 1rem;
+  position: relative;
+  z-index: 1;
+  transition: transform var(--transition-normal);
+}
+
+.game-card:hover .game-icon {
+  transform: scale(1.1);
 }
 
 .game-name {
@@ -327,44 +412,111 @@ input, button, textarea, select {
   font-weight: bold;
   color: var(--gold);
   text-transform: uppercase;
+  position: relative;
+  z-index: 1;
 }
 
-/* 9. Action buttons with new green color */
+/* Специальный стиль для CoinFlip */
+.game-card[data-game="coinflip"] {
+  position: relative;
+  overflow: hidden;
+  background: url('/images/coins-animation.gif') center center no-repeat;
+  background-size: cover;
+}
+
+.game-card[data-game="coinflip"]::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 0;
+}
+
+.game-card[data-game="coinflip"] .game-icon,
+.game-card[data-game="coinflip"] .game-name {
+  position: relative;
+  z-index: 1;
+  color: var(--gold);
+}
+
+.game-card[data-game="coinflip"] .game-icon {
+  text-shadow: 0 0 10px rgba(242, 201, 76, 0.7);
+}
+
+.game-card[data-game="coinflip"]:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 5px 15px rgba(242, 201, 76, 0.3);
+}
+
+/* 9. Современные кнопки */
 .action-btn {
-  background: var(--primary-green);
+  background: var(--primary-gradient);
   color: white;
   border: none;
   padding: 0.8rem 2rem;
-  border-radius: 50px;
+  border-radius: var(--radius-round);
   font-size: 1.1rem;
-  font-weight: bold;
+  font-weight: 600;
   cursor: pointer;
   transition: all var(--transition-normal);
   text-transform: uppercase;
+  box-shadow: var(--shadow-sm);
+  letter-spacing: 0.5px;
+  position: relative;
+  overflow: hidden;
+}
+
+.action-btn::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.6s ease;
 }
 
 .action-btn:hover {
-  opacity: 0.9;
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-green);
+}
+
+.action-btn:hover::after {
+  left: 100%;
+}
+
+.action-btn:active {
+  transform: translateY(1px);
 }
 
 .action-btn:disabled {
   background: var(--light-gray);
   cursor: not-allowed;
+  box-shadow: none;
 }
 
-/* 10. Form inputs with gold focus */
+.action-btn:disabled::after {
+  display: none;
+}
+
+/* 10. Современные формы */
 input[type="text"],
 input[type="number"],
 textarea,
 select {
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid var(--primary-green);
-  border-radius: var(--radius-sm);
+  background: rgba(30, 30, 30, 0.8);
+  border: 1px solid rgba(29, 185, 84, 0.3);
+  border-radius: var(--radius-md);
   padding: 0.8rem 1rem;
   color: var(--white);
   font-size: 1rem;
   width: 100%;
-  transition: border-color var(--transition-normal);
+  transition: all var(--transition-normal);
+  box-shadow: var(--shadow-sm);
 }
 
 input[type="text"]:focus,
@@ -373,15 +525,20 @@ textarea:focus,
 select:focus {
   outline: none;
   border-color: var(--gold);
+  box-shadow: 0 0 0 2px rgba(242, 201, 76, 0.2);
 }
 
-/* Simplified select dropdown */
+/* Улучшенный селект */
 select {
   appearance: none;
   padding-right: 40px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23f2c94c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 16px;
 }
 
-/* 11. Modal styling */
+/* 11. Стильные модальные окна */
 .modal {
   display: none;
   position: fixed;
@@ -390,19 +547,25 @@ select {
   width: 100%;
   height: 100%;
   background-color: rgba(0, 0, 0, 0.8);
-  z-index: 100;
+  z-index: 1000;
   justify-content: center;
   align-items: center;
   padding: 1rem;
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
 }
 
 .modal-content {
-  background: var(--dark-gray);
+  background: linear-gradient(135deg, #1e1e1e 0%, #121212 100%);
   width: 100%;
   max-width: 500px;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   overflow: hidden;
-  border: 1px solid var(--gold);
+  border: 1px solid rgba(242, 201, 76, 0.2);
+  box-shadow: var(--shadow-lg);
+  transform: scale(0.9);
+  opacity: 0;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .modal-header {
@@ -410,14 +573,15 @@ select {
   justify-content: space-between;
   align-items: center;
   padding: 1.2rem 1.5rem;
-  background: var(--black);
-  border-bottom: 1px solid var(--gold);
+  background: rgba(0, 0, 0, 0.5);
+  border-bottom: 1px solid rgba(242, 201, 76, 0.2);
 }
 
 .modal-header h2 {
   margin: 0;
   font-size: 1.5rem;
   color: var(--gold);
+  font-weight: 600;
 }
 
 .close-modal {
@@ -425,10 +589,17 @@ select {
   font-size: 1.5rem;
   cursor: pointer;
   transition: color var(--transition-normal);
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
 }
 
 .close-modal:hover {
   color: var(--white);
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .modal-body {
@@ -437,16 +608,25 @@ select {
   overflow-y: auto;
 }
 
-/* 12. Bottom navigation with logo in circle */
+/* Стили для активного модального окна */
+.modal.visible .modal-content {
+  transform: scale(1);
+  opacity: 1;
+}
+
+/* 12. Нижняя навигация */
 .bottom-nav {
   display: flex;
   justify-content: space-around;
   align-items: center;
   padding: 0.8rem 0;
-  background: var(--black);
-  border-top: 1px solid var(--gold);
+  background: rgba(18, 18, 18, 0.9);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-top: 1px solid rgba(242, 201, 76, 0.2);
   position: relative;
-  z-index: 5;
+  z-index: 90;
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.2);
 }
 
 .nav-btn {
@@ -457,24 +637,33 @@ select {
   color: var(--light-gray);
   background: none;
   border: none;
-  transition: color var(--transition-normal);
+  transition: all var(--transition-normal);
+  position: relative;
+}
+
+.nav-btn::after {
+  content: '';
+  position: absolute;
+  bottom: -5px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 2px;
+  background: var(--primary-gradient);
+  transition: width var(--transition-normal);
+  border-radius: 2px;
 }
 
 .nav-btn.active {
   color: var(--primary-green);
 }
 
-.nav-btn:hover {
-  color: var(--white);
+.nav-btn.active::after {
+  width: 30px;
 }
 
-/* Add logo to home button circle */
-.nav-btn#home-btn .nav-icon {
-  width: 40px;
-  height: 40px;
-  background: url('images/logo-small.png') no-repeat center/contain;
-  border-radius: 50%;
-  margin-bottom: 0.3rem;
+.nav-btn:hover {
+  color: var(--white);
 }
 
 .nav-icon {
@@ -485,9 +674,10 @@ select {
 .nav-label {
   font-size: 0.8rem;
   text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
-/* 13. Game result display */
+/* 13. Области результатов игры */
 .result {
   min-height: 50px;
   margin: 1.5rem 0;
@@ -496,21 +686,30 @@ select {
   border-radius: var(--radius-md);
   font-weight: bold;
   font-size: 1.1rem;
+  transform: translateY(20px);
+  opacity: 0;
+  transition: all var(--transition-normal);
+  box-shadow: var(--shadow-sm);
+}
+
+.result.visible {
+  transform: translateY(0);
+  opacity: 1;
 }
 
 .result.win {
-  background: rgba(76, 175, 80, 0.1);
+  background: rgba(76, 217, 100, 0.1);
   border: 1px solid var(--win-color);
   color: var(--win-color);
 }
 
 .result.lose {
-  background: rgba(244, 67, 54, 0.1);
+  background: rgba(255, 69, 58, 0.1);
   border: 1px solid var(--lose-color);
   color: var(--lose-color);
 }
 
-/* Result icons */
+/* Иконки результатов */
 .win-icon, .lose-icon, .cashout-icon, .crash-icon {
   font-size: 2.5rem;
   margin-bottom: 0.5rem;
@@ -528,28 +727,34 @@ select {
   font-weight: bold;
 }
 
-/* 14. History and transaction lists */
+/* 14. История и транзакции */
 .history-list,
 .transaction-list {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  width: 100%;
 }
 
 .history-item,
 .transaction-item {
-  background: var(--medium-gray);
+  background: rgba(30, 30, 30, 0.7);
   padding: 1rem;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   display: flex;
   justify-content: space-between;
   align-items: center;
   border: 1px solid rgba(255, 255, 255, 0.05);
+  transition: all var(--transition-normal);
+  box-shadow: var(--shadow-sm);
 }
 
 .history-item:hover,
 .transaction-item:hover {
+  transform: translateX(5px);
   border-left: 2px solid var(--gold);
+  background: rgba(30, 30, 30, 0.9);
+  box-shadow: var(--shadow-md);
 }
 
 .history-game,
@@ -599,16 +804,17 @@ select {
   background: rgba(0, 0, 0, 0.2);
   border-radius: var(--radius-md);
   border: 1px dashed rgba(255, 255, 255, 0.1);
+  width: 100%;
 }
 
-/* 15. Loading overlay */
+/* 15. Экран загрузки */
 .loading-overlay {
   position: fixed;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(0, 0, 0, 0.9);
+  background: linear-gradient(135deg, #121212 0%, #000000 100%);
   z-index: 9999;
   display: flex;
   flex-direction: column;
@@ -625,12 +831,33 @@ select {
 }
 
 .loading-spinner {
-  width: 40px;
-  height: 40px;
-  border: 4px solid rgba(0, 0, 0, 0.1);
+  width: 50px;
+  height: 50px;
+  position: relative;
+}
+
+.loading-spinner::before,
+.loading-spinner::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
   border-radius: 50%;
-  border-top: 4px solid var(--primary-green);
-  animation: spin 1s linear infinite;
+  border: 3px solid transparent;
+}
+
+.loading-spinner::before {
+  border-top-color: var(--primary-green);
+  border-bottom-color: var(--primary-green);
+  animation: spin 1.5s linear infinite;
+}
+
+.loading-spinner::after {
+  border-left-color: var(--gold);
+  border-right-color: var(--gold);
+  animation: spin 1s linear infinite reverse;
 }
 
 @keyframes spin {
@@ -638,37 +865,41 @@ select {
   100% { transform: rotate(360deg); }
 }
 
-/* Profile specific styles */
+/* Полоса прогресса */
+#loading-progress {
+  width: 80%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  margin-top: 20px;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+#progress-bar {
+  width: 0%;
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary-green) 0%, var(--gold) 100%);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+/* Стили для профиля */
+.user-info {
+  background: rgba(30, 30, 30, 0.7);
+  border-radius: var(--radius-md);
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  border: 1px solid rgba(242, 201, 76, 0.2);
+  box-shadow: var(--shadow-sm);
+  width: 100%;
+}
+
 .user-info h3 {
-  font-family: 'Impact', sans-serif;
+  color: var(--gold);
+  margin-bottom: 0.5rem;
 }
 
-.account-balance-label {
-  font-family: 'SF Pro Display', sans-serif;
-  font-weight: 300;
-  font-style: italic;
-}
-
-.deposit-button {
-  font-family: 'SF Pro Display', sans-serif;
-  font-weight: 600;
-  font-style: italic;
-}
-
-.transaction-details-label {
-  font-family: 'Impact', sans-serif;
-}
-
-.promo-code-label {
-  font-family: 'SF Pro Display', sans-serif;
-  font-weight: 300;
-  font-style: italic;
-}
-
-/* The rest of the CSS from paste.txt follows - include all game-specific styles and utility classes */
-/* GAME-SPECIFIC STYLES - SIMPLIFIED */
-
-/* SLOTS GAME */
+/* СТИЛИ ДЛЯ ИГРЫ SLOTS */
 .slots-container {
   display: flex;
   flex-direction: column;
@@ -681,22 +912,24 @@ select {
 .slot-reels {
   display: flex;
   gap: 1rem;
-  background: var(--black);
+  background: rgba(0, 0, 0, 0.7);
   padding: 2rem;
   border-radius: var(--radius-md);
   border: 2px solid var(--gold);
+  box-shadow: var(--shadow-md);
 }
 
 .reel {
   width: 80px;
   height: 80px;
-  background: var(--medium-gray);
+  background: rgba(30, 30, 30, 0.7);
   border-radius: var(--radius-sm);
   display: flex;
   justify-content: center;
   align-items: center;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(242, 201, 76, 0.3);
   overflow: hidden;
+  box-shadow: var(--shadow-sm);
 }
 
 .symbol {
@@ -708,7 +941,26 @@ select {
   height: 100%;
 }
 
-/* MINER GAME */
+.symbol.final {
+  animation: symbolPop 0.3s forwards;
+}
+
+@keyframes symbolPop {
+  0% { transform: scale(0.5); opacity: 0; }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.symbol.winning {
+  animation: winningPulse 1.5s infinite;
+}
+
+@keyframes winningPulse {
+  0%, 100% { transform: scale(1); text-shadow: 0 0 10px rgba(242, 201, 76, 0.5); }
+  50% { transform: scale(1.1); text-shadow: 0 0 20px rgba(242, 201, 76, 0.8); }
+}
+
+/* СТИЛИ ДЛЯ ИГРЫ MINER */
 .miner-container {
   display: flex;
   flex-direction: column;
@@ -723,9 +975,10 @@ select {
   justify-content: space-between;
   width: 100%;
   padding: 1rem 1.5rem;
-  background: var(--medium-gray);
+  background: rgba(30, 30, 30, 0.7);
   border-radius: var(--radius-md);
-  border: 1px solid var(--gold);
+  border: 1px solid rgba(242, 201, 76, 0.2);
+  box-shadow: var(--shadow-sm);
 }
 
 .mines-count,
@@ -733,6 +986,7 @@ select {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  font-weight: 500;
 }
 
 .potential-win {
@@ -749,36 +1003,47 @@ select {
 
 .grid-cell {
   aspect-ratio: 1;
-  background: var(--medium-gray);
+  background: rgba(30, 30, 30, 0.7);
   border-radius: var(--radius-sm);
   display: flex;
   justify-content: center;
   align-items: center;
   font-size: 1.5rem;
   cursor: pointer;
-  transition: background-color var(--transition-normal);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  transition: all var(--transition-normal);
+  border: 1px solid rgba(242, 201, 76, 0.2);
+  box-shadow: var(--shadow-sm);
 }
 
 .grid-cell:hover {
-  background: #444;
-  border-color: var(--gold);
+  transform: scale(1.05);
+  background: rgba(30, 30, 30, 0.9);
+  border-color: rgba(242, 201, 76, 0.5);
+  box-shadow: var(--shadow-md);
 }
 
 .grid-cell.revealed {
-  background: var(--primary-green);
+  background: var(--primary-gradient);
   color: var(--white);
+  border: none;
 }
 
 .grid-cell.mine {
-  background: var(--medium-gray);
+  background: rgba(30, 30, 30, 0.7);
 }
 
 .grid-cell.exploded {
   background: var(--lose-color);
+  animation: explode 0.5s;
 }
 
-/* CRUSH GAME */
+@keyframes explode {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.2); box-shadow: 0 0 20px rgba(255, 69, 58, 0.8); }
+  100% { transform: scale(1); }
+}
+
+/* СТИЛИ ДЛЯ ИГРЫ CRUSH */
 .crush-container {
   display: flex;
   flex-direction: column;
@@ -796,148 +1061,107 @@ select {
   display: flex;
   align-items: center;
   justify-content: center;
+  text-shadow: 0 0 10px rgba(242, 201, 76, 0.3);
+}
+
+.multiplier-display.active {
+  animation: multiplierPulse 1s infinite;
+}
+
+@keyframes multiplierPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
 }
 
 .multiplier-display.crashed {
   color: var(--lose-color);
+  text-shadow: 0 0 10px rgba(255, 69, 58, 0.5);
 }
 
 .multiplier-display.cashed-out {
   color: var(--win-color);
+  text-shadow: 0 0 10px rgba(76, 217, 100, 0.5);
+}
+
+.multiplier-display.low {
+  color: #4cd964;
+}
+
+.multiplier-display.medium {
+  color: #ffcc00;
+}
+
+.multiplier-display.high {
+  color: #ff9500;
+}
+
+.multiplier-display.extreme {
+  color: #ff3b30;
 }
 
 .crush-graph {
   width: 100%;
   height: 200px;
-  background: var(--medium-gray);
+  background: rgba(18, 18, 18, 0.8);
   border-radius: var(--radius-md);
   position: relative;
   overflow: hidden;
-  border: 1px solid var(--gold);
+  border: 1px solid rgba(242, 201, 76, 0.2);
+  box-shadow: var(--shadow-sm);
 }
 
-/* COIN FLIP GAME STYLES (бывший Dispute) */
-.dispute-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2rem;
+.crush-history {
   width: 100%;
-  max-width: 500px;
+  margin-top: 1.5rem;
 }
 
-.coin-selection {
-  text-align: center;
-  margin-bottom: 2rem;
-}
-
-.coin-selection h3 {
+.crush-history h3 {
   color: var(--gold);
-  margin-bottom: 1.5rem;
+  margin-bottom: 0.8rem;
+  font-size: 1.2rem;
 }
 
-.coin-buttons {
+.history-items {
   display: flex;
-  gap: 2rem;
-  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
-.coin-btn {
-  background: var(--medium-gray);
-  border: 1px solid var(--gold);
-  border-radius: var(--radius-md);
-  padding: 1.5rem;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  cursor: pointer;
-  transition: all var(--transition-normal);
-  width: 120px;
-}
-
-.coin-btn:hover {
-  transform: translateY(-5px);
-  background: rgba(58, 92, 58, 0.2);
-}
-
-.coin-btn.selected {
-  background: rgba(58, 92, 58, 0.3);
-  border-color: var(--gold);
-}
-
-.coin-icon {
-  font-size: 3rem;
-  margin-bottom: 1rem;
-}
-
-.coin-text {
-  font-weight: bold;
-  color: var(--gold);
-}
-
-.coin-status {
-  display: flex;
-  gap: 3rem;
-  margin-bottom: 2rem;
-}
-
-.player-choice {
-  text-align: center;
-  font-weight: bold;
-  color: var(--primary-green);
-}
-
-.coin-animation-container {
-  width: 150px;
-  height: 150px;
-  perspective: 1000px;
-  margin: 2rem 0;
-}
-
-.coin {
-  width: 100%;
-  height: 100%;
-  position: relative;
-  transform-style: preserve-3d;
-  transition: transform 3s;
-}
-
-.coin.flip {
-  animation: flip 3s forwards;
-}
-
-.coin-heads, .coin-tails {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  backface-visibility: hidden;
-  border-radius: 50%;
+.history-item {
+  width: 50px;
+  height: 25px;
+  border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
+  font-size: 0.8rem;
   font-weight: bold;
-  font-size: 1.5rem;
+  color: var(--white);
+  box-shadow: var(--shadow-sm);
 }
 
-.coin-heads {
-  background: linear-gradient(45deg, var(--gold), #FFAA00);
-  color: var(--black);
-  z-index: 2;
+.history-item.crashed {
+  background: linear-gradient(135deg, #ff453a 0%, #ff695b 100%);
 }
 
-.coin-tails {
-  background: linear-gradient(45deg, #AAAAAA, #DDDDDD);
-  color: var(--black);
-  transform: rotateY(180deg);
+.history-item.cashed-out {
+  background: linear-gradient(135deg, #4cd964 0%, #34c759 100%);
 }
 
-@keyframes flip {
-  0% {
-    transform: rotateY(0);
-  }
-  100% {
-    transform: rotateY(1800deg);
-  }
+.history-item.low {
+  opacity: 0.7;
+}
+
+.history-item.medium {
+  opacity: 0.8;
+}
+
+.history-item.high {
+  opacity: 0.9;
+}
+
+.history-item.extreme {
+  opacity: 1;
 }
 
 /* Game header with back button */
@@ -953,21 +1177,39 @@ select {
   text-align: center;
   color: var(--gold);
   margin: 0;
+  position: relative;
+}
+
+.game-header h2::after {
+  content: '';
+  position: absolute;
+  bottom: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 40px;
+  height: 2px;
+  background: var(--primary-gradient);
+  border-radius: 2px;
 }
 
 .back-btn {
-  background: var(--medium-gray);
-  border: 1px solid var(--gold);
+  background: rgba(30, 30, 30, 0.7);
+  border: 1px solid rgba(242, 201, 76, 0.2);
   color: var(--white);
   padding: 0.5rem 1rem;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: background-color var(--transition-normal);
-  font-weight: bold;
+  transition: all var(--transition-normal);
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .back-btn:hover {
-  background: #444;
+  background: rgba(30, 30, 30, 0.9);
+  border-color: rgba(242, 201, 76, 0.5);
+  transform: translateX(-5px);
 }
 
 /* Bet controls */
@@ -977,6 +1219,11 @@ select {
   flex-direction: column;
   gap: 1rem;
   width: 100%;
+  background: rgba(30, 30, 30, 0.5);
+  padding: 1.5rem;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(242, 201, 76, 0.1);
+  box-shadow: var(--shadow-sm);
 }
 
 .bet-amount {
@@ -989,12 +1236,18 @@ select {
   display: flex;
   gap: 1rem;
   justify-content: center;
+  margin-top: 0.5rem;
 }
 
-/* Responsive design */
+/* Адаптивный дизайн */
 @media (max-width: 768px) {
   html {
     font-size: 14px;
+  }
+  
+  .game-grid {
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 1rem;
   }
   
   .game-row {
@@ -1026,22 +1279,28 @@ select {
   .logo h1 {
     font-size: 1.5rem;
   }
-  
-  .coin-buttons {
-    gap: 1rem;
-  }
-  
-  .coin-btn {
-    width: 100px;
-    padding: 1rem;
-  }
-  
-  .coin-icon {
-    font-size: 2.5rem;
-  }
 }
 
-/* Visibility helpers */
+/* Кастомный скроллбар */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(18, 18, 18, 0.7);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(29, 185, 84, 0.5);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(242, 201, 76, 0.5);
+}
+
+/* Вспомогательные классы */
 .hidden {
   display: none !important;
 }
@@ -1059,411 +1318,55 @@ select {
   display: none !important;
 }
 
-/* Animations */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes fadeOut {
-  from {
-    opacity: 1;
-    transform: translateY(0);
-  }
-  to {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-}
-
-.fade-in {
-  animation: fadeIn 0.3s ease forwards;
-}
-
-.fade-out {
-  animation: fadeOut 0.3s ease forwards;
-}
-
-/* Utility classes (keeping all these from the original) */
-/* Scrollbar styling */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: var(--dark-gray);
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--medium-gray);
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: var(--light-gray);
-}
-
-/* Utility classes */
-.text-center {
-  text-align: center;
-}
-
-.text-right {
-  text-align: right;
-}
-
-.text-left {
-  text-align: left;
-}
-
-.mb-1 {
-  margin-bottom: 0.5rem;
-}
-
-.mb-2 {
-  margin-bottom: 1rem;
-}
-
-.mb-3 {
-  margin-bottom: 1.5rem;
-}
-
-.mb-4 {
-  margin-bottom: 2rem;
-}
-
-.mt-1 {
-  margin-top: 0.5rem;
-}
-
-.mt-2 {
-  margin-top: 1rem;
-}
-
-.mt-3 {
-  margin-top: 1.5rem;
-}
-
-.mt-4 {
-  margin-top: 2rem;
-}
-
-.p-1 {
-  padding: 0.5rem;
-}
-
-.p-2 {
-  padding: 1rem;
-}
-
-.p-3 {
-  padding: 1.5rem;
-}
-
-.p-4 {
-  padding: 2rem;
-}
-
-.gap-1 {
-  gap: 0.5rem;
-}
-
-.gap-2 {
-  gap: 1rem;
-}
-
-.gap-3 {
-  gap: 1.5rem;
-}
-
-.gap-4 {
-  gap: 2rem;
-}
-
-/* Finish the CSS file with any additional utility classes or overrides */
-.cursor-pointer {
-  cursor: pointer;
-}
-
-.opacity-50 {
-  opacity: 0.5;
-}
-
-.opacity-75 {
-  opacity: 0.75;
-}
-
-.border-none {
-  border: none;
-}
-
-.rounded-full {
-  border-radius: 9999px;
-}
-
-.rounded-sm {
-  border-radius: var(--radius-sm);
-}
-
-.rounded-md {
-  border-radius: var(--radius-md);
-}
-
-.rounded-lg {
-  border-radius: var(--radius-lg);
-}
-
-/* Z-index utilities */
-.z-10 {
-  z-index: 10;
-}
-
-.z-20 {
-  z-index: 20;
-}
-
-.z-30 {
-  z-index: 30;
-}
-
-.z-40 {
-  z-index: 40;
-}
-
-.z-50 {
-  z-index: 50;
-}
-
-/* Flex utilities */
-.flex {
-  display: flex;
-}
-
-.flex-col {
-  flex-direction: column;
-}
-
-.items-center {
-  align-items: center;
-}
-
-.justify-center {
-  justify-content: center;
-}
-
-.justify-between {
-  justify-content: space-between;
-}
-
-.justify-around {
-  justify-content: space-around;
-}
-
-.flex-1 {
-  flex: 1;
-}
-
-.flex-wrap {
-  flex-wrap: wrap;
-}
-
-/* Width utilities */
-.w-full {
-  width: 100%;
-}
-
-.max-w-sm {
-  max-width: 24rem;
-}
-
-.max-w-md {
-  max-width: 28rem;
-}
-
-.max-w-lg {
-  max-width: 32rem;
-}
-
-.max-w-xl {
-  max-width: 36rem;
-}
-
-/* Height utilities */
-.h-full {
-  height: 100%;
-}
-
-.min-h-screen {
-  min-height: 100vh;
-}
-
-/* Position utilities */
-.relative {
-  position: relative;
-}
-
-.absolute {
-  position: absolute;
-}
-
-.fixed {
-  position: fixed;
-}
-
-/* Overflow utilities */
-.overflow-hidden {
-  overflow: hidden;
-}
-
-.overflow-auto {
-  overflow: auto;
-}
-
-.overflow-y-auto {
-  overflow-y: auto;
-}
-
-.overflow-x-hidden {
-  overflow-x: hidden;
-}
-
-/* Background utilities */
-.bg-transparent {
-  background-color: transparent;
-}
-
-.bg-dark {
-  background-color: var(--dark-gray);
-}
-
-.bg-medium {
-  background-color: var(--medium-gray);
-}
-
-.bg-black {
-  background-color: var(--black);
-}
-
-/* Text utilities */
-.text-white {
-  color: var(--white);
-}
-
-.text-gold {
-  color: var(--gold);
-}
-
-.text-green {
-  color: var(--primary-green);
-}
-
-.text-red {
-  color: var(--red);
-}
-
-.text-sm {
-  font-size: 0.875rem;
-}
-
-.text-base {
-  font-size: 1rem;
-}
-
-.text-lg {
-  font-size: 1.125rem;
-}
-
-.text-xl {
-  font-size: 1.25rem;
-}
-
-.text-2xl {
-  font-size: 1.5rem;
-}
-
-.font-bold {
-  font-weight: bold;
-}
-
-.font-normal {
-  font-weight: normal;
-}
-
-/* Border utilities */
-.border {
-  border: 1px solid;
-}
-
-.border-2 {
-  border: 2px solid;
-}
-
-.border-t {
-  border-top: 1px solid;
-}
-
-.border-b {
-  border-bottom: 1px solid;
-}
-
-.border-green {
-  border-color: var(--primary-green);
-}
-
-.border-gold {
-  border-color: var(--gold);
-}
-
-/* Shadow utilities */
-.shadow-sm {
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-}
-
-.shadow {
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
-}
-
-.shadow-md {
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-}
-
-.shadow-lg {
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-}
-
-/* Transition utilities */
-.transition {
-  transition-property: all;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: 150ms;
-}
-
-.transition-colors {
-  transition-property: background-color, border-color, color, fill, stroke;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: 150ms;
-}
-
-.transition-opacity {
-  transition-property: opacity;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: 150ms;
-}
-
-.transition-transform {
-  transition-property: transform;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: 150ms;
-}
-
-/* Ensure body doesn't scroll when modal is open */
+/* Утилиты для отступов */
+.mb-1 { margin-bottom: 0.5rem; }
+.mb-2 { margin-bottom: 1rem; }
+.mb-3 { margin-bottom: 1.5rem; }
+.mb-4 { margin-bottom: 2rem; }
+.mt-1 { margin-top: 0.5rem; }
+.mt-2 { margin-top: 1rem; }
+.mt-3 { margin-top: 1.5rem; }
+.mt-4 { margin-top: 2rem; }
+.p-1 { padding: 0.5rem; }
+.p-2 { padding: 1rem; }
+.p-3 { padding: 1.5rem; }
+.p-4 { padding: 2rem; }
+.gap-1 { gap: 0.5rem; }
+.gap-2 { gap: 1rem; }
+.gap-3 { gap: 1.5rem; }
+.gap-4 { gap: 2rem; }
+
+/* Утилиты для текста */
+.text-center { text-align: center; }
+.text-right { text-align: right; }
+.text-left { text-align: left; }
+.text-white { color: var(--white); }
+.text-gold { color: var(--gold); }
+.text-green { color: var(--primary-green); }
+
+/* Утилиты для flex */
+.flex { display: flex; }
+.flex-col { flex-direction: column; }
+.items-center { align-items: center; }
+.justify-center { justify-content: center; }
+.justify-between { justify-content: space-between; }
+.justify-around { justify-content: space-around; }
+.flex-1 { flex: 1; }
+.flex-wrap { flex-wrap: wrap; }
+
+/* Прочие часто используемые утилиты */
+.w-full { width: 100%; }
+.h-full { height: 100%; }
+.cursor-pointer { cursor: pointer; }
+.relative { position: relative; }
+.absolute { position: absolute; }
+.overflow-hidden { overflow: hidden; }
+.rounded-sm { border-radius: var(--radius-sm); }
+.rounded-md { border-radius: var(--radius-md); }
+.rounded-lg { border-radius: var(--radius-lg); }
+.rounded-full { border-radius: 50%; }
+
+/* Обеспечим корректную работу состояния modal-open */
 body.modal-open {
   overflow: hidden;
 }
