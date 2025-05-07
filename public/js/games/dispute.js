@@ -1,6 +1,6 @@
 /**
  * dispute.js - Улучшенная версия режима спора с монеткой
- * Версия 2.0.0
+ * Версия 2.1.0
  * 
  * Особенности:
  * - Поддержка комнаты для двух участников спора
@@ -23,7 +23,7 @@
     }
     
     const app = window.GreenLightApp;
-    app.log('Dispute', 'Инициализация модуля Dispute v2.0.0');
+    app.log('Dispute', 'Инициализация модуля Dispute v2.1.0');
     
     // Игровая логика в замыкании для изоляции
     const disputeGame = (function() {
@@ -117,10 +117,58 @@
                     startAutomaticMode();
                 }
                 
+                // Активируем экран спора вместо основного меню
+                activateDisputeScreen();
+                
                 return true;
             } catch (error) {
                 app.log('Dispute', `Ошибка инициализации: ${error.message}`, true);
                 return false;
+            }
+        };
+        
+        /**
+         * Активация экрана спора
+         */
+        const activateDisputeScreen = function() {
+            try {
+                // Скрываем все экраны
+                document.querySelectorAll('.screen').forEach(screen => {
+                    screen.classList.remove('active');
+                });
+                
+                // Проверяем наличие элемента disputeContainer
+                if (!elements.disputeContainer) {
+                    app.log('Dispute', 'Элемент disputeContainer не найден', true);
+                    return;
+                }
+                
+                // Создаем временный экран для отображения спора, если нужно
+                let disputeScreen = document.getElementById('dispute-screen');
+                if (!disputeScreen) {
+                    disputeScreen = document.createElement('div');
+                    disputeScreen.id = 'dispute-screen';
+                    disputeScreen.className = 'screen';
+                    
+                    // Находим контейнер для экранов
+                    const mainContent = document.querySelector('.main-content');
+                    if (mainContent) {
+                        mainContent.appendChild(disputeScreen);
+                    } else {
+                        document.body.appendChild(disputeScreen);
+                    }
+                }
+                
+                // Очищаем экран спора и добавляем контейнер спора
+                disputeScreen.innerHTML = '';
+                disputeScreen.appendChild(elements.disputeContainer);
+                
+                // Активируем экран спора
+                disputeScreen.classList.add('active');
+                
+                app.log('Dispute', 'Экран спора активирован');
+            } catch (error) {
+                app.log('Dispute', `Ошибка активации экрана спора: ${error.message}`, true);
             }
         };
         
@@ -145,9 +193,9 @@
         const loadSounds = function() {
             try {
                 // Создаем аудио элементы для звуков
-                sounds.flip = new Audio('sounds/flip.mp3');
-                sounds.win = new Audio('sounds/win.mp3');
-                sounds.lose = new Audio('sounds/lose.mp3');
+                sounds.flip = new Audio('https://assets.mixkit.co/sfx/preview/mixkit-arcade-mechanical-bling-210.mp3');
+                sounds.win = new Audio('https://assets.mixkit.co/sfx/preview/mixkit-winning-chimes-2015.mp3');
+                sounds.lose = new Audio('https://assets.mixkit.co/sfx/preview/mixkit-negative-tone-interface-tap-2301.mp3');
                 
                 // Предзагрузка звуков
                 Object.values(sounds).forEach(sound => {
@@ -185,7 +233,7 @@
         const createUI = async function() {
             return new Promise((resolve) => {
                 try {
-                    // Находим контейнер для игры
+                    // Находим контейнер для игры или создаем его
                     let disputeContainer = document.getElementById('dispute-container');
                     
                     // Если контейнер не существует, создаем его
@@ -532,6 +580,7 @@
                         document.head.appendChild(styleElement);
                     }
                     
+                    elements.disputeContainer = disputeContainer;
                     resolve(true);
                 } catch (error) {
                     app.log('Dispute', `Ошибка создания UI: ${error.message}`, true);
@@ -560,6 +609,15 @@
                         elements.disputeAmount = document.getElementById('dispute-amount');
                         elements.disputeId = document.getElementById('dispute-id');
                         
+                        // Проверка важных элементов
+                        if (!elements.coin) {
+                            app.log('Dispute', 'Элемент монеты не найден', true);
+                        }
+                        
+                        if (!elements.readyBtn) {
+                            app.log('Dispute', 'Кнопка готовности не найдена', true);
+                        }
+                        
                         resolve(true);
                     } catch (error) {
                         app.log('Dispute', `Ошибка поиска DOM элементов: ${error.message}`, true);
@@ -576,22 +634,182 @@
             try {
                 // Кнопка готовности
                 if (elements.readyBtn) {
+                    // Очищаем текущие обработчики
+                    const newReadyBtn = elements.readyBtn.cloneNode(true);
+                    elements.readyBtn.parentNode.replaceChild(newReadyBtn, elements.readyBtn);
+                    elements.readyBtn = newReadyBtn;
+                    
+                    // Добавляем новый обработчик
                     elements.readyBtn.addEventListener('click', toggleReady);
                 }
                 
                 // Кнопка закрытия
                 if (elements.closeBtn) {
+                    // Очищаем текущие обработчики
+                    const newCloseBtn = elements.closeBtn.cloneNode(true);
+                    elements.closeBtn.parentNode.replaceChild(newCloseBtn, elements.closeBtn);
+                    elements.closeBtn = newCloseBtn;
+                    
+                    // Добавляем новый обработчик
                     elements.closeBtn.addEventListener('click', closeDispute);
                 }
                 
                 // Обработчик сообщений от Telegram
                 if (window.Telegram && window.Telegram.WebApp) {
-                    window.Telegram.WebApp.onEvent('message', handleTelegramMessage);
+                    window.Telegram.WebApp.onEvent('viewportChanged', updateLayout);
+                    
+                    // Обработчик внешних сообщений
+                    window.addEventListener('message', handleExternalMessage);
                 }
                 
                 app.log('Dispute', 'Обработчики событий установлены');
             } catch (error) {
                 app.log('Dispute', `Ошибка настройки обработчиков: ${error.message}`, true);
+            }
+        };
+        
+        /**
+         * Обработка внешних сообщений
+         */
+        const handleExternalMessage = function(event) {
+            try {
+                // Проверяем источник сообщения
+                if (event.origin !== window.location.origin) {
+                    // Принимаем сообщения только от нашего домена
+                    return;
+                }
+                
+                const data = event.data;
+                
+                // Проверяем тип сообщения
+                if (data && data.type) {
+                    switch (data.type) {
+                        case 'dispute_update':
+                            handleDisputeUpdate(data);
+                            break;
+                        case 'player_ready':
+                            handlePlayerReadyUpdate(data);
+                            break;
+                        case 'dispute_result':
+                            handleDisputeResult(data);
+                            break;
+                    }
+                }
+            } catch (error) {
+                app.log('Dispute', `Ошибка обработки внешнего сообщения: ${error.message}`, true);
+            }
+        };
+        
+        /**
+         * Обработка обновления спора
+         */
+        const handleDisputeUpdate = function(data) {
+            try {
+                if (data.disputeId !== state.disputeId) {
+                    return;
+                }
+                
+                // Обновляем данные спора
+                if (data.dispute) {
+                    state.disputeData = data.dispute;
+                    updateDisputeUI(data.dispute);
+                }
+                
+                // Обновляем статусы готовности
+                if (data.creatorReady !== undefined) {
+                    const isCreatorUpdate = state.isCreator ? 'playerReady' : 'opponentReady';
+                    const isOpponentUpdate = state.isCreator ? 'opponentReady' : 'playerReady';
+                    
+                    state[isCreatorUpdate] = data.creatorReady;
+                    updatePlayerReadyStatus();
+                }
+                
+                if (data.opponentReady !== undefined) {
+                    const isCreatorUpdate = state.isCreator ? 'playerReady' : 'opponentReady';
+                    const isOpponentUpdate = state.isCreator ? 'opponentReady' : 'playerReady';
+                    
+                    state[isOpponentUpdate] = data.opponentReady;
+                    updateOpponentReadyStatus(data.opponentReady);
+                }
+                
+                // Проверяем, готовы ли оба игрока
+                if (data.bothReady) {
+                    state.bothReady = true;
+                    checkBothReady();
+                }
+            } catch (error) {
+                app.log('Dispute', `Ошибка обработки обновления спора: ${error.message}`, true);
+            }
+        };
+        
+        /**
+         * Обработка обновления статуса готовности игрока
+         */
+        const handlePlayerReadyUpdate = function(data) {
+            try {
+                if (data.disputeId !== state.disputeId) {
+                    return;
+                }
+                
+                if (data.isCreator !== state.isCreator) {
+                    // Обновление от другого игрока
+                    state.opponentReady = data.ready;
+                    updateOpponentReadyStatus(data.ready);
+                    checkBothReady();
+                }
+            } catch (error) {
+                app.log('Dispute', `Ошибка обработки статуса готовности: ${error.message}`, true);
+            }
+        };
+        
+        /**
+         * Обработка результата спора
+         */
+        const handleDisputeResult = function(data) {
+            try {
+                if (data.disputeId !== state.disputeId) {
+                    return;
+                }
+                
+                state.result = data.result;
+                flipCoinWithResult(data.result);
+            } catch (error) {
+                app.log('Dispute', `Ошибка обработки результата спора: ${error.message}`, true);
+            }
+        };
+        
+        /**
+         * Обновление макета при изменении размеров экрана
+         */
+        const updateLayout = function() {
+            try {
+                // Адаптируем размер контейнера к размеру окна
+                if (elements.disputeContainer) {
+                    const viewportHeight = window.innerHeight;
+                    const viewportWidth = window.innerWidth;
+                    
+                    // Адаптируем размер монеты
+                    if (elements.coin) {
+                        if (viewportWidth < 400) {
+                            elements.coin.style.width = '80px';
+                            elements.coin.style.height = '80px';
+                        } else {
+                            elements.coin.style.width = '100px';
+                            elements.coin.style.height = '100px';
+                        }
+                    }
+                    
+                    // Адаптируем высоту контейнера монетки
+                    if (document.querySelector('.coin-container')) {
+                        if (viewportHeight < 600) {
+                            document.querySelector('.coin-container').style.height = '100px';
+                        } else {
+                            document.querySelector('.coin-container').style.height = '150px';
+                        }
+                    }
+                }
+            } catch (error) {
+                app.log('Dispute', `Ошибка обновления макета: ${error.message}`, true);
             }
         };
         
@@ -602,8 +820,11 @@
             try {
                 app.log('Dispute', `Загрузка данных спора ${disputeId}`);
                 
+                // Проверяем, есть ли API URL в глобальных переменных
+                const apiUrl = window.GreenLightApp.apiUrl || '/api';
+                
                 // Запрос к API для получения данных спора
-                const response = await fetch(`/api/disputes/${disputeId}`);
+                const response = await fetch(`${apiUrl}/disputes/${disputeId}`);
                 
                 if (!response.ok) {
                     throw new Error(`Ошибка получения данных спора: ${response.status}`);
@@ -681,7 +902,7 @@
                     const creatorSide = elements.creatorInfo.querySelector('.player-side');
                     
                     if (creatorName) {
-                        creatorName.textContent = disputeData.creator.firstName || disputeData.creator.username;
+                        creatorName.textContent = disputeData.creator.firstName || disputeData.creator.username || 'Создатель';
                     }
                     
                     if (creatorSide) {
@@ -695,7 +916,9 @@
                     const opponentSide = elements.opponentInfo.querySelector('.player-side');
                     
                     if (opponentName) {
-                        opponentName.textContent = disputeData.opponent.firstName || disputeData.opponent.username;
+                        opponentName.textContent = disputeData.opponent ? 
+                            (disputeData.opponent.firstName || disputeData.opponent.username || 'Оппонент') : 
+                            'Ожидание оппонента...';
                     }
                     
                     if (opponentSide) {
@@ -725,31 +948,50 @@
                 
                 // Получаем текущий telegramId пользователя
                 let currentUserId = null;
+                
+                // Проверяем несколько источников telegramId
                 if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe && window.Telegram.WebApp.initDataUnsafe.user) {
                     currentUserId = window.Telegram.WebApp.initDataUnsafe.user.id;
-                } else if (window.GreenLightApp && window.GreenLightApp.user) {
+                } else if (window.GreenLightApp && window.GreenLightApp.user && window.GreenLightApp.user.telegramId) {
                     currentUserId = window.GreenLightApp.user.telegramId;
                 }
                 
                 // Если ID не получен, используем демо-режим
                 if (!currentUserId) {
                     app.log('Dispute', 'ID пользователя не найден, используем демо-режим');
-                    // В демо-режиме считаем пользователя создателем
-                    state.isCreator = true;
-                    state.playerSide = disputeData.creatorSide;
-                    state.opponentSide = disputeData.opponentSide;
+                    
+                    // В демо-режиме пытаемся определить роль из URL
+                    const isCreatorParam = getUrlParameter('isCreator');
+                    state.isCreator = isCreatorParam ? (isCreatorParam === 'true') : true;
+                    
+                    if (state.isCreator) {
+                        state.playerSide = disputeData.creatorSide;
+                        state.opponentSide = disputeData.opponentSide;
+                    } else {
+                        state.playerSide = disputeData.opponentSide;
+                        state.opponentSide = disputeData.creatorSide;
+                    }
+                    
+                    app.log('Dispute', `Демо-режим: ${state.isCreator ? 'создатель' : 'оппонент'}, сторона: ${state.playerSide}`);
                     return;
                 }
                 
                 // Определяем, является ли пользователь создателем спора
-                if (disputeData.creator.telegramId === currentUserId) {
+                if (disputeData.creator && disputeData.creator.telegramId === currentUserId) {
                     state.isCreator = true;
                     state.playerSide = disputeData.creatorSide;
                     state.opponentSide = disputeData.opponentSide;
-                } else {
+                } else if (disputeData.opponent && disputeData.opponent.telegramId === currentUserId) {
                     state.isCreator = false;
                     state.playerSide = disputeData.opponentSide;
                     state.opponentSide = disputeData.creatorSide;
+                } else {
+                    // Не является участником спора - предполагаем, что оппонент
+                    state.isCreator = false;
+                    state.playerSide = disputeData.opponentSide;
+                    state.opponentSide = disputeData.creatorSide;
+                    
+                    app.log('Dispute', 'Пользователь не является участником спора, считаем его оппонентом', true);
                 }
                 
                 app.log('Dispute', `Пользователь: ${state.isCreator ? 'создатель' : 'оппонент'}, сторона: ${state.playerSide}`);
@@ -768,21 +1010,136 @@
                 // Отправляем сообщение в родительское окно Telegram
                 if (window.Telegram && window.Telegram.WebApp) {
                     const connectData = {
-                        type: 'connect_dispute_room',
+                        type: 'dispute_room_connect',
                         disputeId: state.disputeId,
                         roomId: state.roomId,
                         isCreator: state.isCreator
                     };
                     
+                    // Отправляем данные на сервер через Telegram WebApp
+                    app.log('Dispute', 'Отправка данных через Telegram WebApp');
                     window.Telegram.WebApp.sendData(JSON.stringify(connectData));
-                    app.log('Dispute', 'Отправлен запрос на подключение к комнате');
                 } else {
-                    // В демо-режиме симулируем подключение
-                    app.log('Dispute', 'Демо-режим: симуляция подключения к комнате');
-                    simulateRoomConnection();
+                    // В демо-режиме отправляем запрос через fetch
+                    app.log('Dispute', 'Демо-режим: отправка запроса через fetch');
+                    
+                    // Проверяем, есть ли API URL в глобальных переменных
+                    const apiUrl = window.GreenLightApp.apiUrl || '/api';
+                    
+                    // Отправляем запрос на создание комнаты
+                    fetch(`${apiUrl}/disputes/room/create`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            disputeId: state.disputeId,
+                            roomId: state.roomId,
+                            userTelegramId: state.isCreator ? 
+                                (state.disputeData.creator && state.disputeData.creator.telegramId) : 
+                                (state.disputeData.opponent && state.disputeData.opponent.telegramId)
+                        })
+                    })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`Ошибка создания комнаты: ${response.status}`);
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        app.log('Dispute', 'Комната спора создана успешно');
+                        
+                        // Запускаем проверку статуса комнаты
+                        startRoomStatusCheck();
+                    })
+                    .catch(error => {
+                        app.log('Dispute', `Ошибка создания комнаты: ${error.message}`, true);
+                        
+                        // Симулируем подключение к комнате в демо-режиме
+                        simulateRoomConnection();
+                    });
                 }
             } catch (error) {
                 app.log('Dispute', `Ошибка подключения к комнате: ${error.message}`, true);
+                
+                // Симулируем подключение к комнате в случае ошибки
+                simulateRoomConnection();
+            }
+        };
+        
+        /**
+         * Периодическая проверка статуса комнаты
+         */
+        const startRoomStatusCheck = function() {
+            if (state.roomStatusInterval) {
+                clearInterval(state.roomStatusInterval);
+            }
+            
+            // Проверяем статус комнаты каждые 3 секунды
+            state.roomStatusInterval = setInterval(() => {
+                checkRoomStatus();
+            }, 3000);
+            
+            // Первая проверка сразу
+            checkRoomStatus();
+        };
+        
+        /**
+         * Проверка статуса комнаты
+         */
+        const checkRoomStatus = function() {
+            try {
+                // Не проверяем, если игра уже завершена
+                if (state.hasFinished) {
+                    if (state.roomStatusInterval) {
+                        clearInterval(state.roomStatusInterval);
+                        state.roomStatusInterval = null;
+                    }
+                    return;
+                }
+                
+                // Проверяем, есть ли API URL в глобальных переменных
+                const apiUrl = window.GreenLightApp.apiUrl || '/api';
+                
+                // Запрашиваем статус комнаты
+                fetch(`${apiUrl}/disputes/room/${state.disputeId}`)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`Ошибка получения статуса комнаты: ${response.status}`);
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        // Обновляем статусы готовности
+                        if (state.isCreator) {
+                            state.playerReady = data.creatorReady;
+                            state.opponentReady = data.opponentReady;
+                        } else {
+                            state.playerReady = data.opponentReady;
+                            state.opponentReady = data.creatorReady;
+                        }
+                        
+                        // Обновляем UI
+                        updatePlayerReadyStatus();
+                        updateOpponentReadyStatus(state.opponentReady);
+                        
+                        // Проверяем готовность обоих игроков
+                        if (data.bothReady && !state.bothReady) {
+                            state.bothReady = true;
+                            checkBothReady();
+                        }
+                        
+                        // Проверяем, если есть результат
+                        if (data.status === 'completed' && data.result && !state.hasFinished) {
+                            state.result = data.result;
+                            flipCoinWithResult(data.result);
+                        }
+                    })
+                    .catch(error => {
+                        app.log('Dispute', `Ошибка проверки статуса комнаты: ${error.message}`, true);
+                    });
+            } catch (error) {
+                app.log('Dispute', `Ошибка проверки статуса комнаты: ${error.message}`, true);
             }
         };
         
@@ -790,54 +1147,21 @@
          * Симуляция подключения к комнате (для демо-режима)
          */
         const simulateRoomConnection = function() {
+            app.log('Dispute', 'Симуляция подключения к комнате');
+            
+            // Ждем 1 секунду и симулируем автоматическое подключение оппонента
             setTimeout(() => {
-                // Симулируем автоматическое подключение оппонента через 2 секунды
-                updateOpponentStatus(!state.isCreator);
-            }, 2000);
-        };
-        
-        /**
-         * Обработка сообщений от Telegram
-         */
-        const handleTelegramMessage = function(event) {
-            try {
-                const data = JSON.parse(event.data);
-                app.log('Dispute', `Получено сообщение: ${data.type}`);
+                updateOpponentStatus(true);
                 
-                switch (data.type) {
-                    case 'player_ready':
-                        // Оппонент готов
-                        if (data.isCreator !== state.isCreator) {
-                            updateOpponentReadyStatus(true);
-                            checkBothReady();
-                        }
-                        break;
-                        
-                    case 'player_joined':
-                        // Оппонент присоединился к комнате
-                        if (data.isCreator !== state.isCreator) {
-                            updateOpponentStatus(true);
-                        }
-                        break;
-                        
-                    case 'coin_result':
-                        // Получен результат подбрасывания монетки
-                        if (data.disputeId === state.disputeId) {
-                            handleCoinResult(data.result);
-                        }
-                        break;
+                // Проверяем статус готовности пользователя
+                if (state.playerReady) {
+                    // Если пользователь уже готов, оппонент тоже будет готов через 2 секунды
+                    setTimeout(() => {
+                        updateOpponentReadyStatus(true);
+                        checkBothReady();
+                    }, 2000);
                 }
-            } catch (error) {
-                app.log('Dispute', `Ошибка обработки сообщения: ${error.message}`, true);
-            }
-        };
-        
-        /**
-         * Обработка результата подбрасывания монетки
-         */
-        const handleCoinResult = function(result) {
-            state.result = result;
-            flipCoinWithResult(result);
+            }, 1000);
         };
         
         /**
@@ -952,12 +1276,53 @@
                     window.Telegram.WebApp.sendData(JSON.stringify(readyData));
                     app.log('Dispute', `Отправлен статус готовности: ${state.playerReady}`);
                 } else {
-                    // В демо-режиме симулируем ответ оппонента
-                    app.log('Dispute', 'Демо-режим: симуляция ответа оппонента');
-                    simulateOpponentReady();
+                    // В демо-режиме отправляем запрос через fetch
+                    app.log('Dispute', 'Демо-режим: отправка статуса готовности через fetch');
+                    
+                    // Проверяем, есть ли API URL в глобальных переменных
+                    const apiUrl = window.GreenLightApp.apiUrl || '/api';
+                    
+                    // Отправляем запрос на обновление статуса готовности
+                    fetch(`${apiUrl}/disputes/room/ready`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            disputeId: state.disputeId,
+                            userTelegramId: state.isCreator ? 
+                                (state.disputeData.creator && state.disputeData.creator.telegramId) : 
+                                (state.disputeData.opponent && state.disputeData.opponent.telegramId),
+                            ready: state.playerReady
+                        })
+                    })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`Ошибка обновления статуса готовности: ${response.status}`);
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        app.log('Dispute', 'Статус готовности обновлен успешно');
+                        
+                        // Если оба готовы, запускаем подбрасывание
+                        if (data.bothReady && !state.bothReady) {
+                            state.bothReady = true;
+                            checkBothReady();
+                        }
+                    })
+                    .catch(error => {
+                        app.log('Dispute', `Ошибка обновления статуса готовности: ${error.message}`, true);
+                        
+                        // Симулируем ответ оппонента в демо-режиме
+                        simulateOpponentReady();
+                    });
                 }
             } catch (error) {
                 app.log('Dispute', `Ошибка отправки статуса готовности: ${error.message}`, true);
+                
+                // Симулируем ответ оппонента в случае ошибки
+                simulateOpponentReady();
             }
         };
         
@@ -965,9 +1330,11 @@
          * Симуляция готовности оппонента (для демо-режима)
          */
         const simulateOpponentReady = function() {
+            app.log('Dispute', 'Симуляция готовности оппонента');
+            
             setTimeout(() => {
                 if (state.playerReady) {
-                    // Если игрок готов, симулируем готовность оппонента
+                    // Если игрок готов, оппонент тоже готов
                     updateOpponentReadyStatus(true);
                     checkBothReady();
                 } else {
@@ -1046,8 +1413,11 @@
             try {
                 app.log('Dispute', 'Загрузка результата спора');
                 
+                // Проверяем, есть ли API URL в глобальных переменных
+                const apiUrl = window.GreenLightApp.apiUrl || '/api';
+                
                 // Запрос к API для получения результата спора
-                fetch('/api/disputes/result', {
+                fetch(`${apiUrl}/disputes/result`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ disputeId: state.disputeId })
@@ -1093,10 +1463,10 @@
          */
         const sendCoinResult = function(result) {
             try {
-                // Отправляем сообщение в Telegram
+                // Отправляем сообщение через Telegram WebApp
                 if (window.Telegram && window.Telegram.WebApp) {
                     const resultData = {
-                        type: 'coin_result',
+                        type: 'dispute_result',
                         disputeId: state.disputeId,
                         roomId: state.roomId,
                         result: result
@@ -1190,6 +1560,9 @@
                 
                 app.log('Dispute', `Результат: ${result}, игрок ${playerWon ? 'выиграл' : 'проиграл'}`);
                 
+                // Отправляем результат в Telegram, если мы in-app
+                sendDisputeResultToTelegram(result, playerWon);
+                
                 // Автоматическое закрытие через 5 секунд
                 setTimeout(() => {
                     if (!state.closed) {
@@ -1202,12 +1575,55 @@
         };
         
         /**
+         * Отправка результата спора в Telegram
+         */
+        const sendDisputeResultToTelegram = function(result, playerWon) {
+            try {
+                if (window.Telegram && window.Telegram.WebApp) {
+                    const resultData = {
+                        type: 'dispute_result_final',
+                        disputeId: state.disputeId,
+                        result: result,
+                        playerWon: playerWon
+                    };
+                    
+                    window.Telegram.WebApp.sendData(JSON.stringify(resultData));
+                    app.log('Dispute', 'Финальный результат отправлен в Telegram');
+                }
+            } catch (error) {
+                app.log('Dispute', `Ошибка отправки результата в Telegram: ${error.message}`, true);
+            }
+        };
+        
+        /**
          * Закрытие спора
          */
         const closeDispute = function() {
             app.log('Dispute', 'Закрытие спора');
             
             state.closed = true;
+            
+            try {
+                // Отправляем запрос на закрытие комнаты
+                const apiUrl = window.GreenLightApp.apiUrl || '/api';
+                
+                fetch(`${apiUrl}/disputes/room/close`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        disputeId: state.disputeId,
+                        userTelegramId: state.isCreator ? 
+                            (state.disputeData.creator && state.disputeData.creator.telegramId) : 
+                            (state.disputeData.opponent && state.disputeData.opponent.telegramId)
+                    })
+                }).catch(error => {
+                    app.log('Dispute', `Ошибка закрытия комнаты: ${error.message}`, true);
+                });
+            } catch (error) {
+                app.log('Dispute', `Ошибка запроса закрытия комнаты: ${error.message}`, true);
+            }
             
             // Закрываем мини-приложение
             if (window.Telegram && window.Telegram.WebApp) {
@@ -1259,9 +1675,18 @@
         // 4. Автоматическая инициализация при загрузке страницы
         document.addEventListener('DOMContentLoaded', function() {
             setTimeout(() => {
-                if (!disputeGame.getStatus().initialized && !disputeGame.getStatus().initializationStarted) {
-                    app.log('Dispute', 'Начало автоматической инициализации');
-                    disputeGame.init();
+                // Проверяем наличие параметра dispute в URL
+                const disputeId = new URLSearchParams(window.location.search).get('dispute');
+                
+                if (disputeId && !disputeGame.getStatus().initialized && !disputeGame.getStatus().initializationStarted) {
+                    app.log('Dispute', 'Обнаружен параметр dispute в URL, начало автоматической инициализации');
+                    disputeGame.init().then(success => {
+                        if (success) {
+                            app.log('Dispute', 'Автоматическая инициализация успешно завершена');
+                        } else {
+                            app.log('Dispute', 'Ошибка автоматической инициализации', true);
+                        }
+                    });
                 }
             }, 500);
         });
@@ -1269,9 +1694,18 @@
         // 5. Если DOM уже загружен, инициализируем сразу
         if (document.readyState === 'complete' || document.readyState === 'interactive') {
             setTimeout(() => {
-                if (!disputeGame.getStatus().initialized && !disputeGame.getStatus().initializationStarted) {
-                    app.log('Dispute', 'Начало автоматической инициализации (DOM уже загружен)');
-                    disputeGame.init();
+                // Проверяем наличие параметра dispute в URL
+                const disputeId = new URLSearchParams(window.location.search).get('dispute');
+                
+                if (disputeId && !disputeGame.getStatus().initialized && !disputeGame.getStatus().initializationStarted) {
+                    app.log('Dispute', 'DOM уже загружен, обнаружен параметр dispute в URL, начало автоматической инициализации');
+                    disputeGame.init().then(success => {
+                        if (success) {
+                            app.log('Dispute', 'Автоматическая инициализация успешно завершена');
+                        } else {
+                            app.log('Dispute', 'Ошибка автоматической инициализации', true);
+                        }
+                    });
                 }
             }, 500);
         }

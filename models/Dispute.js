@@ -88,6 +88,19 @@ const disputeSchema = new mongoose.Schema({
     type: Number
   },
   
+  // Новые поля для комнаты спора
+  roomId: {
+    type: String
+  },
+  creatorReady: {
+    type: Boolean,
+    default: false
+  },
+  opponentReady: {
+    type: Boolean,
+    default: false
+  },
+  
   // Метки времени
   createdAt: {
     type: Date,

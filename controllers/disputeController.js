@@ -68,7 +68,10 @@ exports.createDispute = async (req, res) => {
             status: 'pending',
             // Добавляем информацию о сообщении
             messageId,
-            chatId
+            chatId,
+            // Инициализируем статусы готовности
+            creatorReady: false,
+            opponentReady: false
         });
         
         await dispute.save();
@@ -191,8 +194,28 @@ exports.updateDisputeMessage = async (dispute) => {
             return;
         }
         
+        // Проверяем, есть ли данные об участниках
+        if (!dispute.creator || !dispute.opponent) {
+            console.error('Отсутствуют данные об участниках спора:', dispute._id);
+            return;
+        }
+        
+        // Загружаем информацию о создателе и оппоненте, если нужно
+        const creator = typeof dispute.creator === 'object' ? 
+            dispute.creator : 
+            await User.findById(dispute.creator);
+            
+        const opponent = typeof dispute.opponent === 'object' ? 
+            dispute.opponent : 
+            await User.findById(dispute.opponent);
+        
+        if (!creator || !opponent) {
+            console.error('Не удалось загрузить данные участников спора:', dispute._id);
+            return;
+        }
+        
         // Формируем URL для комнаты спора
-        const roomUrl = `https://t.me/${process.env.TELEGRAM_BOT_USERNAME}/app?startapp=dispute_${dispute._id}`;
+        const roomUrl = `https://t.me/${process.env.TELEGRAM_BOT_USERNAME}?start=dispute_${dispute._id}`;
         
         // Формируем клавиатуру для редактирования сообщения
         const inlineKeyboard = {
@@ -214,8 +237,8 @@ exports.updateDisputeMessage = async (dispute) => {
         const messageText = `🏆 <b>Спор начинается!</b>\n\n`
             + `<b>Тема:</b> ${dispute.question}\n`
             + `<b>Сумма:</b> ${dispute.bet.amount} ⭐\n\n`
-            + `<b>Создатель:</b> ${dispute.creator.firstName} (${creatorSideText})\n`
-            + `<b>Оппонент:</b> ${dispute.opponent.firstName} (${opponentSideText})\n\n`
+            + `<b>Создатель:</b> ${creator.firstName} (${creatorSideText})\n`
+            + `<b>Оппонент:</b> ${opponent.firstName} (${opponentSideText})\n\n`
             + `<b>Статус:</b> Спор принят\n\n`
             + `Нажмите кнопку ниже, чтобы открыть спор и бросить монетку!`;
         
@@ -389,15 +412,18 @@ exports.sendDisputeResultMessage = async (dispute, result, creatorWins) => {
         const opponentSideText = dispute.opponentSide === 'heads' ? 'Орёл' : 'Решка';
         
         // Определяем победителя
-        const winnerName = creatorWins ? dispute.creator.firstName : dispute.opponent.firstName;
+        const winnerName = creatorWins ? 
+            (dispute.creator && dispute.creator.firstName ? dispute.creator.firstName : 'Создатель') : 
+            (dispute.opponent && dispute.opponent.firstName ? dispute.opponent.firstName : 'Оппонент');
+            
         const winnerSide = creatorWins ? creatorSideText : opponentSideText;
         
         // Формируем текст сообщения
         const messageText = `🎉 <b>Спор завершен!</b>\n\n`
             + `<b>Тема:</b> ${dispute.question}\n`
             + `<b>Сумма:</b> ${dispute.bet.amount} ⭐\n\n`
-            + `<b>Создатель:</b> ${dispute.creator.firstName} (${creatorSideText})\n`
-            + `<b>Оппонент:</b> ${dispute.opponent.firstName} (${opponentSideText})\n\n`
+            + `<b>Создатель:</b> ${dispute.creator && dispute.creator.firstName ? dispute.creator.firstName : 'Создатель'} (${creatorSideText})\n`
+            + `<b>Оппонент:</b> ${dispute.opponent && dispute.opponent.firstName ? dispute.opponent.firstName : 'Оппонент'} (${opponentSideText})\n\n`
             + `<b>Результат:</b> Выпал ${resultText}!\n`
             + `<b>Победитель:</b> ${winnerName} (${winnerSide})\n`
             + `<b>Выигрыш:</b> ${dispute.bet.amount * 2 - dispute.commission} ⭐`;
@@ -464,6 +490,8 @@ exports.createDisputeRoom = async (req, res) => {
     try {
         const { disputeId, roomId, userTelegramId } = req.body;
         
+        console.log('Создание комнаты для спора:', { disputeId, roomId, userTelegramId });
+        
         // Проверяем существование спора
         const dispute = await Dispute.findById(disputeId)
             .populate('creator', 'telegramId firstName lastName username')
@@ -474,11 +502,23 @@ exports.createDisputeRoom = async (req, res) => {
         }
         
         // Проверяем, что пользователь является участником спора
-        const isCreator = dispute.creatorTelegramId === userTelegramId;
-        const isOpponent = dispute.opponentTelegramId === userTelegramId;
+        const isCreator = dispute.creatorTelegramId == userTelegramId;
+        const isOpponent = dispute.opponentTelegramId == userTelegramId;
         
         if (!isCreator && !isOpponent) {
-            return res.status(403).json({ message: 'Вы не являетесь участником этого спора' });
+            console.log('Пользователь не является участником спора:', userTelegramId);
+            console.log('Создатель:', dispute.creatorTelegramId);
+            console.log('Оппонент:', dispute.opponentTelegramId);
+            return res.status(403).json({ 
+                message: 'Вы не являетесь участником этого спора',
+                debug: { 
+                    userTelegramId, 
+                    creatorTelegramId: dispute.creatorTelegramId, 
+                    opponentTelegramId: dispute.opponentTelegramId,
+                    isCreator, 
+                    isOpponent
+                }
+            });
         }
         
         // Проверяем статус спора
@@ -500,11 +540,11 @@ exports.createDisputeRoom = async (req, res) => {
         }
         
         // Логируем создание комнаты
-        console.log(`Создана комната для спора ${dispute._id}. RoomID: ${dispute.roomId}`);
+        console.log(`Создана комната для спора ${dispute._id}. RoomID: ${dispute.roomId || roomId}`);
         
         res.status(200).json({ 
             success: true, 
-            roomId: dispute.roomId,
+            roomId: dispute.roomId || roomId,
             dispute: {
                 _id: dispute._id,
                 question: dispute.question,
@@ -513,12 +553,14 @@ exports.createDisputeRoom = async (req, res) => {
                 opponentSide: dispute.opponentSide,
                 creator: dispute.creator,
                 opponent: dispute.opponent,
-                status: dispute.status
+                status: dispute.status,
+                creatorReady: dispute.creatorReady,
+                opponentReady: dispute.opponentReady
             }
         });
     } catch (error) {
         console.error('Ошибка создания комнаты спора:', error);
-        res.status(500).json({ message: 'Server error' });
+        res.status(500).json({ message: 'Server error', error: error.message });
     }
 };
 
@@ -533,7 +575,7 @@ exports.notifyDisputeParticipant = async (telegramId, dispute) => {
         }
         
         // Формируем URL для комнаты спора
-        const roomUrl = `https://t.me/${process.env.TELEGRAM_BOT_USERNAME}/app?startapp=dispute_${dispute._id}`;
+        const roomUrl = `https://t.me/${process.env.TELEGRAM_BOT_USERNAME}?start=dispute_${dispute._id}`;
         
         // Формируем текст уведомления
         const messageText = `🔔 <b>Приглашение в комнату спора</b>\n\n`
@@ -548,7 +590,7 @@ exports.notifyDisputeParticipant = async (telegramId, dispute) => {
                 [
                     {
                         text: 'Присоединиться к спору 👑',
-                        url: roomUrl
+                        web_app: { url: `${process.env.WEBAPP_URL}?dispute=${dispute._id}` }
                     }
                 ]
             ]
@@ -588,6 +630,8 @@ exports.updatePlayerReadyStatus = async (req, res) => {
     try {
         const { disputeId, userTelegramId, ready } = req.body;
         
+        console.log('Обновление статуса готовности:', { disputeId, userTelegramId, ready });
+        
         // Проверяем существование спора
         const dispute = await Dispute.findById(disputeId);
         if (!dispute) {
@@ -595,11 +639,23 @@ exports.updatePlayerReadyStatus = async (req, res) => {
         }
         
         // Проверяем, что пользователь является участником спора
-        const isCreator = dispute.creatorTelegramId === userTelegramId;
-        const isOpponent = dispute.opponentTelegramId === userTelegramId;
+        const isCreator = dispute.creatorTelegramId == userTelegramId;
+        const isOpponent = dispute.opponentTelegramId == userTelegramId;
         
         if (!isCreator && !isOpponent) {
-            return res.status(403).json({ message: 'Вы не являетесь участником этого спора' });
+            console.log('Пользователь не является участником спора:', userTelegramId);
+            console.log('Создатель:', dispute.creatorTelegramId);
+            console.log('Оппонент:', dispute.opponentTelegramId);
+            return res.status(403).json({ 
+                message: 'Вы не являетесь участником этого спора',
+                debug: { 
+                    userTelegramId, 
+                    creatorTelegramId: dispute.creatorTelegramId, 
+                    opponentTelegramId: dispute.opponentTelegramId,
+                    isCreator, 
+                    isOpponent
+                }
+            });
         }
         
         // Обновляем статус готовности
@@ -618,31 +674,234 @@ exports.updatePlayerReadyStatus = async (req, res) => {
         console.log(`Обновлен статус готовности для спора ${dispute._id}. Пользователь: ${userTelegramId}, готов: ${ready}. Оба готовы: ${bothReady}`);
         
         // Если оба игрока готовы, начинаем подбрасывание монетки
+        let resultData = null;
         if (bothReady && isCreator) {
             // Только создатель запускает процесс определения результата
-            setTimeout(() => {
-                this.getDisputeResult({ body: { disputeId } }, { 
-                    status: () => ({ 
-                        json: () => {} 
-                    }) 
-                }).catch(error => {
-                    console.error('Ошибка автоматического определения результата:', error);
-                });
-            }, 3000);
+            try {
+                console.log('Оба участника готовы, определяем результат спора');
+                const result = await this.determineDisputeResult(dispute);
+                resultData = result;
+            } catch (resultError) {
+                console.error('Ошибка определения результата спора:', resultError);
+            }
         }
         
         // Отправляем статус готовности другому участнику
-        this.sendReadyStatusNotification(dispute, isCreator);
+        await this.sendReadyStatusNotification(dispute, isCreator);
         
         res.status(200).json({ 
             success: true, 
             bothReady,
             creatorReady: dispute.creatorReady,
-            opponentReady: dispute.opponentReady
+            opponentReady: dispute.opponentReady,
+            result: resultData
         });
     } catch (error) {
         console.error('Ошибка обновления статуса готовности:', error);
-        res.status(500).json({ message: 'Server error' });
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
+// Определение результата спора
+exports.determineDisputeResult = async (dispute) => {
+    try {
+        // Проверяем, что спор активен
+        if (dispute.status !== 'active') {
+            throw new Error(`Спор ${dispute._id} не активен, статус: ${dispute.status}`);
+        }
+        
+        console.log(`Определение результата спора ${dispute._id}`);
+        
+        // Генерируем случайный результат - "heads" или "tails"
+        const result = Math.random() < 0.5 ? 'heads' : 'tails';
+        
+        // Определяем победителя
+        const creatorWins = (dispute.creatorSide === result);
+        const winnerId = creatorWins ? dispute.creator : dispute.opponent;
+        const winnerTelegramId = creatorWins ? dispute.creatorTelegramId : dispute.opponentTelegramId;
+        
+        // Вычисляем сумму выигрыша с комиссией 5%
+        const totalAmount = dispute.bet.amount * 2;
+        const commission = Math.floor(totalAmount * 0.05);
+        const winAmount = totalAmount - commission;
+        
+        // Обновляем спор
+        dispute.result = result;
+        dispute.winner = winnerId;
+        dispute.winnerTelegramId = winnerTelegramId;
+        dispute.commission = commission;
+        dispute.status = 'completed';
+        dispute.completedAt = new Date();
+        
+        await dispute.save();
+        
+        // Обновляем баланс победителя
+        const winnerUser = await User.findOne({ telegramId: winnerTelegramId });
+        if (winnerUser) {
+            winnerUser.balance += winAmount;
+            await winnerUser.save();
+            
+            // Записываем транзакцию выигрыша
+            const winTransaction = new Transaction({
+                userId: winnerUser._id,
+                telegramId: winnerTelegramId,
+                amount: winAmount,
+                type: 'win',
+                game: 'dispute'
+            });
+            
+            await winTransaction.save();
+        }
+        
+        // Записываем в историю игр
+        await this.addGameHistoryRecords(dispute, result, winAmount);
+        
+        // Оповещаем участников о результате
+        await this.notifyPlayersAboutResult(dispute, result, creatorWins, winAmount);
+        
+        // Результат для возврата
+        return {
+            dispute,
+            result,
+            winnerTelegramId,
+            creatorWins,
+            winAmount,
+            commission
+        };
+    } catch (error) {
+        console.error('Ошибка определения результата спора:', error);
+        throw error;
+    }
+};
+
+// Добавление записей в историю игр
+exports.addGameHistoryRecords = async (dispute, result, winAmount) => {
+    try {
+        // Определяем победителя и проигравшего
+        const creatorWins = (dispute.creatorSide === result);
+        const winnerId = creatorWins ? dispute.creator : dispute.opponent;
+        const winnerTelegramId = creatorWins ? dispute.creatorTelegramId : dispute.opponentTelegramId;
+        const loserId = creatorWins ? dispute.opponent : dispute.creator;
+        const loserTelegramId = creatorWins ? dispute.opponentTelegramId : dispute.creatorTelegramId;
+        
+        // Получаем объекты пользователей
+        const winnerUser = await User.findOne({ telegramId: winnerTelegramId });
+        const loserUser = await User.findOne({ telegramId: loserTelegramId });
+        
+        if (!winnerUser || !loserUser) {
+            throw new Error('Не удалось найти участников спора');
+        }
+        
+        // Запись для победителя
+        const winnerHistory = new GameHistory({
+            userId: winnerUser._id,
+            telegramId: winnerTelegramId,
+            gameType: 'dispute',
+            betAmount: dispute.bet.amount,
+            outcome: 'win',
+            winAmount: winAmount,
+            gameData: {
+                disputeId: dispute._id,
+                question: dispute.question,
+                opponentId: loserTelegramId,
+                coinResult: result
+            },
+            disputeId: dispute._id
+        });
+        
+        // Запись для проигравшего
+        const loserHistory = new GameHistory({
+            userId: loserUser._id,
+            telegramId: loserTelegramId,
+            gameType: 'dispute',
+            betAmount: dispute.bet.amount,
+            outcome: 'lose',
+            winAmount: 0,
+            gameData: {
+                disputeId: dispute._id,
+                question: dispute.question,
+                opponentId: winnerTelegramId,
+                coinResult: result
+            },
+            disputeId: dispute._id
+        });
+        
+        await winnerHistory.save();
+        await loserHistory.save();
+        
+        console.log(`Записи истории игр для спора ${dispute._id} добавлены`);
+    } catch (error) {
+        console.error('Ошибка добавления записей в историю игр:', error);
+    }
+};
+
+// Оповещение участников о результате
+exports.notifyPlayersAboutResult = async (dispute, result, creatorWins, winAmount) => {
+    try {
+        // Определяем стороны на русском
+        const resultText = result === 'heads' ? 'Орёл' : 'Решка';
+        
+        // Сообщение для победителя
+        const winnerMessage = `🎉 Результат спора: выпал ${resultText}!\n\n`
+            + `🏆 Вы выиграли ${winAmount} ⭐!\n\n`
+            + `❓ ${dispute.question}`;
+        
+        // Сообщение для проигравшего
+        const loserMessage = `🎲 Результат спора: выпал ${resultText}!\n\n`
+            + `😢 К сожалению, вы проиграли.\n\n`
+            + `❓ ${dispute.question}`;
+        
+        // Отправляем уведомления
+        const botToken = process.env.TELEGRAM_BOT_TOKEN;
+        if (!botToken) {
+            console.error('Токен Telegram бота не настроен');
+            return;
+        }
+        
+        if (dispute.creatorTelegramId) {
+            try {
+                await fetch(
+                    `https://api.telegram.org/bot${botToken}/sendMessage`,
+                    {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            chat_id: dispute.creatorTelegramId,
+                            text: creatorWins ? winnerMessage : loserMessage
+                        })
+                    }
+                );
+            } catch (error) {
+                console.error('Ошибка отправки уведомления создателю:', error);
+            }
+        }
+        
+        if (dispute.opponentTelegramId) {
+            try {
+                await fetch(
+                    `https://api.telegram.org/bot${botToken}/sendMessage`,
+                    {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            chat_id: dispute.opponentTelegramId,
+                            text: creatorWins ? loserMessage : winnerMessage
+                        })
+                    }
+                );
+            } catch (error) {
+                console.error('Ошибка отправки уведомления оппоненту:', error);
+            }
+        }
+        
+        // Обновляем сообщение в чате, если доступно
+        if (dispute.messageId && dispute.chatId) {
+            await this.sendDisputeResultMessage(dispute, result, creatorWins);
+        }
+        
+        console.log(`Уведомления о результате спора ${dispute._id} отправлены участникам`);
+    } catch (error) {
+        console.error('Ошибка оповещения участников о результате:', error);
     }
 };
 
@@ -656,9 +915,23 @@ exports.sendReadyStatusNotification = async (dispute, isFromCreator) => {
             return;
         }
         
+        // Загружаем информацию о пользователях, если нужно
+        let creator = dispute.creator;
+        let opponent = dispute.opponent;
+        
+        if (typeof creator !== 'object' || !creator.firstName) {
+            creator = await User.findById(dispute.creator);
+        }
+        
+        if (typeof opponent !== 'object' || !opponent.firstName) {
+            opponent = await User.findById(dispute.opponent);
+        }
+        
         // Определяем получателя уведомления
         const recipientTelegramId = isFromCreator ? dispute.opponentTelegramId : dispute.creatorTelegramId;
-        const senderName = isFromCreator ? dispute.creator.firstName : dispute.opponent.firstName;
+        const senderName = isFromCreator ? 
+            (creator && creator.firstName ? creator.firstName : 'Создатель') : 
+            (opponent && opponent.firstName ? opponent.firstName : 'Оппонент');
         
         // Определяем статус отправителя
         const isReady = isFromCreator ? dispute.creatorReady : dispute.opponentReady;
@@ -669,6 +942,22 @@ exports.sendReadyStatusNotification = async (dispute, isFromCreator) => {
             + `<b>Тема спора:</b> ${dispute.question}\n`
             + `<b>Сумма:</b> ${dispute.bet.amount} ⭐`;
         
+        // Добавляем кнопку для открытия игры, если оба участника готовы
+        let replyMarkup = {};
+        
+        if (dispute.creatorReady && dispute.opponentReady) {
+            replyMarkup = {
+                inline_keyboard: [
+                    [
+                        {
+                            text: '🎮 Открыть комнату спора',
+                            web_app: { url: `${process.env.WEBAPP_URL}?dispute=${dispute._id}` }
+                        }
+                    ]
+                ]
+            };
+        }
+        
         // Выполняем запрос к API Telegram для отправки уведомления
         const response = await fetch(
             `https://api.telegram.org/bot${botToken}/sendMessage`,
@@ -678,7 +967,8 @@ exports.sendReadyStatusNotification = async (dispute, isFromCreator) => {
                 body: JSON.stringify({
                     chat_id: recipientTelegramId,
                     text: messageText,
-                    parse_mode: 'HTML'
+                    parse_mode: 'HTML',
+                    reply_markup: dispute.creatorReady && dispute.opponentReady ? replyMarkup : {}
                 })
             }
         );
@@ -686,6 +976,8 @@ exports.sendReadyStatusNotification = async (dispute, isFromCreator) => {
         const result = await response.json();
         if (!result.ok) {
             console.error('Ошибка отправки уведомления о готовности:', result.description);
+        } else {
+            console.log(`Уведомление о готовности для спора ${dispute._id} отправлено`);
         }
         
         return result;
@@ -738,8 +1030,8 @@ exports.closeDisputeRoom = async (req, res) => {
         }
         
         // Проверяем, что пользователь является участником спора
-        const isCreator = dispute.creatorTelegramId === userTelegramId;
-        const isOpponent = dispute.opponentTelegramId === userTelegramId;
+        const isCreator = dispute.creatorTelegramId == userTelegramId;
+        const isOpponent = dispute.opponentTelegramId == userTelegramId;
         
         if (!isCreator && !isOpponent) {
             return res.status(403).json({ message: 'Вы не являетесь участником этого спора' });
