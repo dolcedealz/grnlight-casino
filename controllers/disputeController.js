@@ -565,6 +565,7 @@ exports.createDisputeRoom = async (req, res) => {
 };
 
 // Уведомление участника спора
+// Уведомление участника спора
 exports.notifyDisputeParticipant = async (telegramId, dispute) => {
     try {
         // Получаем токен бота из конфигурации
