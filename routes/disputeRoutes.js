@@ -20,4 +20,16 @@ router.post('/result', disputeController.getDisputeResult);
 // Получение истории споров пользователя
 router.get('/history/:telegramId', disputeController.getUserDisputeHistory);
 
+// Создание комнаты для спора
+router.post('/room/create', disputeController.createDisputeRoom);
+
+// Обновление статуса готовности игрока
+router.post('/room/ready', disputeController.updatePlayerReadyStatus);
+
+// Получение статуса комнаты спора
+router.get('/room/:disputeId', disputeController.getDisputeRoomStatus);
+
+// Закрытие комнаты спора
+router.post('/room/close', disputeController.closeDisputeRoom);
+
 module.exports = router;

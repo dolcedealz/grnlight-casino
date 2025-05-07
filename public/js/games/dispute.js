@@ -1,19 +1,19 @@
 /**
- * coinflip.js - Optimized Coin Flip game with dispute functionality
- * Version 1.0.0
+ * dispute.js - Улучшенная версия режима спора с монеткой
+ * Версия 2.0.0
  * 
- * Features:
- * - Standard coin flip game
- * - Dispute resolution system
- * - Telegram Mini App integration
- * - Animation and tactile feedback
+ * Особенности:
+ * - Поддержка комнаты для двух участников спора
+ * - Механизм готовности игроков
+ * - Интеграция с Telegram для обновления сообщений
+ * - Автоматический запуск монетки при готовности обоих участников
  */
 
-// Prevent conflicts with isolated environment
+// Предотвращаем конфликты и обеспечиваем изолированную среду
 (function() {
-    // Check for app object
+    // Проверяем наличие основного объекта приложения
     if (!window.GreenLightApp) {
-        console.error('[CoinFlip] GreenLightApp not initialized!');
+        console.error('[Dispute] GreenLightApp не инициализирован!');
         window.GreenLightApp = {
             log: function(source, message, isError) {
                 if (isError) console.error(`[${source}] ${message}`);
@@ -23,995 +23,1260 @@
     }
     
     const app = window.GreenLightApp;
-    app.log('CoinFlip', 'Initializing CoinFlip module v1.0.0');
+    app.log('Dispute', 'Инициализация модуля Dispute v2.0.0');
     
-    // Game logic in closure for isolation
-    const coinFlipGame = (function() {
-        // UI elements
+    // Игровая логика в замыкании для изоляции
+    const disputeGame = (function() {
+        // Элементы игры
         let elements = {
-            coinFlipContainer: null,
+            disputeContainer: null,
             coin: null,
-            headsBtn: null,
-            tailsBtn: null,
-            flipBtn: null,
-            betAmount: null,
-            resultDisplay: null,
-            balanceDisplay: null
+            readyBtn: null,
+            coinResult: null,
+            playersList: null,
+            creatorInfo: null,
+            opponentInfo: null,
+            waitingMessage: null,
+            resultMessage: null
         };
         
-        // Game state
+        // Глобальное состояние спора
         let state = {
-            isFlipping: false,
             initialized: false,
             initializationStarted: false,
-            selectedSide: null, // 'heads' or 'tails'
-            disputeId: null,    // If game is running as part of a dispute
-            disputeData: null,  // Dispute data if available
-            playerSide: null,   // Player's side in dispute ('heads' or 'tails')
-            opponentSide: null  // Opponent's side in dispute
+            isFlipping: false,
+            disputeId: null,
+            disputeData: null,
+            roomId: null,
+            playerSide: null,
+            opponentSide: null,
+            isCreator: false,
+            playerReady: false,
+            opponentReady: false,
+            bothReady: false,
+            result: null,
+            hasFinished: false
+        };
+        
+        // Звуковые эффекты
+        let sounds = {
+            flip: null,
+            win: null,
+            lose: null
         };
         
         /**
-         * Game initialization
-         * Protected from repeated initialization and with timeout
+         * Инициализация игры
          */
         const init = async function() {
-            // Prevent repeated initialization
+            // Предотвращаем повторную инициализацию
             if (state.initialized || state.initializationStarted) {
-                app.log('CoinFlip', 'Initialization already completed or in progress');
+                app.log('Dispute', 'Инициализация уже выполнена или выполняется');
                 return true;
             }
             
             state.initializationStarted = true;
-            app.log('CoinFlip', 'Starting game initialization');
+            app.log('Dispute', 'Начало инициализации режима спора');
             
             try {
-                // Set timeout for initialization
-                const initPromise = new Promise(async (resolve) => {
-                    try {
-                        // Create UI elements if they don't exist
-                        ensureUIElements();
-                        
-                        // Get DOM elements
-                        await findDOMElements();
-                        
-                        // Check URL parameters for dispute
-                        checkDisputeParams();
-                        
-                        // Set up event listeners
-                        setupEventListeners();
-                        
-                        state.initialized = true;
-                        app.log('CoinFlip', 'Initialization completed successfully');
-                        resolve(true);
-                    } catch (innerError) {
-                        app.log('CoinFlip', `Error during initialization: ${innerError.message}`, true);
-                        resolve(false);
-                    }
-                });
+                // Проверяем URL параметры для получения disputeId и roomId
+                const disputeId = getUrlParameter('dispute');
+                const roomId = getUrlParameter('room');
                 
-                // Set timeout (3 seconds)
-                const timeoutPromise = new Promise((resolve) => {
-                    setTimeout(() => {
-                        app.log('CoinFlip', 'Initialization timeout', true);
-                        resolve(false);
-                    }, 3000);
-                });
+                if (!disputeId) {
+                    app.log('Dispute', 'Отсутствует ID спора в URL', true);
+                    return false;
+                }
                 
-                // Use Promise.race to prevent hanging
-                const result = await Promise.race([initPromise, timeoutPromise]);
+                state.disputeId = disputeId;
+                state.roomId = roomId || generateRoomId();
                 
-                return result;
+                // Создаем UI элементы
+                await createUI();
                 
+                // Находим DOM элементы
+                await findDOMElements();
+                
+                // Загружаем данные спора
+                await loadDisputeData(disputeId);
+                
+                // Настраиваем обработчики событий
+                setupEventListeners();
+                
+                // Загружаем звуки
+                loadSounds();
+                
+                // Подключаемся к комнате спора
+                connectToDisputeRoom();
+                
+                state.initialized = true;
+                app.log('Dispute', 'Инициализация завершена успешно');
+                
+                // Проверяем URL на наличие параметра автоматического запуска
+                if (getUrlParameter('autostart') === 'true') {
+                    startAutomaticMode();
+                }
+                
+                return true;
             } catch (error) {
-                app.log('CoinFlip', `Critical initialization error: ${error.message}`, true);
+                app.log('Dispute', `Ошибка инициализации: ${error.message}`, true);
                 return false;
             }
         };
         
         /**
-         * Check URL parameters for dispute ID
+         * Получение параметра из URL
          */
-        const checkDisputeParams = function() {
-            try {
-                const urlParams = new URLSearchParams(window.location.search);
-                const disputeId = urlParams.get('dispute');
-                
-                if (disputeId) {
-                    state.disputeId = disputeId;
-                    app.log('CoinFlip', `Dispute ID found: ${disputeId}`);
-                    
-                    // Load dispute data
-                    loadDisputeData(disputeId).then(dispute => {
-                        if (dispute) {
-                            setupDisputeMode(dispute);
-                        }
-                    });
-                }
-            } catch (error) {
-                app.log('CoinFlip', `Error checking URL parameters: ${error.message}`, true);
-            }
+        const getUrlParameter = function(name) {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get(name);
         };
         
         /**
-         * Load dispute data from server
+         * Генерация уникального ID комнаты
          */
-        const loadDisputeData = async function(disputeId) {
-            try {
-                app.log('CoinFlip', `Loading dispute data for ${disputeId}`);
-                
-                // In real implementation, this would be an API call
-                // For demo, using static data
-                const disputeData = {
-                    id: disputeId,
-                    creator: {
-                        telegramId: 123456789,
-                        username: 'user1',
-                        side: 'heads'
-                    },
-                    opponent: {
-                        telegramId: 987654321,
-                        username: 'user2',
-                        side: 'tails'
-                    },
-                    amount: 100,
-                    subject: 'Who will win the match?',
-                    status: 'accepted',
-                    result: null
-                };
-                
-                // Store data in state
-                state.disputeData = disputeData;
-                
-                return disputeData;
-            } catch (error) {
-                app.log('CoinFlip', `Error loading dispute data: ${error.message}`, true);
-                return null;
-            }
+        const generateRoomId = function() {
+            return 'room_' + Math.random().toString(36).substr(2, 9);
         };
         
         /**
-         * Configure dispute mode
+         * Загрузка звуковых эффектов
          */
-        const setupDisputeMode = function(dispute) {
+        const loadSounds = function() {
             try {
-                app.log('CoinFlip', 'Setting up dispute mode');
+                // Создаем аудио элементы для звуков
+                sounds.flip = new Audio('sounds/flip.mp3');
+                sounds.win = new Audio('sounds/win.mp3');
+                sounds.lose = new Audio('sounds/lose.mp3');
                 
-                // Determine player's side
-                const currentUserId = window.GreenLightApp.user.telegramId;
-                const isCreator = currentUserId === dispute.creator.telegramId;
-                
-                state.playerSide = isCreator ? dispute.creator.side : dispute.opponent.side;
-                state.opponentSide = isCreator ? dispute.opponent.side : dispute.creator.side;
-                
-                // Update UI
-                if (elements.coinFlipContainer) {
-                    // Add class for dispute mode
-                    elements.coinFlipContainer.classList.add('dispute-mode');
-                    
-                    // Add dispute info
-                    const disputeInfo = document.createElement('div');
-                    disputeInfo.className = 'dispute-info';
-                    disputeInfo.innerHTML = `
-                        <h3>Dispute: ${dispute.subject}</h3>
-                        <div class="dispute-details">
-                            <p>Amount: ${dispute.amount} ⭐</p>
-                            <p>Your side: ${state.playerSide === 'heads' ? 'Heads' : 'Tails'}</p>
-                            <p>Opponent: @${isCreator ? dispute.opponent.username : dispute.creator.username}</p>
-                        </div>
-                    `;
-                    
-                    // Insert before coin
-                    if (elements.coin) {
-                        elements.coin.parentNode.insertBefore(disputeInfo, elements.coin);
-                    } else {
-                        elements.coinFlipContainer.prepend(disputeInfo);
+                // Предзагрузка звуков
+                Object.values(sounds).forEach(sound => {
+                    if (sound) {
+                        sound.load();
                     }
-                    
-                    // Fix side selection
-                    state.selectedSide = state.playerSide;
-                    
-                    // Disable side selection buttons
-                    if (elements.headsBtn) {
-                        elements.headsBtn.disabled = true;
-                        if (state.playerSide === 'heads') {
-                            elements.headsBtn.classList.add('selected');
-                        }
-                    }
-                    
-                    if (elements.tailsBtn) {
-                        elements.tailsBtn.disabled = true;
-                        if (state.playerSide === 'tails') {
-                            elements.tailsBtn.classList.add('selected');
-                        }
-                    }
-                    
-                    // Set bet amount
-                    if (elements.betAmount) {
-                        elements.betAmount.value = dispute.amount;
-                        elements.betAmount.disabled = true;
-                    }
-                }
-                
-            } catch (error) {
-                app.log('CoinFlip', `Error setting up dispute mode: ${error.message}`, true);
-            }
-        };
-        
-        /**
-         * Ensure UI elements exist
-         */
-        const ensureUIElements = function() {
-            try {
-                app.log('CoinFlip', 'Checking UI elements');
-                
-                // Find or create main game container
-                let container = document.getElementById('coinflip-screen');
-                
-                if (!container) {
-                    app.log('CoinFlip', 'Creating game container');
-                    
-                    // Find insertion point
-                    const mainContent = document.querySelector('.main-content');
-                    
-                    if (!mainContent) {
-                        app.log('CoinFlip', 'main-content container not found', true);
-                        return;
-                    }
-                    
-                    // Create game screen
-                    container = document.createElement('div');
-                    container.id = 'coinflip-screen';
-                    container.className = 'screen';
-                    
-                    // Add HTML markup
-                    container.innerHTML = `
-                        <div class="game-header">
-                            <button class="back-btn">← Back</button>
-                            <h2>Coin Flip</h2>
-                        </div>
-                        <div class="coinflip-container">
-                            <div class="coin-wrapper">
-                                <div id="coin" class="coin">
-                                    <div class="heads-side">
-                                        <div class="coin-design">
-                                            <span>H</span>
-                                        </div>
-                                    </div>
-                                    <div class="tails-side">
-                                        <div class="coin-design">
-                                            <span>T</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div id="result-display" class="result"></div>
-                            
-                            <div class="selection-buttons">
-                                <button id="heads-btn" class="side-btn">Heads</button>
-                                <button id="tails-btn" class="side-btn">Tails</button>
-                            </div>
-                            
-                            <div class="bet-controls">
-                                <div class="bet-amount">
-                                    <label for="coinflip-bet">Bet Amount:</label>
-                                    <input type="number" id="coinflip-bet" min="1" value="10">
-                                </div>
-                                <button id="flip-btn" class="action-btn">FLIP</button>
-                            </div>
-                        </div>
-                    `;
-                    
-                    // Add to DOM
-                    mainContent.appendChild(container);
-                    
-                    // Add game card to main screen
-                    addGameCard();
-                    
-                    // Add styles
-                    addStyles();
-                }
-            } catch (error) {
-                app.log('CoinFlip', `Error checking interface: ${error.message}`, true);
-            }
-        };
-        
-        /**
-         * Add game card to main screen
-         */
-        const addGameCard = function() {
-            try {
-                const gameGrid = document.querySelector('.game-grid');
-                
-                if (!gameGrid) {
-                    app.log('CoinFlip', 'Game grid not found', true);
-                    return;
-                }
-                
-                // Check if card already exists
-                if (document.querySelector('.game-card[data-game="coinflip"]')) {
-                    return;
-                }
-                
-                // Create card
-                const card = document.createElement('div');
-                card.className = 'game-card';
-                card.setAttribute('data-game', 'coinflip');
-                
-                card.innerHTML = `
-                    <div class="game-icon">🪙</div>
-                    <div class="game-name">Coin Flip</div>
-                `;
-                
-                // Add to grid
-                gameGrid.appendChild(card);
-                
-                // Update card handlers
-                const gameCards = document.querySelectorAll('.game-card');
-                gameCards.forEach(card => {
-                    card.addEventListener('click', (e) => {
-                        const game = card.getAttribute('data-game');
-                        if (!game) return;
-                        
-                        // Tactile feedback
-                        if (window.casinoApp && window.casinoApp.provideTactileFeedback) {
-                            window.casinoApp.provideTactileFeedback('light');
-                        }
-                        
-                        // Pressed animation
-                        card.classList.add('card-pressed');
-                        setTimeout(() => {
-                            card.classList.remove('card-pressed');
-                        }, 150);
-                        
-                        // Switch screens
-                        document.querySelectorAll('.screen').forEach(screen => {
-                            screen.classList.remove('active');
-                        });
-                        
-                        const targetScreen = document.getElementById(`${game}-screen`);
-                        if (targetScreen) {
-                            targetScreen.classList.add('active');
-                        }
-                    });
                 });
+                
+                app.log('Dispute', 'Звуки загружены успешно');
             } catch (error) {
-                app.log('CoinFlip', `Error adding card: ${error.message}`, true);
+                app.log('Dispute', `Ошибка загрузки звуков: ${error.message}`, true);
             }
         };
         
         /**
-         * Add styles for the game
+         * Воспроизведение звука
          */
-        const addStyles = function() {
+        const playSound = function(soundName) {
             try {
-                // Check if styles already exist
-                if (document.getElementById('coinflip-styles')) {
-                    return;
+                const sound = sounds[soundName];
+                if (sound) {
+                    sound.currentTime = 0;
+                    sound.play().catch(e => {
+                        // Игнорируем ошибки автовоспроизведения
+                    });
                 }
-                
-                // Create style element
-                const style = document.createElement('style');
-                style.id = 'coinflip-styles';
-                
-                // Add CSS
-                style.textContent = `
-                    .coinflip-container {
-                        display: flex;
-                        flex-direction: column;
-                        align-items: center;
-                        gap: 2rem;
-                        width: 100%;
-                        max-width: 500px;
-                        margin: 0 auto;
-                        padding: 1rem;
-                    }
-                    
-                    .coin-wrapper {
-                        perspective: 800px;
-                        width: 200px;
-                        height: 200px;
-                        display: flex;
-                        justify-content: center;
-                        align-items: center;
-                        margin: 2rem 0;
-                    }
-                    
-                    .coin {
-                        position: relative;
-                        width: 150px;
-                        height: 150px;
-                        transform-style: preserve-3d;
-                        transition: transform 1s ease-in-out;
-                    }
-                    
-                    .coin.flipping {
-                        animation: flip-coin 3s forwards;
-                    }
-                    
-                    .coin .heads-side,
-                    .coin .tails-side {
-                        position: absolute;
-                        width: 100%;
-                        height: 100%;
-                        border-radius: 50%;
-                        backface-visibility: hidden;
-                        display: flex;
-                        justify-content: center;
-                        align-items: center;
-                        font-size: 2rem;
-                        font-weight: bold;
-                    }
-                    
-                    .coin .heads-side {
-                        background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
-                        z-index: 2;
-                    }
-                    
-                    .coin .tails-side {
-                        background: linear-gradient(135deg, #C0C0C0 0%, #A0A0A0 100%);
-                        transform: rotateY(180deg);
-                    }
-                    
-                    .coin-design {
-                        width: 80%;
-                        height: 80%;
-                        border-radius: 50%;
-                        border: 3px solid rgba(0,0,0,0.2);
-                        display: flex;
-                        justify-content: center;
-                        align-items: center;
-                        color: rgba(0,0,0,0.6);
-                    }
-                    
-                    .selection-buttons {
-                        display: flex;
-                        gap: 1rem;
-                        margin-bottom: 1rem;
-                    }
-                    
-                    .side-btn {
-                        padding: 0.8rem 2rem;
-                        border: 2px solid var(--primary-green);
-                        background: var(--dark-gray);
-                        color: var(--white);
-                        border-radius: 50px;
-                        cursor: pointer;
-                        font-weight: bold;
-                        transition: all 0.3s;
-                    }
-                    
-                    .side-btn:hover {
-                        background: rgba(0, 168, 107, 0.2);
-                    }
-                    
-                    .side-btn.selected {
-                        background: var(--primary-green);
-                        color: var(--white);
-                    }
-                    
-                    .bet-controls {
-                        width: 100%;
-                        display: flex;
-                        flex-direction: column;
-                        gap: 1rem;
-                    }
-                    
-                    .dispute-info {
-                        background: rgba(0, 0, 0, 0.2);
-                        border-radius: 10px;
-                        padding: 1rem;
-                        margin-bottom: 1rem;
-                        border: 1px solid var(--primary-green);
-                        width: 100%;
-                    }
-                    
-                    .dispute-details {
-                        margin-top: 0.5rem;
-                        font-size: 0.9rem;
-                    }
-                    
-                    @keyframes flip-coin {
-                        0% {
-                            transform: rotateY(0);
-                        }
-                        100% {
-                            transform: rotateY(1800deg);
-                        }
-                    }
-                    
-                    @keyframes flip-to-heads {
-                        0% {
-                            transform: rotateY(0);
-                        }
-                        100% {
-                            transform: rotateY(1800deg);
-                        }
-                    }
-                    
-                    @keyframes flip-to-tails {
-                        0% {
-                            transform: rotateY(0);
-                        }
-                        100% {
-                            transform: rotateY(1980deg);
-                        }
-                    }
-                    
-                    .coin.heads-result {
-                        animation: flip-to-heads 3s forwards;
-                    }
-                    
-                    .coin.tails-result {
-                        animation: flip-to-tails 3s forwards;
-                    }
-                `;
-                
-                // Add to DOM
-                document.head.appendChild(style);
-                
             } catch (error) {
-                app.log('CoinFlip', `Error adding styles: ${error.message}`, true);
+                app.log('Dispute', `Ошибка воспроизведения звука: ${error.message}`, true);
             }
         };
         
         /**
-         * Find DOM elements
+         * Создание пользовательского интерфейса
+         */
+        const createUI = async function() {
+            return new Promise((resolve) => {
+                try {
+                    // Находим контейнер для игры
+                    let disputeContainer = document.getElementById('dispute-container');
+                    
+                    // Если контейнер не существует, создаем его
+                    if (!disputeContainer) {
+                        disputeContainer = document.createElement('div');
+                        disputeContainer.id = 'dispute-container';
+                        document.body.appendChild(disputeContainer);
+                    }
+                    
+                    // Создаем HTML разметку
+                    disputeContainer.innerHTML = `
+                        <div class="dispute-header">
+                            <h2>Разрешение спора</h2>
+                            <div id="dispute-id" class="dispute-id"></div>
+                        </div>
+                        
+                        <div class="players-section">
+                            <h3>Участники</h3>
+                            <div id="players-list" class="players-list">
+                                <div id="creator-info" class="player-info">
+                                    <div class="player-name">Создатель спора</div>
+                                    <div class="player-side"></div>
+                                    <div class="ready-status not-ready">Не готов</div>
+                                </div>
+                                <div id="opponent-info" class="player-info">
+                                    <div class="player-name">Оппонент</div>
+                                    <div class="player-side"></div>
+                                    <div class="ready-status not-ready">Не готов</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="dispute-content">
+                            <div id="dispute-subject" class="dispute-subject"></div>
+                            <div id="dispute-amount" class="dispute-amount"></div>
+                        </div>
+                        
+                        <div id="waiting-message" class="waiting-message">
+                            Ожидание готовности обоих участников...
+                        </div>
+                        
+                        <div class="coin-container">
+                            <div id="dispute-coin" class="coin">
+                                <div class="heads"></div>
+                                <div class="tails"></div>
+                            </div>
+                        </div>
+                        
+                        <div id="result-message" class="result-message hidden"></div>
+                        
+                        <div class="dispute-controls">
+                            <button id="ready-btn" class="ready-btn">Я ГОТОВ</button>
+                            <button id="close-btn" class="close-btn">ЗАКРЫТЬ</button>
+                        </div>
+                        
+                        <div class="dispute-footer">
+                            <div class="dispute-note">
+                                Подбрасывание монетки начнется автоматически, когда оба участника будут готовы
+                            </div>
+                        </div>
+                    `;
+                    
+                    // Добавляем стили, если их нет
+                    if (!document.getElementById('dispute-styles')) {
+                        const styleElement = document.createElement('style');
+                        styleElement.id = 'dispute-styles';
+                        styleElement.textContent = `
+                            #dispute-container {
+                                max-width: 500px;
+                                margin: 0 auto;
+                                padding: 20px;
+                                background: linear-gradient(135deg, #1a1a1a, #2a2a2a);
+                                border-radius: 15px;
+                                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+                                color: white;
+                                font-family: 'Arial', sans-serif;
+                            }
+                            
+                            .dispute-header {
+                                text-align: center;
+                                margin-bottom: 20px;
+                                padding-bottom: 10px;
+                                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                            }
+                            
+                            .dispute-header h2 {
+                                margin: 0;
+                                color: #1db954;
+                                font-size: 24px;
+                            }
+                            
+                            .dispute-id {
+                                font-size: 12px;
+                                color: #777;
+                                margin-top: 5px;
+                            }
+                            
+                            .players-section {
+                                margin-bottom: 20px;
+                            }
+                            
+                            .players-section h3 {
+                                font-size: 18px;
+                                margin-bottom: 10px;
+                                color: #f2c94c;
+                            }
+                            
+                            .players-list {
+                                display: flex;
+                                gap: 15px;
+                            }
+                            
+                            .player-info {
+                                flex: 1;
+                                background: rgba(0, 0, 0, 0.2);
+                                padding: 15px;
+                                border-radius: 10px;
+                                border: 1px solid rgba(255, 255, 255, 0.1);
+                            }
+                            
+                            .player-name {
+                                font-weight: bold;
+                                margin-bottom: 5px;
+                            }
+                            
+                            .player-side {
+                                margin-bottom: 10px;
+                                color: #f2c94c;
+                            }
+                            
+                            .ready-status {
+                                display: inline-block;
+                                padding: 3px 8px;
+                                border-radius: 5px;
+                                font-size: 12px;
+                                font-weight: bold;
+                            }
+                            
+                            .ready-status.not-ready {
+                                background-color: rgba(255, 69, 58, 0.2);
+                                color: #ff453a;
+                            }
+                            
+                            .ready-status.ready {
+                                background-color: rgba(76, 217, 100, 0.2);
+                                color: #4cd964;
+                            }
+                            
+                            .dispute-content {
+                                background: rgba(0, 0, 0, 0.2);
+                                padding: 15px;
+                                border-radius: 10px;
+                                margin-bottom: 20px;
+                                text-align: center;
+                            }
+                            
+                            .dispute-subject {
+                                font-size: 18px;
+                                margin-bottom: 10px;
+                            }
+                            
+                            .dispute-amount {
+                                font-size: 24px;
+                                color: #f2c94c;
+                                font-weight: bold;
+                            }
+                            
+                            .waiting-message {
+                                text-align: center;
+                                padding: 15px;
+                                margin-bottom: 20px;
+                                background: rgba(242, 201, 76, 0.1);
+                                border-radius: 10px;
+                                color: #f2c94c;
+                                font-weight: bold;
+                            }
+                            
+                            .coin-container {
+                                position: relative;
+                                height: 150px;
+                                display: flex;
+                                justify-content: center;
+                                align-items: center;
+                                margin-bottom: 20px;
+                                perspective: 1000px;
+                            }
+                            
+                            .coin {
+                                position: relative;
+                                width: 100px;
+                                height: 100px;
+                                transform-style: preserve-3d;
+                                transition: transform 0.5s;
+                            }
+                            
+                            .coin .heads,
+                            .coin .tails {
+                                position: absolute;
+                                width: 100%;
+                                height: 100%;
+                                border-radius: 50%;
+                                backface-visibility: hidden;
+                                display: flex;
+                                justify-content: center;
+                                align-items: center;
+                                font-size: 30px;
+                                font-weight: bold;
+                            }
+                            
+                            .coin .heads {
+                                background: radial-gradient(#FFD700, #B8860B);
+                                z-index: 2;
+                            }
+                            
+                            .coin .heads::before {
+                                content: "H";
+                            }
+                            
+                            .coin .tails {
+                                background: radial-gradient(#C0C0C0, #808080);
+                                transform: rotateY(180deg);
+                            }
+                            
+                            .coin .tails::before {
+                                content: "T";
+                            }
+                            
+                            .coin.heads {
+                                transform: rotateY(0deg);
+                            }
+                            
+                            .coin.tails {
+                                transform: rotateY(180deg);
+                            }
+                            
+                            .coin.flipping {
+                                animation: flip-coin 3s forwards;
+                            }
+                            
+                            @keyframes flip-coin {
+                                0% { transform: rotateY(0); }
+                                100% { transform: rotateY(1800deg); }
+                            }
+                            
+                            @keyframes flip-to-heads {
+                                0% { transform: rotateY(0); }
+                                100% { transform: rotateY(1800deg); }
+                            }
+                            
+                            @keyframes flip-to-tails {
+                                0% { transform: rotateY(0); }
+                                100% { transform: rotateY(1980deg); }
+                            }
+                            
+                            .coin.heads-result {
+                                animation: flip-to-heads 3s forwards;
+                            }
+                            
+                            .coin.tails-result {
+                                animation: flip-to-tails 3s forwards;
+                            }
+                            
+                            .result-message {
+                                text-align: center;
+                                padding: 15px;
+                                margin-bottom: 20px;
+                                border-radius: 10px;
+                                font-weight: bold;
+                                font-size: 18px;
+                            }
+                            
+                            .result-message.win {
+                                background: rgba(76, 217, 100, 0.1);
+                                color: #4cd964;
+                            }
+                            
+                            .result-message.lose {
+                                background: rgba(255, 69, 58, 0.1);
+                                color: #ff453a;
+                            }
+                            
+                            .result-message.hidden {
+                                display: none;
+                            }
+                            
+                            .dispute-controls {
+                                display: flex;
+                                gap: 15px;
+                                margin-bottom: 20px;
+                            }
+                            
+                            .ready-btn, .close-btn {
+                                flex: 1;
+                                padding: 15px;
+                                border: none;
+                                border-radius: 10px;
+                                font-weight: bold;
+                                cursor: pointer;
+                                transition: all 0.3s;
+                            }
+                            
+                            .ready-btn {
+                                background: #1db954;
+                                color: white;
+                            }
+                            
+                            .ready-btn:hover {
+                                background: #15ad49;
+                                transform: translateY(-2px);
+                                box-shadow: 0 5px 15px rgba(29, 185, 84, 0.3);
+                            }
+                            
+                            .ready-btn:active {
+                                transform: translateY(1px);
+                            }
+                            
+                            .ready-btn.disabled {
+                                background: #888;
+                                cursor: not-allowed;
+                                transform: none;
+                                box-shadow: none;
+                            }
+                            
+                            .close-btn {
+                                background: #333;
+                                color: white;
+                            }
+                            
+                            .close-btn:hover {
+                                background: #444;
+                                transform: translateY(-2px);
+                            }
+                            
+                            .close-btn:active {
+                                transform: translateY(1px);
+                            }
+                            
+                            .dispute-footer {
+                                text-align: center;
+                                font-size: 12px;
+                                color: #777;
+                            }
+                        `;
+                        document.head.appendChild(styleElement);
+                    }
+                    
+                    resolve(true);
+                } catch (error) {
+                    app.log('Dispute', `Ошибка создания UI: ${error.message}`, true);
+                    resolve(false);
+                }
+            });
+        };
+        
+        /**
+         * Поиск DOM элементов
          */
         const findDOMElements = async function() {
             return new Promise((resolve) => {
                 setTimeout(() => {
-                    elements.coinFlipContainer = document.querySelector('.coinflip-container');
-                    elements.coin = document.getElementById('coin');
-                    elements.headsBtn = document.getElementById('heads-btn');
-                    elements.tailsBtn = document.getElementById('tails-btn');
-                    elements.flipBtn = document.getElementById('flip-btn');
-                    elements.betAmount = document.getElementById('coinflip-bet');
-                    elements.resultDisplay = document.getElementById('result-display');
-                    
-                    // Check if elements exist
-                    if (!elements.coin) {
-                        app.log('CoinFlip', 'Coin element not found', true);
+                    try {
+                        elements.disputeContainer = document.getElementById('dispute-container');
+                        elements.coin = document.getElementById('dispute-coin');
+                        elements.readyBtn = document.getElementById('ready-btn');
+                        elements.closeBtn = document.getElementById('close-btn');
+                        elements.playersList = document.getElementById('players-list');
+                        elements.creatorInfo = document.getElementById('creator-info');
+                        elements.opponentInfo = document.getElementById('opponent-info');
+                        elements.waitingMessage = document.getElementById('waiting-message');
+                        elements.resultMessage = document.getElementById('result-message');
+                        elements.disputeSubject = document.getElementById('dispute-subject');
+                        elements.disputeAmount = document.getElementById('dispute-amount');
+                        elements.disputeId = document.getElementById('dispute-id');
+                        
+                        resolve(true);
+                    } catch (error) {
+                        app.log('Dispute', `Ошибка поиска DOM элементов: ${error.message}`, true);
+                        resolve(false);
                     }
-                    
-                    if (!elements.flipBtn) {
-                        app.log('CoinFlip', 'Flip button not found', true);
-                    }
-                    
-                    resolve();
                 }, 100);
             });
         };
         
         /**
-         * Set up event listeners
+         * Настройка обработчиков событий
          */
         const setupEventListeners = function() {
             try {
-                // Heads button
-                if (elements.headsBtn) {
-                    elements.headsBtn.addEventListener('click', () => selectSide('heads'));
+                // Кнопка готовности
+                if (elements.readyBtn) {
+                    elements.readyBtn.addEventListener('click', toggleReady);
                 }
                 
-                // Tails button
-                if (elements.tailsBtn) {
-                    elements.tailsBtn.addEventListener('click', () => selectSide('tails'));
+                // Кнопка закрытия
+                if (elements.closeBtn) {
+                    elements.closeBtn.addEventListener('click', closeDispute);
                 }
                 
-                // Flip button
-                if (elements.flipBtn) {
-                    const newFlipBtn = elements.flipBtn.cloneNode(true);
-                    if (elements.flipBtn.parentNode) {
-                        elements.flipBtn.parentNode.replaceChild(newFlipBtn, elements.flipBtn);
-                    }
-                    elements.flipBtn = newFlipBtn;
-                    
-                    elements.flipBtn.addEventListener('click', flipCoin);
+                // Обработчик сообщений от Telegram
+                if (window.Telegram && window.Telegram.WebApp) {
+                    window.Telegram.WebApp.onEvent('message', handleTelegramMessage);
                 }
                 
-                // Back button handler
-                const backBtn = document.querySelector('#coinflip-screen .back-btn');
-                if (backBtn) {
-                    backBtn.addEventListener('click', () => {
-                        if (state.disputeId) {
-                            // If this is a dispute, return to bot
-                            if (window.Telegram && window.Telegram.WebApp) {
-                                window.Telegram.WebApp.close();
-                            }
-                        } else {
-                            // Otherwise return to main screen
-                            document.querySelectorAll('.screen').forEach(screen => {
-                                screen.classList.remove('active');
-                            });
-                            
-                            const welcomeScreen = document.getElementById('welcome-screen');
-                            if (welcomeScreen) {
-                                welcomeScreen.classList.add('active');
-                            }
-                        }
-                    });
-                }
-                
-                app.log('CoinFlip', 'Event listeners set up');
+                app.log('Dispute', 'Обработчики событий установлены');
             } catch (error) {
-                app.log('CoinFlip', `Error setting up event listeners: ${error.message}`, true);
+                app.log('Dispute', `Ошибка настройки обработчиков: ${error.message}`, true);
             }
         };
         
         /**
-         * Select coin side
+         * Загрузка данных спора с сервера
          */
-        const selectSide = function(side) {
+        const loadDisputeData = async function(disputeId) {
             try {
-                // Check if side change is allowed
-                if (state.disputeId) {
-                    return; // In dispute mode, side is fixed
+                app.log('Dispute', `Загрузка данных спора ${disputeId}`);
+                
+                // Запрос к API для получения данных спора
+                const response = await fetch(`/api/disputes/${disputeId}`);
+                
+                if (!response.ok) {
+                    throw new Error(`Ошибка получения данных спора: ${response.status}`);
                 }
                 
-                state.selectedSide = side;
+                const disputeData = await response.json();
+                state.disputeData = disputeData;
                 
-                // Update visual display
-                if (elements.headsBtn) {
-                    elements.headsBtn.classList.toggle('selected', side === 'heads');
-                }
+                // Обновляем информацию о пользователе
+                updateUserInfo(disputeData);
                 
-                if (elements.tailsBtn) {
-                    elements.tailsBtn.classList.toggle('selected', side === 'tails');
-                }
+                // Обновляем UI с данными спора
+                updateDisputeUI(disputeData);
                 
-                // Tactile feedback
-                if (window.casinoApp && window.casinoApp.provideTactileFeedback) {
-                    window.casinoApp.provideTactileFeedback('light');
-                }
-                
-                app.log('CoinFlip', `Side selected: ${side}`);
+                app.log('Dispute', 'Данные спора загружены успешно');
+                return disputeData;
             } catch (error) {
-                app.log('CoinFlip', `Error selecting side: ${error.message}`, true);
-            }
-        };
-        
-        /**
-         * Flip coin
-         */
-        const flipCoin = async function() {
-            try {
-                // Check if already flipping
-                if (state.isFlipping) {
-                    return;
-                }
+                app.log('Dispute', `Ошибка загрузки данных спора: ${error.message}`, true);
                 
-                // Check if side is selected
-                if (!state.selectedSide && !state.disputeId) {
-                    app.log('CoinFlip', 'No side selected');
-                    
-                    if (window.casinoApp && window.casinoApp.showNotification) {
-                        window.casinoApp.showNotification('Please select Heads or Tails');
-                    } else {
-                        alert('Please select Heads or Tails');
-                    }
-                    return;
-                }
-                
-                // Get bet amount
-                const bet = parseInt(elements.betAmount.value);
-                
-                // Check bet validity
-                if (isNaN(bet) || bet <= 0) {
-                    app.log('CoinFlip', 'Invalid bet', true);
-                    
-                    if (window.casinoApp && window.casinoApp.showNotification) {
-                        window.casinoApp.showNotification('Please enter a valid bet amount');
-                    } else {
-                        alert('Please enter a valid bet amount');
-                    }
-                    return;
-                }
-                
-                // Check balance
-                if (window.GreenLightApp && window.GreenLightApp.user && bet > window.GreenLightApp.user.balance) {
-                    app.log('CoinFlip', 'Insufficient funds', true);
-                    
-                    if (window.casinoApp && window.casinoApp.showNotification) {
-                        window.casinoApp.showNotification('Insufficient funds for this bet');
-                    } else {
-                        alert('Insufficient funds for this bet');
-                    }
-                    return;
-                }
-                
-                // Set state
-                state.isFlipping = true;
-                
-                // Disable buttons during flip
-                if (elements.flipBtn) elements.flipBtn.disabled = true;
-                if (elements.headsBtn) elements.headsBtn.disabled = true;
-                if (elements.tailsBtn) elements.tailsBtn.disabled = true;
-                
-                // Tactile feedback
-                if (window.casinoApp && window.casinoApp.provideTactileFeedback) {
-                    window.casinoApp.provideTactileFeedback('medium');
-                }
-                
-                // Clear previous result
-                if (elements.resultDisplay) {
-                    elements.resultDisplay.textContent = '';
-                    elements.resultDisplay.classList.remove('win', 'lose');
-                    elements.resultDisplay.style.display = 'none';
-                }
-                
-                // Start coin animation
-                if (elements.coin) {
-                    // Remove previous result classes
-                    elements.coin.classList.remove('heads-result', 'tails-result');
-                    
-                    // Determine flip result
-                    const result = await determineResult();
-                    
-                    // Add appropriate class for animation
-                    elements.coin.classList.add(`${result}-result`);
-                    
-                    // Show result after 3 seconds
-                    setTimeout(() => {
-                        showResult(result);
-                    }, 3000);
-                } else {
-                    // If coin element not found, just get result
-                    const result = await determineResult();
-                    showResult(result);
-                }
-                
-            } catch (error) {
-                app.log('CoinFlip', `Error flipping coin: ${error.message}`, true);
-                
-                // Reset state
-                state.isFlipping = false;
-                if (elements.flipBtn) elements.flipBtn.disabled = false;
-                if (elements.headsBtn) elements.headsBtn.disabled = false;
-                if (elements.tailsBtn) elements.tailsBtn.disabled = false;
-            }
-        };
-        
-        /**
-         * Determine flip result
-         */
-        const determineResult = async function() {
-            try {
-                // In dispute mode, result is preset
-                if (state.disputeId && state.disputeData) {
-                    const expectedResult = await getPresetResult(state.disputeId);
-                    if (expectedResult) {
-                        return expectedResult;
-                    }
-                }
-                
-                // Generate random result
-                return Math.random() < 0.5 ? 'heads' : 'tails';
-            } catch (error) {
-                app.log('CoinFlip', `Error determining result: ${error.message}`, true);
-                return Math.random() < 0.5 ? 'heads' : 'tails';
-            }
-        };
-        
-        /**
-         * Get preset result for dispute
-         */
-        const getPresetResult = async function(disputeId) {
-            try {
-                // In real implementation, this would be an API call
-                // For demo, using random value
-                return Math.random() < 0.5 ? 'heads' : 'tails';
-            } catch (error) {
-                app.log('CoinFlip', `Error getting preset result: ${error.message}`, true);
-                return null;
-            }
-        };
-        
-        /**
-         * Show result
-         */
-        const showResult = async function(result) {
-            try {
-                // Reset state
-                state.isFlipping = false;
-                
-                // Enable buttons
-                if (elements.flipBtn) elements.flipBtn.disabled = false;
-                
-                // In dispute mode, side selection buttons remain disabled
-                if (!state.disputeId) {
-                    if (elements.headsBtn) elements.headsBtn.disabled = false;
-                    if (elements.tailsBtn) elements.tailsBtn.disabled = false;
-                }
-                
-                // Get bet amount
-                const bet = parseInt(elements.betAmount.value);
-                
-                // Determine if player won
-                let isWin = false;
-                let winAmount = 0;
-                
-                if (state.disputeId) {
-                    // In dispute mode, compare with player's side
-                    isWin = (state.playerSide === result);
-                    winAmount = isWin ? Math.floor(bet * 2 * 0.95) : 0; // Account for 5% commission
-                } else {
-                    // In regular mode, compare with selected side
-                    isWin = (state.selectedSide === result);
-                    winAmount = isWin ? bet * 2 : 0;
-                }
-                
-                // Process game result
-                await processGameResult(bet, isWin, winAmount, result);
-                
-                // Show result
-                if (elements.resultDisplay) {
-                    elements.resultDisplay.innerHTML = isWin ? 
-                        `<div class="win-title">You won ${winAmount} ⭐!</div>` : 
-                        '<div class="lose-title">You lost. Try again!</div>';
-                    
-                    elements.resultDisplay.classList.add(isWin ? 'win' : 'lose');
-                    elements.resultDisplay.style.display = 'block';
-                }
-                
-                // Tactile feedback
-                if (window.casinoApp && window.casinoApp.provideTactileFeedback) {
-                    if (isWin) {
-                        window.casinoApp.provideTactileFeedback('success');
-                    } else {
-                        window.casinoApp.provideTactileFeedback('warning');
-                    }
-                }
-                
-                // Update dispute data if applicable
-                if (state.disputeId) {
-                    updateDisputeResult(result, isWin);
-                }
-                
-                app.log('CoinFlip', `Result: ${result}, Win: ${isWin}`);
-            } catch (error) {
-                app.log('CoinFlip', `Error showing result: ${error.message}`, true);
-            }
-        };
-        
-        /**
-         * Process game result
-         */
-        const processGameResult = async function(bet, isWin, winAmount, result) {
-            try {
-                // Check for casinoApp
-                if (!window.casinoApp || !window.casinoApp.processGameResult) {
-                    app.log('CoinFlip', 'casinoApp.processGameResult not found', true);
-                    return;
-                }
-                
-                // Send result to casinoApp
-                await window.casinoApp.processGameResult(
-                    'coinflip',
-                    bet,
-                    isWin ? 'win' : 'lose',
-                    winAmount,
-                    {
-                        selectedSide: state.selectedSide || state.playerSide,
-                        result: result,
-                        isDispute: !!state.disputeId,
-                        disputeId: state.disputeId
-                    }
-                );
-                
-                // Update balance locally
-                if (window.GreenLightApp && window.GreenLightApp.user) {
-                    if (isWin) {
-                        window.GreenLightApp.user.balance += winAmount - bet;
-                    } else {
-                        window.GreenLightApp.user.balance -= bet;
-                    }
-                    
-                    // Update balance display
-                    if (window.casinoApp && window.casinoApp.updateBalance) {
-                        window.casinoApp.updateBalance();
-                    }
-                }
-                
-            } catch (error) {
-                app.log('CoinFlip', `Error processing game result: ${error.message}`, true);
-            }
-        };
-        
-        /**
-         * Update dispute result
-         */
-        const updateDisputeResult = async function(result, isWin) {
-            try {
-                if (!state.disputeId) return;
-                
-                app.log('CoinFlip', `Updating dispute result ${state.disputeId}`);
-                
-                // In real implementation, this would be an API call
-                const disputeResult = {
-                    disputeId: state.disputeId,
-                    result: result,
-                    winnerId: isWin ? window.GreenLightApp.user.telegramId : 
-                        (state.disputeData.creator.telegramId === window.GreenLightApp.user.telegramId ? 
-                            state.disputeData.opponent.telegramId : 
-                            state.disputeData.creator.telegramId)
+                // Для демонстрации используем тестовые данные
+                const testData = {
+                    _id: disputeId,
+                    creator: {
+                        telegramId: 123456789,
+                        firstName: 'Пользователь1',
+                        username: 'user1'
+                    },
+                    opponent: {
+                        telegramId: 987654321,
+                        firstName: 'Пользователь2',
+                        username: 'user2'
+                    },
+                    creatorSide: 'heads',
+                    opponentSide: 'tails',
+                    bet: {
+                        amount: 100
+                    },
+                    question: 'Кто выиграет матч?',
+                    status: 'active'
                 };
                 
-                // Close mini-app after 5 seconds
-                setTimeout(() => {
-                    if (window.Telegram && window.Telegram.WebApp) {
-                        window.Telegram.WebApp.close();
-                    }
-                }, 5000);
+                state.disputeData = testData;
+                updateUserInfo(testData);
+                updateDisputeUI(testData);
                 
-            } catch (error) {
-                app.log('CoinFlip', `Error updating dispute result: ${error.message}`, true);
+                return testData;
             }
         };
         
-        // Return public interface
-        return {
-            // Main methods
-            init: init,
-            flipCoin: flipCoin,
-            selectSide: selectSide,
+        /**
+         * Обновление UI с данными спора
+         */
+        const updateDisputeUI = function(disputeData) {
+            try {
+                if (!disputeData) return;
+                
+                // Обновляем ID спора
+                if (elements.disputeId) {
+                    elements.disputeId.textContent = `ID: ${disputeData._id}`;
+                }
+                
+                // Обновляем тему спора
+                if (elements.disputeSubject) {
+                    elements.disputeSubject.textContent = disputeData.question;
+                }
+                
+                // Обновляем сумму спора
+                if (elements.disputeAmount) {
+                    elements.disputeAmount.textContent = `${disputeData.bet.amount} ⭐`;
+                }
+                
+                // Обновляем информацию о создателе
+                if (elements.creatorInfo) {
+                    const creatorName = elements.creatorInfo.querySelector('.player-name');
+                    const creatorSide = elements.creatorInfo.querySelector('.player-side');
+                    
+                    if (creatorName) {
+                        creatorName.textContent = disputeData.creator.firstName || disputeData.creator.username;
+                    }
+                    
+                    if (creatorSide) {
+                        creatorSide.textContent = `Сторона: ${translateSide(disputeData.creatorSide)}`;
+                    }
+                }
+                
+                // Обновляем информацию об оппоненте
+                if (elements.opponentInfo) {
+                    const opponentName = elements.opponentInfo.querySelector('.player-name');
+                    const opponentSide = elements.opponentInfo.querySelector('.player-side');
+                    
+                    if (opponentName) {
+                        opponentName.textContent = disputeData.opponent.firstName || disputeData.opponent.username;
+                    }
+                    
+                    if (opponentSide) {
+                        opponentSide.textContent = `Сторона: ${translateSide(disputeData.opponentSide)}`;
+                    }
+                }
+                
+                app.log('Dispute', 'UI обновлен с данными спора');
+            } catch (error) {
+                app.log('Dispute', `Ошибка обновления UI: ${error.message}`, true);
+            }
+        };
+        
+        /**
+         * Перевод стороны монеты на русский
+         */
+        const translateSide = function(side) {
+            return side === 'heads' ? 'Орёл' : 'Решка';
+        };
+        
+        /**
+         * Обновление информации о пользователе
+         */
+        const updateUserInfo = function(disputeData) {
+            try {
+                if (!disputeData) return;
+                
+                // Получаем текущий telegramId пользователя
+                let currentUserId = null;
+                if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe && window.Telegram.WebApp.initDataUnsafe.user) {
+                    currentUserId = window.Telegram.WebApp.initDataUnsafe.user.id;
+                } else if (window.GreenLightApp && window.GreenLightApp.user) {
+                    currentUserId = window.GreenLightApp.user.telegramId;
+                }
+                
+                // Если ID не получен, используем демо-режим
+                if (!currentUserId) {
+                    app.log('Dispute', 'ID пользователя не найден, используем демо-режим');
+                    // В демо-режиме считаем пользователя создателем
+                    state.isCreator = true;
+                    state.playerSide = disputeData.creatorSide;
+                    state.opponentSide = disputeData.opponentSide;
+                    return;
+                }
+                
+                // Определяем, является ли пользователь создателем спора
+                if (disputeData.creator.telegramId === currentUserId) {
+                    state.isCreator = true;
+                    state.playerSide = disputeData.creatorSide;
+                    state.opponentSide = disputeData.opponentSide;
+                } else {
+                    state.isCreator = false;
+                    state.playerSide = disputeData.opponentSide;
+                    state.opponentSide = disputeData.creatorSide;
+                }
+                
+                app.log('Dispute', `Пользователь: ${state.isCreator ? 'создатель' : 'оппонент'}, сторона: ${state.playerSide}`);
+            } catch (error) {
+                app.log('Dispute', `Ошибка обновления информации о пользователе: ${error.message}`, true);
+            }
+        };
+        
+        /**
+         * Подключение к комнате спора
+         */
+        const connectToDisputeRoom = function() {
+            try {
+                app.log('Dispute', `Подключение к комнате спора ${state.roomId}`);
+                
+                // Отправляем сообщение в родительское окно Telegram
+                if (window.Telegram && window.Telegram.WebApp) {
+                    const connectData = {
+                        type: 'connect_dispute_room',
+                        disputeId: state.disputeId,
+                        roomId: state.roomId,
+                        isCreator: state.isCreator
+                    };
+                    
+                    window.Telegram.WebApp.sendData(JSON.stringify(connectData));
+                    app.log('Dispute', 'Отправлен запрос на подключение к комнате');
+                } else {
+                    // В демо-режиме симулируем подключение
+                    app.log('Dispute', 'Демо-режим: симуляция подключения к комнате');
+                    simulateRoomConnection();
+                }
+            } catch (error) {
+                app.log('Dispute', `Ошибка подключения к комнате: ${error.message}`, true);
+            }
+        };
+        
+        /**
+         * Симуляция подключения к комнате (для демо-режима)
+         */
+        const simulateRoomConnection = function() {
+            setTimeout(() => {
+                // Симулируем автоматическое подключение оппонента через 2 секунды
+                updateOpponentStatus(!state.isCreator);
+            }, 2000);
+        };
+        
+        /**
+         * Обработка сообщений от Telegram
+         */
+        const handleTelegramMessage = function(event) {
+            try {
+                const data = JSON.parse(event.data);
+                app.log('Dispute', `Получено сообщение: ${data.type}`);
+                
+                switch (data.type) {
+                    case 'player_ready':
+                        // Оппонент готов
+                        if (data.isCreator !== state.isCreator) {
+                            updateOpponentReadyStatus(true);
+                            checkBothReady();
+                        }
+                        break;
+                        
+                    case 'player_joined':
+                        // Оппонент присоединился к комнате
+                        if (data.isCreator !== state.isCreator) {
+                            updateOpponentStatus(true);
+                        }
+                        break;
+                        
+                    case 'coin_result':
+                        // Получен результат подбрасывания монетки
+                        if (data.disputeId === state.disputeId) {
+                            handleCoinResult(data.result);
+                        }
+                        break;
+                }
+            } catch (error) {
+                app.log('Dispute', `Ошибка обработки сообщения: ${error.message}`, true);
+            }
+        };
+        
+        /**
+         * Обработка результата подбрасывания монетки
+         */
+        const handleCoinResult = function(result) {
+            state.result = result;
+            flipCoinWithResult(result);
+        };
+        
+        /**
+         * Обновление статуса оппонента
+         */
+        const updateOpponentStatus = function(joined) {
+            try {
+                const opponentStatusEl = elements.opponentInfo.querySelector('.ready-status');
+                if (opponentStatusEl) {
+                    if (joined) {
+                        opponentStatusEl.textContent = 'Не готов';
+                        opponentStatusEl.className = 'ready-status not-ready';
+                    } else {
+                        opponentStatusEl.textContent = 'Не присоединился';
+                        opponentStatusEl.className = 'ready-status not-ready';
+                    }
+                }
+            } catch (error) {
+                app.log('Dispute', `Ошибка обновления статуса оппонента: ${error.message}`, true);
+            }
+        };
+        
+        /**
+         * Обновление статуса готовности оппонента
+         */
+        const updateOpponentReadyStatus = function(ready) {
+            try {
+                state.opponentReady = ready;
+                
+                const opponentStatusEl = elements.opponentInfo.querySelector('.ready-status');
+                if (opponentStatusEl) {
+                    if (ready) {
+                        opponentStatusEl.textContent = 'Готов';
+                        opponentStatusEl.className = 'ready-status ready';
+                    } else {
+                        opponentStatusEl.textContent = 'Не готов';
+                        opponentStatusEl.className = 'ready-status not-ready';
+                    }
+                }
+                
+                app.log('Dispute', `Статус готовности оппонента: ${ready}`);
+            } catch (error) {
+                app.log('Dispute', `Ошибка обновления статуса готовности оппонента: ${error.message}`, true);
+            }
+        };
+        
+        /**
+         * Переключение статуса готовности игрока
+         */
+        const toggleReady = function() {
+            try {
+                // Игнорируем, если подбрасывание уже началось
+                if (state.isFlipping || state.bothReady) return;
+                
+                // Инвертируем текущий статус
+                state.playerReady = !state.playerReady;
+                
+                // Обновляем UI
+                updatePlayerReadyStatus();
+                
+                // Отправляем сообщение об изменении статуса
+                sendReadyStatus();
+                
+                // Проверяем, готовы ли оба игрока
+                checkBothReady();
+                
+                app.log('Dispute', `Статус готовности игрока: ${state.playerReady}`);
+            } catch (error) {
+                app.log('Dispute', `Ошибка переключения статуса готовности: ${error.message}`, true);
+            }
+        };
+        
+        /**
+         * Обновление статуса готовности игрока в UI
+         */
+        const updatePlayerReadyStatus = function() {
+            try {
+                const playerInfo = state.isCreator ? elements.creatorInfo : elements.opponentInfo;
+                const playerStatusEl = playerInfo.querySelector('.ready-status');
+                
+                if (playerStatusEl) {
+                    if (state.playerReady) {
+                        playerStatusEl.textContent = 'Готов';
+                        playerStatusEl.className = 'ready-status ready';
+                        elements.readyBtn.textContent = 'ОТМЕНИТЬ ГОТОВНОСТЬ';
+                    } else {
+                        playerStatusEl.textContent = 'Не готов';
+                        playerStatusEl.className = 'ready-status not-ready';
+                        elements.readyBtn.textContent = 'Я ГОТОВ';
+                    }
+                }
+            } catch (error) {
+                app.log('Dispute', `Ошибка обновления статуса готовности игрока: ${error.message}`, true);
+            }
+        };
+        
+        /**
+         * Отправка статуса готовности
+         */
+        const sendReadyStatus = function() {
+            try {
+                // Отправляем сообщение в родительское окно Telegram
+                if (window.Telegram && window.Telegram.WebApp) {
+                    const readyData = {
+                        type: 'player_ready',
+                        disputeId: state.disputeId,
+                        roomId: state.roomId,
+                        isCreator: state.isCreator,
+                        ready: state.playerReady
+                    };
+                    
+                    window.Telegram.WebApp.sendData(JSON.stringify(readyData));
+                    app.log('Dispute', `Отправлен статус готовности: ${state.playerReady}`);
+                } else {
+                    // В демо-режиме симулируем ответ оппонента
+                    app.log('Dispute', 'Демо-режим: симуляция ответа оппонента');
+                    simulateOpponentReady();
+                }
+            } catch (error) {
+                app.log('Dispute', `Ошибка отправки статуса готовности: ${error.message}`, true);
+            }
+        };
+        
+        /**
+         * Симуляция готовности оппонента (для демо-режима)
+         */
+        const simulateOpponentReady = function() {
+            setTimeout(() => {
+                if (state.playerReady) {
+                    // Если игрок готов, симулируем готовность оппонента
+                    updateOpponentReadyStatus(true);
+                    checkBothReady();
+                } else {
+                    // Если игрок отменил готовность, оппонент тоже отменяет
+                    updateOpponentReadyStatus(false);
+                }
+            }, 1500);
+        };
+        
+        /**
+         * Проверка готовности обоих игроков
+         */
+        const checkBothReady = function() {
+            if (state.playerReady && state.opponentReady && !state.bothReady) {
+                state.bothReady = true;
+                
+                // Обновляем UI
+                if (elements.waitingMessage) {
+                    elements.waitingMessage.textContent = 'Оба игрока готовы! Подбрасываем монетку...';
+                }
+                
+                // Блокируем кнопку готовности
+                if (elements.readyBtn) {
+                    elements.readyBtn.disabled = true;
+                    elements.readyBtn.classList.add('disabled');
+                }
+                
+                // Начинаем подбрасывание монетки
+                startCoinFlip();
+                
+                app.log('Dispute', 'Оба игрока готовы, начинаем подбрасывание');
+            }
+        };
+        
+        /**
+         * Запуск автоматического режима (для быстрой демонстрации)
+         */
+        const startAutomaticMode = function() {
+            app.log('Dispute', 'Запуск автоматического режима');
             
-            // Status check method
+            // Имитируем нажатие кнопки "Я готов"
+            setTimeout(() => {
+                if (elements.readyBtn) {
+                    elements.readyBtn.click();
+                }
+            }, 1000);
+        };
+        
+        /**
+         * Начало подбрасывания монетки
+         */
+        const startCoinFlip = function() {
+            try {
+                // Устанавливаем флаг подбрасывания
+                state.isFlipping = true;
+                
+                // Загружаем результат спора с сервера
+                if (state.isCreator) {
+                    // Создатель спора определяет результат подбрасывания
+                    loadDisputeResult();
+                } else {
+                    // Оппонент ожидает результат от создателя
+                    if (elements.waitingMessage) {
+                        elements.waitingMessage.textContent = 'Ожидание определения результата...';
+                    }
+                }
+            } catch (error) {
+                app.log('Dispute', `Ошибка начала подбрасывания: ${error.message}`, true);
+            }
+        };
+        
+        /**
+         * Загрузка результата спора с сервера
+         */
+        const loadDisputeResult = function() {
+            try {
+                app.log('Dispute', 'Загрузка результата спора');
+                
+                // Запрос к API для получения результата спора
+                fetch('/api/disputes/result', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ disputeId: state.disputeId })
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Ошибка получения результата: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // Сохраняем результат
+                    state.result = data.result;
+                    
+                    // Отправляем результат оппоненту
+                    sendCoinResult(data.result);
+                    
+                    // Запускаем анимацию монетки
+                    flipCoinWithResult(data.result);
+                })
+                .catch(error => {
+                    app.log('Dispute', `Ошибка загрузки результата: ${error.message}`, true);
+                    
+                    // В случае ошибки генерируем случайный результат
+                    const result = Math.random() < 0.5 ? 'heads' : 'tails';
+                    state.result = result;
+                    sendCoinResult(result);
+                    flipCoinWithResult(result);
+                });
+            } catch (error) {
+                app.log('Dispute', `Ошибка запроса результата: ${error.message}`, true);
+                
+                // В случае ошибки генерируем случайный результат
+                const result = Math.random() < 0.5 ? 'heads' : 'tails';
+                state.result = result;
+                sendCoinResult(result);
+                flipCoinWithResult(result);
+            }
+        };
+        
+        /**
+         * Отправка результата подбрасывания монетки оппоненту
+         */
+        const sendCoinResult = function(result) {
+            try {
+                // Отправляем сообщение в Telegram
+                if (window.Telegram && window.Telegram.WebApp) {
+                    const resultData = {
+                        type: 'coin_result',
+                        disputeId: state.disputeId,
+                        roomId: state.roomId,
+                        result: result
+                    };
+                    
+                    window.Telegram.WebApp.sendData(JSON.stringify(resultData));
+                    app.log('Dispute', `Отправлен результат подбрасывания: ${result}`);
+                }
+            } catch (error) {
+                app.log('Dispute', `Ошибка отправки результата: ${error.message}`, true);
+            }
+        };
+        
+        /**
+         * Подбрасывание монетки с заданным результатом
+         */
+        const flipCoinWithResult = function(result) {
+            try {
+                app.log('Dispute', `Подбрасывание монетки с результатом: ${result}`);
+                
+                if (!elements.coin) {
+                    app.log('Dispute', 'Элемент монетки не найден', true);
+                    showResult(result);
+                    return;
+                }
+                
+                // Воспроизводим звук подбрасывания
+                playSound('flip');
+                
+                // Убираем предыдущие классы результата
+                elements.coin.classList.remove('heads-result', 'tails-result', 'heads', 'tails');
+                
+                // Сбрасываем стили для анимации
+                elements.coin.style.animation = 'none';
+                
+                // Форсируем перерисовку
+                void elements.coin.offsetWidth;
+                
+                // Добавляем класс для анимации
+                elements.coin.classList.add(`${result}-result`);
+                
+                // Ждем окончания анимации
+                setTimeout(() => {
+                    // Останавливаем анимацию и устанавливаем финальное положение
+                    elements.coin.style.animation = 'none';
+                    elements.coin.classList.add(result);
+                    
+                    // Показываем результат
+                    showResult(result);
+                    
+                    // Сбрасываем флаг подбрасывания
+                    state.isFlipping = false;
+                }, 3000);
+            } catch (error) {
+                app.log('Dispute', `Ошибка подбрасывания монетки: ${error.message}`, true);
+                showResult(result);
+            }
+        };
+        
+        /**
+         * Отображение результата подбрасывания
+         */
+        const showResult = function(result) {
+            try {
+                const playerWon = result === state.playerSide;
+                
+                // Воспроизводим звук результата
+                playSound(playerWon ? 'win' : 'lose');
+                
+                // Показываем сообщение о результате
+                if (elements.resultMessage) {
+                    elements.resultMessage.innerHTML = playerWon 
+                        ? `<div>Вы выиграли!</div><div>Выпал ${translateSide(result)}</div>` 
+                        : `<div>Вы проиграли</div><div>Выпал ${translateSide(result)}</div>`;
+                    
+                    elements.resultMessage.className = `result-message ${playerWon ? 'win' : 'lose'}`;
+                }
+                
+                // Скрываем сообщение ожидания
+                if (elements.waitingMessage) {
+                    elements.waitingMessage.style.display = 'none';
+                }
+                
+                // Обновляем текст кнопки закрытия
+                if (elements.closeBtn) {
+                    elements.closeBtn.textContent = 'ЗАКРЫТЬ';
+                }
+                
+                // Отмечаем спор как завершенный
+                state.hasFinished = true;
+                
+                app.log('Dispute', `Результат: ${result}, игрок ${playerWon ? 'выиграл' : 'проиграл'}`);
+                
+                // Автоматическое закрытие через 5 секунд
+                setTimeout(() => {
+                    if (!state.closed) {
+                        closeDispute();
+                    }
+                }, 5000);
+            } catch (error) {
+                app.log('Dispute', `Ошибка отображения результата: ${error.message}`, true);
+            }
+        };
+        
+        /**
+         * Закрытие спора
+         */
+        const closeDispute = function() {
+            app.log('Dispute', 'Закрытие спора');
+            
+            state.closed = true;
+            
+            // Закрываем мини-приложение
+            if (window.Telegram && window.Telegram.WebApp) {
+                window.Telegram.WebApp.close();
+            } else {
+                // В демо-режиме просто перенаправляем на главную
+                window.location.href = '/';
+            }
+        };
+        
+        // Публичный интерфейс
+        return {
+            init: init,
+            closeDispute: closeDispute,
+            
+            // Геттер для текущего состояния
             getStatus: function() {
                 return {
                     initialized: state.initialized,
-                    initializationStarted: state.initializationStarted,
                     isFlipping: state.isFlipping,
-                    selectedSide: state.selectedSide,
                     disputeId: state.disputeId,
-                    disputeMode: !!state.disputeId,
-                    elementsFound: {
-                        coin: !!elements.coin,
-                        flipBtn: !!elements.flipBtn,
-                        headsBtn: !!elements.headsBtn,
-                        tailsBtn: !!elements.tailsBtn
-                    }
+                    roomId: state.roomId,
+                    playerSide: state.playerSide,
+                    playerReady: state.playerReady,
+                    opponentReady: state.opponentReady,
+                    bothReady: state.bothReady,
+                    result: state.result,
+                    hasFinished: state.hasFinished
                 };
             }
         };
     })();
     
-    // Register game in all formats for compatibility
+    // Регистрируем игру в разных форматах для максимальной совместимости
     try {
-        // 1. Register through new system
+        // 1. Регистрация через новую систему
         if (window.registerGame) {
-            window.registerGame('coinFlipGame', coinFlipGame);
-            app.log('CoinFlip', 'Game registered through registerGame system');
+            window.registerGame('disputeGame', disputeGame);
+            app.log('Dispute', 'Игра зарегистрирована через систему registerGame');
         }
         
-        // 2. Export to global namespace (backward compatibility)
-        window.coinFlipGame = coinFlipGame;
-        app.log('CoinFlip', 'Game exported to global namespace');
+        // 2. Экспорт в глобальное пространство имен (обратная совместимость)
+        window.disputeGame = disputeGame;
+        app.log('Dispute', 'Игра экспортирована в глобальное пространство имен');
         
-        // 3. Log module loading completion
-        app.log('CoinFlip', 'Module loaded and ready for initialization');
+        // 3. Логирование завершения загрузки модуля
+        app.log('Dispute', 'Модуль загружен и готов к инициализации');
         
-        // 4. Auto-initialize on page load
+        // 4. Автоматическая инициализация при загрузке страницы
         document.addEventListener('DOMContentLoaded', function() {
             setTimeout(() => {
-                if (!coinFlipGame.getStatus().initialized && !coinFlipGame.getStatus().initializationStarted) {
-                    app.log('CoinFlip', 'Starting automatic initialization');
-                    coinFlipGame.init();
+                if (!disputeGame.getStatus().initialized && !disputeGame.getStatus().initializationStarted) {
+                    app.log('Dispute', 'Начало автоматической инициализации');
+                    disputeGame.init();
                 }
             }, 500);
         });
         
-        // 5. If DOM already loaded, initialize immediately
+        // 5. Если DOM уже загружен, инициализируем сразу
         if (document.readyState === 'complete' || document.readyState === 'interactive') {
             setTimeout(() => {
-                if (!coinFlipGame.getStatus().initialized && !coinFlipGame.getStatus().initializationStarted) {
-                    app.log('CoinFlip', 'Starting automatic initialization (DOM already loaded)');
-                    coinFlipGame.init();
+                if (!disputeGame.getStatus().initialized && !disputeGame.getStatus().initializationStarted) {
+                    app.log('Dispute', 'Начало автоматической инициализации (DOM уже загружен)');
+                    disputeGame.init();
                 }
             }, 500);
         }
         
     } catch (error) {
-        app.log('CoinFlip', `Error registering game: ${error.message}`, true);
+        app.log('Dispute', `Ошибка регистрации игры: ${error.message}`, true);
     }
-  })();
+})();
