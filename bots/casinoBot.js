@@ -573,13 +573,19 @@ async function handleDisputeStartParam(ctx) {
   }
 }
 
-// Обработчик inline режима (ДОБАВЛЯЕМ НОВУЮ ФУНКЦИОНАЛЬНОСТЬ)
+// Обработчик inline режима (ИСПРАВЛЕННАЯ ВЕРСИЯ)
 bot.on('inline_query', async (ctx) => {
   try {
-    console.log('Получен inline запрос от пользователя:', ctx.from.id, 'Запрос:', ctx.inlineQuery.query);
+    // Проверяем наличие объекта inlineQuery
+    if (!ctx.inlineQuery) {
+      console.error('inlineQuery отсутствует в контексте');
+      return;
+    }
     
-    // Разбираем запрос: [сумма] [вопрос]
-    const query = ctx.inlineQuery.query.trim();
+    console.log('Получен inline запрос от пользователя:', ctx.from.id, 'Запрос:', ctx.inlineQuery.query || '');
+    
+    // Проверяем наличие запроса
+    const query = (ctx.inlineQuery.query || '').trim();
     
     if (!query) {
       // Если запрос пустой, показываем инструкцию
@@ -589,15 +595,30 @@ bot.on('inline_query', async (ctx) => {
         title: 'Создать спор',
         description: 'Введите: [сумма] [вопрос]. Например: 100 Кто победит в матче?',
         input_message_content: {
-          message_text: 'Для создания спора введите сумму и вопрос. Например: @' + ctx.botInfo.username + ' 100 Кто победит в матче?'
+          message_text: 'Для создания спора введите сумму и вопрос. Например: @' + (ctx.botInfo ? ctx.botInfo.username : 'bot') + ' 100 Кто победит в матче?'
         }
-      }]);
+      }], {cache_time: 1}); // Уменьшаем время кеширования до 1 секунды
       return;
     }
     
     // Находим первое число в запросе (сумма)
     const parts = query.split(' ');
     const amount = parseInt(parts[0]);
+    
+    // Проверяем, что минимум 2 части - сумма и хотя бы одно слово вопроса
+    if (parts.length < 2) {
+      await ctx.answerInlineQuery([{
+        type: 'article',
+        id: 'format_error',
+        title: 'Неверный формат',
+        description: 'Необходимо ввести сумму и вопрос',
+        input_message_content: {
+          message_text: 'Для создания спора введите сумму и вопрос. Например: @' + (ctx.botInfo ? ctx.botInfo.username : 'bot') + ' 100 Кто победит в матче?'
+        }
+      }], {cache_time: 1});
+      return;
+    }
+    
     const question = parts.slice(1).join(' ');
     
     if (isNaN(amount) || amount <= 0 || !question) {
@@ -608,26 +629,32 @@ bot.on('inline_query', async (ctx) => {
         title: 'Неверный формат запроса',
         description: 'Введите: [сумма] [вопрос]. Например: 100 Кто победит в матче?',
         input_message_content: {
-          message_text: 'Для создания спора введите сумму и вопрос. Например: @' + ctx.botInfo.username + ' 100 Кто победит в матче?'
+          message_text: 'Для создания спора введите сумму и вопрос. Например: @' + (ctx.botInfo ? ctx.botInfo.username : 'bot') + ' 100 Кто победит в матче?'
         }
-      }]);
+      }], {cache_time: 1});
       return;
     }
     
-    // Получаем данные пользователя
-    const user = await User.findOne({ telegramId: ctx.from.id });
+    // Получаем данные пользователя с таймаутом
+    const user = await Promise.race([
+      User.findOne({ telegramId: ctx.from.id }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Таймаут БД')), 3000))
+    ]).catch(err => {
+      console.error('Ошибка запроса пользователя:', err);
+      return null;
+    });
     
     if (!user) {
-      // Пользователь не зарегистрирован
+      // Пользователь не зарегистрирован или таймаут БД
       await ctx.answerInlineQuery([{
         type: 'article',
         id: 'not_registered',
-        title: 'Вы не зарегистрированы',
+        title: 'Вы не зарегистрированы или ошибка БД',
         description: 'Сначала отправьте /start боту',
         input_message_content: {
-          message_text: 'Для создания спора сначала отправьте /start боту @' + ctx.botInfo.username
+          message_text: 'Для создания спора сначала отправьте /start боту @' + (ctx.botInfo ? ctx.botInfo.username : 'bot')
         }
-      }]);
+      }], {cache_time: 1});
       return;
     }
     
@@ -641,11 +668,29 @@ bot.on('inline_query', async (ctx) => {
         input_message_content: {
           message_text: `Для создания спора на ${amount} звезд нужно иметь достаточный баланс. Ваш текущий баланс: ${user.balance} звезд.`
         }
-      }]);
+      }], {cache_time: 1});
       return;
     }
     
-    // Формируем результат для отправки
+    // ВАЖНОЕ ИЗМЕНЕНИЕ: Вместо кодирования в base64, используем ID в БД
+    // Создаем временную запись о споре
+    const tempDispute = new Dispute({
+      creator: user._id,
+      creatorTelegramId: ctx.from.id,
+      question: question,
+      bet: {
+        amount: amount
+      },
+      status: 'pending'
+    });
+    
+    // Сохраняем и получаем ID
+    await tempDispute.save();
+    const disputeId = tempDispute._id.toString();
+    
+    console.log(`Создана временная запись спора: ${disputeId}`);
+    
+    // Формируем результат для отправки, используя ID спора вместо закодированного вопроса
     await ctx.answerInlineQuery([{
       type: 'article',
       id: 'create_dispute',
@@ -657,12 +702,12 @@ bot.on('inline_query', async (ctx) => {
       },
       reply_markup: {
         inline_keyboard: [
-          [{ text: '✅ Принять спор', callback_data: `accept_dispute_${ctx.from.id}_${amount}_${Buffer.from(question).toString('base64')}` }]
+          [{ text: '✅ Принять спор', callback_data: `accept_${disputeId}` }]
         ]
       }
-    }]);
+    }], {cache_time: 1});
     
-    console.log('Inline запрос успешно обработан');
+    console.log('Inline запрос успешно обработан, временный ID спора:', disputeId);
   } catch (error) {
     console.error('Ошибка при обработке inline запроса:', error);
     // Отправляем ошибку пользователю
@@ -674,20 +719,30 @@ bot.on('inline_query', async (ctx) => {
       input_message_content: {
         message_text: 'Произошла ошибка при создании спора. Пожалуйста, попробуйте позже или обратитесь к администратору.'
       }
-    }]);
+    }], {cache_time: 1});
   }
 });
-
 // Обработчик callback-запросов для принятия споров (ИСПРАВЛЕННАЯ ВЕРСИЯ)
-bot.action(/accept_dispute_(\d+)_(\d+)_(.+)/, async (ctx) => {
+bot.action(/^accept_([a-f0-9]+)$/, async (ctx) => {
   try {
     console.log('Получен callback запрос на принятие спора');
     
-    // Извлекаем данные из callback_data
-    const creatorId = parseInt(ctx.match[1]);
-    const amount = parseInt(ctx.match[2]);
-    const questionBase64 = ctx.match[3];
-    const question = Buffer.from(questionBase64, 'base64').toString();
+    // Извлекаем ID спора из callback_data
+    const disputeId = ctx.match[1];
+    console.log('ID спора:', disputeId);
+    
+    // Получаем данные спора из базы данных
+    const dispute = await Dispute.findById(disputeId);
+    
+    if (!dispute) {
+      await ctx.answerCbQuery('Ошибка: спор не найден или устарел', true);
+      return;
+    }
+    
+    // Получаем сумму и вопрос из спора
+    const amount = dispute.bet.amount;
+    const question = dispute.question;
+    const creatorId = dispute.creatorTelegramId;
     
     // Не позволяем пользователю принять свой же спор
     if (ctx.from.id === creatorId) {
@@ -725,29 +780,16 @@ bot.action(/accept_dispute_(\d+)_(\d+)_(.+)/, async (ctx) => {
       chatId = ctx.callbackQuery.message.chat.id;
     }
     
-    // Создаем новый спор
-    const dispute = new Dispute({
-      creator: creator._id,
-      creatorTelegramId: creatorId,
-      opponent: opponent._id,
-      opponentTelegramId: ctx.from.id,
-      question,
-      bet: {
-        amount: amount
-      },
-      status: 'active',
-      // Определяем случайные стороны монетки
-      creatorSide: Math.random() < 0.5 ? 'heads' : 'tails',
-      // Инициализируем статусы готовности
-      creatorReady: false,
-      opponentReady: false,
-      // Сохраняем информацию о сообщении для обновления (если доступна)
-      messageId: messageId,
-      chatId: chatId
-    });
-    
-    // Устанавливаем сторону оппонента противоположную создателю
+    // Обновляем существующий спор вместо создания нового
+    dispute.opponent = opponent._id;
+    dispute.opponentTelegramId = ctx.from.id;
+    dispute.status = 'active';
+    dispute.creatorSide = Math.random() < 0.5 ? 'heads' : 'tails';
     dispute.opponentSide = dispute.creatorSide === 'heads' ? 'tails' : 'heads';
+    dispute.creatorReady = false;
+    dispute.opponentReady = false;
+    dispute.messageId = messageId;
+    dispute.chatId = chatId;
     
     await dispute.save();
     
@@ -851,60 +893,10 @@ bot.action(/accept_dispute_(\d+)_(\d+)_(.+)/, async (ctx) => {
     
     await ctx.answerCbQuery('Вы приняли спор! Теперь нужно подбросить монетку.');
     
-    console.log(`Спор ${dispute._id} успешно создан и принят`);
+    console.log(`Спор ${dispute._id} успешно принят`);
   } catch (error) {
     console.error('Ошибка при обработке принятия спора:', error);
     await ctx.answerCbQuery('Произошла ошибка при принятии спора', true);
-  }
-});
-
-// Простая тестовая команда
-bot.command('test', (ctx) => {
-  try {
-    console.log('Получена команда /test от пользователя:', ctx.from.id);
-    ctx.reply('Тестовая команда работает!');
-  } catch (error) {
-    console.error('Ошибка при выполнении команды /test:', error);
-    ctx.reply('Ошибка в тестовой команде');
-  }
-});
-
-// Balance command
-bot.command('balance', async (ctx) => {
-  try {
-    console.log('Получена команда /balance от пользователя:', ctx.from.id);
-    const { id } = ctx.from;
-    
-    console.log('Поиск пользователя в базе данных...');
-    const user = await User.findOne({ telegramId: id });
-    
-    if (!user) {
-      console.log('Пользователь не найден');
-      return ctx.reply('You need to start the bot first. Please send /start.');
-    }
-    
-    console.log('Пользователь найден, баланс:', user.balance);
-    ctx.reply(`Your current balance: ${user.balance} Stars ⭐`);
-  } catch (error) {
-    console.error('Ошибка при выполнении команды /balance:', error);
-    ctx.reply('Sorry, there was an error. Please try again later.');
-  }
-});
-
-// Команда для создания спора (старый способ)
-bot.command('dispute', async (ctx) => {
-  try {
-    ctx.replyWithHTML(
-      '<b>🎲 Создание спора</b>\n\n' +
-      'Теперь вы можете создавать споры прямо в любом чате!\n\n' +
-      '1. В любом чате напишите: @' + ctx.botInfo.username + '\n' +
-      '2. Введите сумму и вопрос, например: 100 Кто победит в матче?\n' +
-      '3. Отправьте спор собеседнику\n\n' +
-      'Принцип работы: оба участника делают ставку, а победитель определяется подбрасыванием монеты.'
-    );
-  } catch (error) {
-    console.error('Ошибка в команде dispute:', error);
-    ctx.reply('Произошла ошибка');
   }
 });
 
