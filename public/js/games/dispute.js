@@ -1131,69 +1131,82 @@
         /**
          * Проверка статуса комнаты
          */
-        const checkRoomStatus = function() {
-            try {
-                // Не проверяем, если игра уже завершена
-                if (state.hasFinished) {
-                    if (state.roomStatusInterval) {
-                        clearInterval(state.roomStatusInterval);
-                        state.roomStatusInterval = null;
+        // Проверка статуса комнаты
+const checkRoomStatus = function() {
+    try {
+        // Не проверяем, если игра уже завершена
+        if (state.hasFinished) {
+            if (state.roomStatusInterval) {
+                clearInterval(state.roomStatusInterval);
+                state.roomStatusInterval = null;
+            }
+            return;
+        }
+        
+        // Проверяем, есть ли API URL в глобальных переменных
+        const apiUrl = window.GreenLightApp.apiUrl || '/api';
+        
+        // Запрашиваем статус комнаты, добавляя метку времени для предотвращения кэширования
+        fetch(`${apiUrl}/disputes/room/${state.disputeId}?timestamp=${Date.now()}`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Ошибка получения статуса комнаты: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                app.log('Dispute', `Получен статус комнаты: ${JSON.stringify(data)}`);
+                
+                // Важно! НЕ перезаписываем статус готовности игрока, если он активно взаимодействовал
+                // Это предотвращает "скачки" статуса
+                let updatedState = false;
+                
+                // Обновляем статус оппонента в зависимости от роли игрока
+                if (state.isCreator) {
+                    // Если я создатель, то мой оппонент - opponent
+                    if (data.opponentReady !== state.opponentReady) {
+                        state.opponentReady = data.opponentReady;
+                        updateOpponentReadyStatus(state.opponentReady);
+                        updatedState = true;
                     }
-                    return;
+                } else {
+                    // Если я оппонент, то мой оппонент - creator
+                    if (data.creatorReady !== state.opponentReady) {
+                        state.opponentReady = data.creatorReady;
+                        updateOpponentReadyStatus(state.opponentReady);
+                        updatedState = true;
+                    }
                 }
                 
-                // Проверяем, есть ли API URL в глобальных переменных
-                const apiUrl = window.GreenLightApp.apiUrl || '/api';
+                if (updatedState) {
+                    app.log('Dispute', `Обновлен статус готовности: моя=${state.playerReady}, оппонент=${state.opponentReady}`);
+                    
+                    // ВАЖНО: Проверяем, готовы ли оба игрока после обновления статуса
+                    if (state.playerReady && state.opponentReady && !state.bothReady) {
+                        state.bothReady = true;
+                        checkBothReady();
+                    }
+                }
                 
-                // Запрашиваем статус комнаты, добавляя метку времени для предотвращения кэширования
-                fetch(`${apiUrl}/disputes/room/${state.disputeId}?timestamp=${Date.now()}`)
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error(`Ошибка получения статуса комнаты: ${response.status}`);
-                        }
-                        return response.json();
-                    })
-                    .then(data => {
-                        app.log('Dispute', `Получен статус комнаты: ${JSON.stringify(data)}`);
-                        
-                        // Важно! НЕ перезаписываем статус готовности игрока, если он активно взаимодействовал
-                        // Это предотвращает "скачки" статуса
-                        let updatedState = false;
-                        
-                        // Обновляем статус оппонента
-                        if (state.isCreator && data.opponentReady !== state.opponentReady) {
-                            state.opponentReady = data.opponentReady;
-                            updateOpponentReadyStatus(state.opponentReady);
-                            updatedState = true;
-                        } else if (!state.isCreator && data.creatorReady !== state.opponentReady) {
-                            state.opponentReady = data.creatorReady;
-                            updateOpponentReadyStatus(state.opponentReady);
-                            updatedState = true;
-                        }
-                        
-                        if (updatedState) {
-                            app.log('Dispute', `Обновлен статус готовности: моя=${state.playerReady}, оппонент=${state.opponentReady}`);
-                        }
-                        
-                        // Проверяем готовность обоих игроков
-                        if (data.bothReady && !state.bothReady) {
-                            state.bothReady = true;
-                            checkBothReady();
-                        }
-                        
-                        // Проверяем, если есть результат
-                        if (data.status === 'completed' && data.result && !state.hasFinished) {
-                            state.result = data.result;
-                            flipCoinWithResult(data.result);
-                        }
-                    })
-                    .catch(error => {
-                        app.log('Dispute', `Ошибка проверки статуса комнаты: ${error.message}`, true);
-                    });
-            } catch (error) {
+                // Проверяем готовность обоих игроков по данным с сервера
+                if (data.bothReady && !state.bothReady) {
+                    state.bothReady = true;
+                    checkBothReady();
+                }
+                
+                // Проверяем, если есть результат
+                if (data.status === 'completed' && data.result && !state.hasFinished) {
+                    state.result = data.result;
+                    flipCoinWithResult(data.result);
+                }
+            })
+            .catch(error => {
                 app.log('Dispute', `Ошибка проверки статуса комнаты: ${error.message}`, true);
-            }
-        };
+            });
+    } catch (error) {
+        app.log('Dispute', `Ошибка проверки статуса комнаты: ${error.message}`, true);
+    }
+};
         
         /**
          * Симуляция подключения к комнате (для демо-режима)
@@ -1430,27 +1443,37 @@
         /**
          * Проверка готовности обоих игроков
          */
-        const checkBothReady = function() {
-            if (state.playerReady && state.opponentReady && !state.bothReady) {
-                state.bothReady = true;
-                
-                // Обновляем UI
-                if (elements.waitingMessage) {
-                    elements.waitingMessage.textContent = 'Оба игрока готовы! Подбрасываем монетку...';
-                }
-                
-                // Блокируем кнопку готовности
-                if (elements.readyBtn) {
-                    elements.readyBtn.disabled = true;
-                    elements.readyBtn.classList.add('disabled');
-                }
-                
-                // Начинаем подбрасывание монетки
-                startCoinFlip();
-                
-                app.log('Dispute', 'Оба игрока готовы, начинаем подбрасывание');
+        // Проверка готовности обоих игроков
+const checkBothReady = function() {
+    try {
+        app.log('Dispute', `Проверка готовности обоих игроков: Player=${state.playerReady}, Opponent=${state.opponentReady}, BothReady=${state.bothReady}`);
+        
+        if (state.playerReady && state.opponentReady && !state.bothReady) {
+            app.log('Dispute', 'Оба игрока готовы! Устанавливаем bothReady=true');
+            state.bothReady = true;
+            
+            // Обновляем UI
+            if (elements.waitingMessage) {
+                elements.waitingMessage.textContent = 'Оба игрока готовы! Подбрасываем монетку...';
             }
-        };
+            
+            // Блокируем кнопку готовности
+            if (elements.readyBtn) {
+                elements.readyBtn.disabled = true;
+                elements.readyBtn.classList.add('disabled');
+            }
+            
+            // Начинаем подбрасывание монетки
+            startCoinFlip();
+            
+            app.log('Dispute', 'Оба игрока готовы, начинаем подбрасывание');
+        } else {
+            app.log('Dispute', 'Проверка готовности: условия не выполнены');
+        }
+    } catch (error) {
+        app.log('Dispute', `Ошибка в checkBothReady: ${error.message}`, true);
+    }
+};
         
         /**
          * Запуск автоматического режима (для быстрой демонстрации)
