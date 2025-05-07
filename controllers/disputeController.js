@@ -629,11 +629,17 @@ exports.notifyDisputeParticipant = async (telegramId, dispute) => {
 
 // Обновление статуса готовности игрока
 // Обновление статуса готовности игрока
+// Обновление статуса готовности игрока
 exports.updatePlayerReadyStatus = async (req, res) => {
     try {
         const { disputeId, userTelegramId, ready } = req.body;
         
-        console.log('Обновление статуса готовности:', { disputeId, userTelegramId, ready });
+        console.log('Обновление статуса готовности:', { 
+            disputeId, 
+            userTelegramId, 
+            ready, 
+            readyType: typeof ready 
+        });
         
         // Проверяем существование спора
         const dispute = await Dispute.findById(disputeId)
@@ -645,24 +651,44 @@ exports.updatePlayerReadyStatus = async (req, res) => {
             return res.status(404).json({ message: 'Спор не найден', success: false });
         }
         
-        // Проверяем, что пользователь является участником спора
-        const isCreator = dispute.creatorTelegramId == userTelegramId;
-        const isOpponent = dispute.opponentTelegramId == userTelegramId;
+        // Логируем состояние спора до изменений
+        console.log('Состояние спора до обновления:', {
+            creatorReady: dispute.creatorReady,
+            opponentReady: dispute.opponentReady,
+            creatorTelegramId: dispute.creatorTelegramId,
+            opponentTelegramId: dispute.opponentTelegramId
+        });
+        
+        // Проверяем, является ли пользователь участником спора
+        // Приводим ID к строкам для безопасного сравнения
+        const isCreator = String(dispute.creatorTelegramId) === String(userTelegramId);
+        const isOpponent = String(dispute.opponentTelegramId) === String(userTelegramId);
         
         if (!isCreator && !isOpponent) {
             console.log('Пользователь не является участником спора:', userTelegramId);
+            console.log('Создатель:', dispute.creatorTelegramId, 'Оппонент:', dispute.opponentTelegramId);
             return res.status(403).json({ 
                 message: 'Вы не являетесь участником этого спора',
-                success: false 
+                success: false,
+                debug: {
+                    userTelegramId,
+                    creatorTelegramId: dispute.creatorTelegramId,
+                    opponentTelegramId: dispute.opponentTelegramId,
+                    isCreator,
+                    isOpponent
+                }
             });
         }
         
         // Обновляем статус готовности с явным преобразованием в boolean
+        // Принимаем "true", true, 1 и другие truthy значения
+        const readyValue = ready === true || ready === "true" || ready === 1;
+        
         if (isCreator) {
-            dispute.creatorReady = ready === true || ready === 'true';
+            dispute.creatorReady = readyValue;
             console.log(`Статус создателя обновлен: ${dispute.creatorReady}`);
         } else if (isOpponent) {
-            dispute.opponentReady = ready === true || ready === 'true';
+            dispute.opponentReady = readyValue;
             console.log(`Статус оппонента обновлен: ${dispute.opponentReady}`);
         }
         
@@ -672,6 +698,16 @@ exports.updatePlayerReadyStatus = async (req, res) => {
         const bothReady = dispute.creatorReady && dispute.opponentReady;
         
         console.log(`Обновлен статус готовности для спора ${dispute._id}. Создатель: ${dispute.creatorReady}, Оппонент: ${dispute.opponentReady}, Оба: ${bothReady}`);
+        
+        // Отправляем уведомление другому участнику после успешного сохранения
+        try {
+            const otherParticipantId = isCreator ? dispute.opponentTelegramId : dispute.creatorTelegramId;
+            if (otherParticipantId) {
+                await this.sendReadyStatusNotification(dispute, isCreator);
+            }
+        } catch (notifyError) {
+            console.error('Ошибка отправки уведомления о готовности:', notifyError);
+        }
         
         // Возвращаем текущий статус обоих игроков
         res.status(200).json({ 

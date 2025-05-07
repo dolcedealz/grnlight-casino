@@ -121,7 +121,6 @@ bot.on('web_app_data', async (ctx) => {
 });
 
 // Обработчик подключения к комнате спора
-// Обработчик подключения к комнате спора
 async function handleDisputeRoomConnect(ctx, data) {
   try {
       console.log('Обработка подключения к комнате спора:', data);
@@ -142,7 +141,8 @@ async function handleDisputeRoomConnect(ctx, data) {
       const userId = ctx.from.id;
       
       // Проверяем, является ли пользователь участником спора
-      const isValidParticipant = dispute.creatorTelegramId == userId || dispute.opponentTelegramId == userId;
+      const isValidParticipant = String(dispute.creatorTelegramId) === String(userId) || 
+                                 String(dispute.opponentTelegramId) === String(userId);
       
       if (!isValidParticipant) {
           ctx.reply('❌ Вы не являетесь участником этого спора');
@@ -156,7 +156,7 @@ async function handleDisputeRoomConnect(ctx, data) {
       }
       
       // Определяем роль пользователя
-      const userRole = dispute.creatorTelegramId == userId ? 'creator' : 'opponent';
+      const userRole = String(dispute.creatorTelegramId) === String(userId) ? 'creator' : 'opponent';
       
       // Отправляем уведомление другому участнику о подключении к комнате
       const otherParticipantId = userRole === 'creator' ? dispute.opponentTelegramId : dispute.creatorTelegramId;
@@ -172,8 +172,8 @@ async function handleDisputeRoomConnect(ctx, data) {
                   {
                       reply_markup: {
                           inline_keyboard: [[
-                              // ВАЖНО: Изменяем тип кнопки с web_app на url
-                              { text: '🎮 Присоединиться к спору', url: roomUrl }
+                              // Используем web_app для кнопки
+                              { text: '🎮 Присоединиться к спору', web_app: { url: roomUrl } }
                           ]]
                       }
                   }
@@ -191,8 +191,6 @@ async function handleDisputeRoomConnect(ctx, data) {
   }
 }
 
-// Обработчик статуса готовности игрока
-// Обработчик web_app_data - улучшенная версия для обработки статуса готовности игрока
 // Обработчик статуса готовности игрока
 async function handlePlayerReady(ctx, data) {
   try {
@@ -214,7 +212,8 @@ async function handlePlayerReady(ctx, data) {
       const userId = ctx.from.id;
       
       // Проверяем, является ли пользователь участником спора
-      const isValidParticipant = dispute.creatorTelegramId == userId || dispute.opponentTelegramId == userId;
+      const isValidParticipant = String(dispute.creatorTelegramId) === String(userId) || 
+                                String(dispute.opponentTelegramId) === String(userId);
       
       if (!isValidParticipant) {
           ctx.reply('❌ Вы не являетесь участником этого спора');
@@ -222,13 +221,13 @@ async function handlePlayerReady(ctx, data) {
       }
       
       // Определяем роль пользователя и обновляем соответствующее поле
-      const userRole = dispute.creatorTelegramId == userId ? 'creator' : 'opponent';
+      const userRole = String(dispute.creatorTelegramId) === String(userId) ? 'creator' : 'opponent';
       
-      // Обновляем статус готовности в базе данных
+      // Обновляем статус готовности в базе данных с явным преобразованием в boolean
       if (userRole === 'creator') {
-          dispute.creatorReady = ready;
+          dispute.creatorReady = Boolean(ready);
       } else {
-          dispute.opponentReady = ready;
+          dispute.opponentReady = Boolean(ready);
       }
       
       await dispute.save();
@@ -251,8 +250,8 @@ async function handlePlayerReady(ctx, data) {
                   {
                       reply_markup: {
                           inline_keyboard: [[
-                              // ВАЖНО: Изменяем тип кнопки с web_app на url
-                              { text: '🎮 Перейти к спору', url: roomUrl }
+                              // Используем web_app для кнопки
+                              { text: '🎮 Перейти к спору', web_app: { url: roomUrl } }
                           ]]
                       }
                   }
@@ -278,6 +277,7 @@ async function handlePlayerReady(ctx, data) {
       ctx.reply('❌ Произошла ошибка при обновлении статуса готовности');
   }
 }
+
 // Определение результата спора
 async function determineDisputeResult(dispute) {
   try {
@@ -435,7 +435,8 @@ async function handleDisputeResult(ctx, data) {
       const userId = ctx.from.id;
       
       // Проверяем, является ли пользователь участником спора
-      const isValidParticipant = dispute.creatorTelegramId === userId || dispute.opponentTelegramId === userId;
+      const isValidParticipant = String(dispute.creatorTelegramId) === String(userId) || 
+                                 String(dispute.opponentTelegramId) === String(userId);
       
       if (!isValidParticipant) {
           ctx.reply('❌ Вы не являетесь участником этого спора');
@@ -443,7 +444,7 @@ async function handleDisputeResult(ctx, data) {
       }
       
       // Определяем роль пользователя
-      const userRole = dispute.creatorTelegramId === userId ? 'creator' : 'opponent';
+      const userRole = String(dispute.creatorTelegramId) === String(userId) ? 'creator' : 'opponent';
       
       // Только создатель может определять результат
       if (userRole !== 'creator') {
@@ -530,72 +531,71 @@ async function handleLegacyDisputeResult(ctx, data) {
 }
 
 // Обработчик параметра dispute для команды start
-// Обработчик параметра dispute для команды start
 async function handleDisputeStartParam(ctx) {
   try {
-    console.log('Обработка параметра dispute в команде start');
-    
-    // Получаем ID спора из параметра start
-    const startCommand = ctx.message.text;
-    const disputeParam = startCommand.split('dispute_')[1];
-    
-    if (!disputeParam) {
-      ctx.reply('❌ Некорректный параметр');
-      return;
-    }
-    
-    // Получаем спор из базы данных
-    const dispute = await Dispute.findById(disputeParam);
-    
-    if (!dispute) {
-      ctx.reply('❌ Спор не найден');
-      return;
-    }
-    
-    // Получаем ID пользователя, который запустил команду
-    const userId = ctx.from.id;
-    
-    // Определяем роль пользователя
-    const isCreator = String(dispute.creatorTelegramId) === String(userId);
-    const isOpponent = String(dispute.opponentTelegramId) === String(userId);
-    
-    // Формируем URL для комнаты спора с учетом роли
-    let roomUrl;
-    
-    if (isCreator) {
-      roomUrl = `${process.env.WEBAPP_URL}?dispute=${dispute._id}&isCreator=true`;
-    } else if (isOpponent) {
-      roomUrl = `${process.env.WEBAPP_URL}?dispute=${dispute._id}&isCreator=false`;
-    } else {
-      // Пользователь не является участником спора
-      ctx.reply('❌ Вы не являетесь участником этого спора');
-      return;
-    }
-    
-    // Отправляем сообщение с кнопкой для открытия спора
-    await ctx.reply(
-      `🎮 <b>Спор готов к разрешению!</b>\n\n`
-      + `<b>Тема:</b> ${dispute.question}\n`
-      + `<b>Сумма:</b> ${dispute.bet.amount} ⭐\n\n`
-      + `Нажмите кнопку ниже, чтобы открыть спор и бросить монетку:`,
-      {
-        parse_mode: 'HTML',
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: '🎮 Открыть комнату спора', url: roomUrl }]
-          ]
-        }
+      console.log('Обработка параметра dispute в команде start');
+      
+      // Получаем ID спора из параметра start
+      const startCommand = ctx.message.text;
+      const disputeParam = startCommand.split('dispute_')[1];
+      
+      if (!disputeParam) {
+          ctx.reply('❌ Некорректный параметр');
+          return;
       }
-    );
-    
-    console.log(`Отправлена ссылка на спор ${dispute._id} пользователю ${userId}`);
+      
+      // Получаем спор из базы данных
+      const dispute = await Dispute.findById(disputeParam);
+      
+      if (!dispute) {
+          ctx.reply('❌ Спор не найден');
+          return;
+      }
+      
+      // Получаем ID пользователя, который запустил команду
+      const userId = ctx.from.id;
+      
+      // Определяем роль пользователя
+      const isCreator = String(dispute.creatorTelegramId) === String(userId);
+      const isOpponent = String(dispute.opponentTelegramId) === String(userId);
+      
+      // Формируем URL для комнаты спора с учетом роли
+      let roomUrl;
+      
+      if (isCreator) {
+          roomUrl = `${process.env.WEBAPP_URL}?dispute=${dispute._id}&isCreator=true`;
+      } else if (isOpponent) {
+          roomUrl = `${process.env.WEBAPP_URL}?dispute=${dispute._id}&isCreator=false`;
+      } else {
+          // Пользователь не является участником спора
+          ctx.reply('❌ Вы не являетесь участником этого спора');
+          return;
+      }
+      
+      // Отправляем сообщение с кнопкой для открытия спора
+      await ctx.reply(
+          `🎮 <b>Спор готов к разрешению!</b>\n\n`
+          + `<b>Тема:</b> ${dispute.question}\n`
+          + `<b>Сумма:</b> ${dispute.bet.amount} ⭐\n\n`
+          + `Нажмите кнопку ниже, чтобы открыть спор и бросить монетку:`,
+          {
+              parse_mode: 'HTML',
+              reply_markup: {
+                  inline_keyboard: [
+                      [{ text: '🎮 Открыть комнату спора', web_app: { url: roomUrl } }]
+                  ]
+              }
+          }
+      );
+      
+      console.log(`Отправлена ссылка на спор ${dispute._id} пользователю ${userId}`);
   } catch (error) {
-    console.error('Ошибка при обработке параметра dispute:', error);
-    ctx.reply('❌ Произошла ошибка при открытии спора');
+      console.error('Ошибка при обработке параметра dispute:', error);
+      ctx.reply('❌ Произошла ошибка при открытии спора');
   }
 }
 
-// Обработчик inline режима (ИСПРАВЛЕННАЯ ВЕРСИЯ)
+// Обработчик inline режима
 bot.on('inline_query', async (ctx) => {
   try {
     // Проверяем наличие объекта inlineQuery
@@ -694,11 +694,10 @@ bot.on('inline_query', async (ctx) => {
       return;
     }
     
-    // ВАЖНОЕ ИЗМЕНЕНИЕ: Вместо кодирования в base64, используем ID в БД
     // Создаем временную запись о споре
     const tempDispute = new Dispute({
       creator: user._id,
-      creatorTelegramId: ctx.from.id,
+      creatorTelegramId: String(ctx.from.id),
       question: question,
       bet: {
         amount: amount
@@ -744,8 +743,7 @@ bot.on('inline_query', async (ctx) => {
     }], {cache_time: 1});
   }
 });
-// Обработчик callback-запросов для принятия споров
-// Обработчик callback-запросов для принятия споров
+
 // Обработчик callback-запросов для принятия споров
 bot.action(/^accept_([a-f0-9]+)$/, async (ctx) => {
   try {
@@ -755,6 +753,9 @@ bot.action(/^accept_([a-f0-9]+)$/, async (ctx) => {
     const disputeId = ctx.match[1];
     console.log('ID спора:', disputeId);
     
+    // ВАЖНО: Логируем ID пользователя, который принимает спор и его тип
+    console.log('Пользователь принимающий спор (ID):', ctx.from.id, 'Тип:', typeof ctx.from.id);
+    
     // Получаем данные спора из базы данных
     const dispute = await Dispute.findById(disputeId);
     
@@ -763,12 +764,25 @@ bot.action(/^accept_([a-f0-9]+)$/, async (ctx) => {
       return;
     }
     
+    // Логируем данные спора для отладки
+    console.log('Данные спора:', {
+      id: dispute._id,
+      creator: dispute.creator,
+      creatorTelegramId: dispute.creatorTelegramId,
+      typeCTID: typeof dispute.creatorTelegramId,
+      question: dispute.question,
+      betAmount: dispute.bet.amount,
+      status: dispute.status
+    });
+    
     // Получаем сумму и вопрос из спора
     const amount = dispute.bet.amount;
     const question = dispute.question;
     const creatorId = dispute.creatorTelegramId;
     
-    // Не позволяем пользователю принять свой же спор
+    console.log('ID создателя:', creatorId, 'Тип:', typeof creatorId);
+    
+    // Не позволяем пользователю принять свой же спор - используем строковое сравнение
     if (String(ctx.from.id) === String(creatorId)) {
       await ctx.answerCbQuery('Вы не можете принять свой собственный спор!', true);
       return;
@@ -777,6 +791,10 @@ bot.action(/^accept_([a-f0-9]+)$/, async (ctx) => {
     // Получаем данные пользователей
     const creator = await User.findOne({ telegramId: creatorId });
     const opponent = await User.findOne({ telegramId: ctx.from.id });
+    
+    // Логируем данные обоих пользователей
+    console.log('Данные создателя:', creator ? {id: creator._id, telegramId: creator.telegramId, name: creator.firstName} : 'не найден');
+    console.log('Данные оппонента:', opponent ? {id: opponent._id, telegramId: opponent.telegramId, name: opponent.firstName} : 'не найден');
     
     if (!creator || !opponent) {
       await ctx.answerCbQuery('Ошибка: один из пользователей не найден', true);
@@ -802,9 +820,10 @@ bot.action(/^accept_([a-f0-9]+)$/, async (ctx) => {
     if (ctx.callbackQuery && ctx.callbackQuery.message) {
       messageId = ctx.callbackQuery.message.message_id;
       chatId = ctx.callbackQuery.message.chat.id;
+      console.log('ID сообщения:', messageId, 'ID чата:', chatId);
     }
     
-    // Обновляем существующий спор
+    // Обновляем спор, сохраняя telegramId как строки для безопасности
     dispute.opponent = opponent._id;
     dispute.opponentTelegramId = String(ctx.from.id);
     dispute.status = 'active';
@@ -814,6 +833,14 @@ bot.action(/^accept_([a-f0-9]+)$/, async (ctx) => {
     dispute.opponentReady = false;
     dispute.messageId = messageId;
     dispute.chatId = chatId;
+    
+    console.log('Обновленные данные спора перед сохранением:', {
+      opponentId: dispute.opponent,
+      opponentTelegramId: dispute.opponentTelegramId,
+      creatorSide: dispute.creatorSide,
+      opponentSide: dispute.opponentSide,
+      status: dispute.status
+    });
     
     await dispute.save();
     
@@ -849,6 +876,8 @@ bot.action(/^accept_([a-f0-9]+)$/, async (ctx) => {
     // Формируем URL для комнаты спора с явным указанием роли для обоих игроков
     const creatorRoomUrl = `${process.env.WEBAPP_URL}?dispute=${dispute._id}&isCreator=true`;
     const opponentRoomUrl = `${process.env.WEBAPP_URL}?dispute=${dispute._id}&isCreator=false`;
+    console.log('URL комнаты спора для создателя:', creatorRoomUrl);
+    console.log('URL комнаты спора для оппонента:', opponentRoomUrl);
     
     // ВАЖНО: Гарантированная отправка сообщений обоим участникам
     try {
@@ -860,14 +889,14 @@ bot.action(/^accept_([a-f0-9]+)$/, async (ctx) => {
           parse_mode: 'HTML',
           reply_markup: {
             inline_keyboard: [
-              [{ text: '🎮 Открыть комнату спора', url: creatorRoomUrl }]
+              [{ text: '🎮 Открыть комнату спора', web_app: { url: creatorRoomUrl } }]
             ]
           }
         }
       );
       console.log(`Уведомление отправлено создателю ${creatorId}`);
       
-      // 2. ВАЖНО: Используем bot.telegram.sendMessage вместо ctx.reply для оппонента
+      // 2. Используем bot.telegram.sendMessage вместо ctx.reply для оппонента
       await bot.telegram.sendMessage(
         ctx.from.id, // ID оппонента
         `🎲 <b>Вы приняли спор!</b>\n\nВы приняли спор от пользователя ${creator.firstName} по теме "${question}".\n\nНажмите кнопку ниже, чтобы открыть комнату спора:`,
@@ -875,7 +904,7 @@ bot.action(/^accept_([a-f0-9]+)$/, async (ctx) => {
           parse_mode: 'HTML',
           reply_markup: {
             inline_keyboard: [
-              [{ text: '🎮 Открыть комнату спора', url: opponentRoomUrl }]
+              [{ text: '🎮 Открыть комнату спора', web_app: { url: opponentRoomUrl } }]
             ]
           }
         }
@@ -900,11 +929,12 @@ bot.action(/^accept_([a-f0-9]+)$/, async (ctx) => {
             parse_mode: 'HTML',
             reply_markup: {
               inline_keyboard: [
-                [{ text: '🎮 Открыть комнату спора', url: `${process.env.WEBAPP_URL}?dispute=${dispute._id}` }]
+                [{ text: '🎮 Открыть комнату спора', web_app: { url: `${process.env.WEBAPP_URL}?dispute=${dispute._id}` } }]
               ]
             }
           }
         );
+        console.log('Сообщение в чате обновлено');
       } catch (editError) {
         console.error('Ошибка при обновлении сообщения:', editError);
       }

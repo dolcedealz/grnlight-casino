@@ -1318,90 +1318,99 @@ const checkRoomStatus = function() {
         /**
          * Отправка статуса готовности
          */
-        const sendReadyStatus = function() {
-            try {
-                // Отправляем сообщение в родительское окно Telegram
-                if (window.Telegram && window.Telegram.WebApp) {
-                    const readyData = {
-                        type: 'player_ready',
-                        disputeId: state.disputeId,
-                        roomId: state.roomId,
-                        isCreator: state.isCreator,
-                        ready: state.playerReady
-                    };
-                    
-                    window.Telegram.WebApp.sendData(JSON.stringify(readyData));
-                    app.log('Dispute', `Отправлен статус готовности через Telegram WebApp: ${state.playerReady}`);
-                } else {
-                    // В демо-режиме отправляем запрос через fetch
-                    app.log('Dispute', 'Отправка статуса готовности через fetch');
-                    
-                    // Проверяем, есть ли API URL в глобальных переменных
-                    const apiUrl = window.GreenLightApp.apiUrl || '/api';
-                    
-                    // Отправляем запрос на обновление статуса готовности
-                    fetch(`${apiUrl}/disputes/room/ready`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            disputeId: state.disputeId,
-                            userTelegramId: state.isCreator ? 
-                                (state.disputeData.creator && state.disputeData.creator.telegramId) : 
-                                (state.disputeData.opponent && state.disputeData.opponent.telegramId),
-                            ready: state.playerReady
-                        })
-                    })
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error(`Ошибка обновления статуса готовности: ${response.status}`);
-                        }
-                        return response.json();
-                    })
-                    .then(data => {
-                        if (data.success) {
-                            app.log('Dispute', 'Статус готовности обновлен успешно');
-                            
-                            // Явно обновляем локальное состояние на основе ответа сервера
-                            if (state.isCreator) {
-                                state.playerReady = data.creatorReady;
-                            } else {
-                                state.playerReady = data.opponentReady;
-                            }
-                            
-                            // Обновляем статус оппонента
-                            if (state.isCreator) {
-                                state.opponentReady = data.opponentReady;
-                            } else {
-                                state.opponentReady = data.creatorReady;
-                            }
-                            
-                            // Обновляем UI для отображения текущего состояния
-                            updatePlayerReadyStatus();
-                            updateOpponentReadyStatus(state.opponentReady);
-                            
-                            // Если оба готовы, запускаем подбрасывание
-                            if (data.bothReady && !state.bothReady) {
-                                state.bothReady = true;
-                                checkBothReady();
-                            }
-                        } else {
-                            app.log('Dispute', 'Ошибка обновления статуса готовности на сервере', true);
-                        }
-                    })
-                    .catch(error => {
-                        app.log('Dispute', `Ошибка обновления статуса готовности: ${error.message}`, true);
-                        
-                        // Не сбрасываем готовность при ошибке сети
-                        // Вместо этого пробуем еще раз через некоторое время
-                        setTimeout(() => sendReadyStatus(), 2000);
-                    });
+        /**
+ * Отправка статуса готовности
+ */
+const sendReadyStatus = function() {
+    try {
+        // Отправляем сообщение в родительское окно Telegram
+        if (window.Telegram && window.Telegram.WebApp) {
+            const readyData = {
+                type: 'player_ready',
+                disputeId: state.disputeId,
+                roomId: state.roomId,
+                isCreator: state.isCreator,
+                ready: state.playerReady
+            };
+            
+            window.Telegram.WebApp.sendData(JSON.stringify(readyData));
+            app.log('Dispute', `Отправлен статус готовности через Telegram WebApp: ${state.playerReady}`);
+        } else {
+            // В демо-режиме отправляем запрос через fetch
+            app.log('Dispute', 'Отправка статуса готовности через fetch');
+            
+            // Проверяем, есть ли API URL в глобальных переменных
+            const apiUrl = window.GreenLightApp.apiUrl || '/api';
+            
+            // Формируем данные для отправки, убедившись, что готовность передается как boolean
+            const readyData = {
+                disputeId: state.disputeId,
+                userTelegramId: state.isCreator ? 
+                    (state.disputeData.creator && state.disputeData.creator.telegramId) : 
+                    (state.disputeData.opponent && state.disputeData.opponent.telegramId),
+                ready: Boolean(state.playerReady) // Гарантированно boolean
+            };
+            
+            // Отображаем данные для отладки
+            app.log('Dispute', `Отправка статуса на сервер: ${JSON.stringify(readyData)}`);
+            
+            // Отправляем запрос на обновление статуса готовности
+            fetch(`${apiUrl}/disputes/room/ready`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(readyData)
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Ошибка обновления статуса готовности: ${response.status}`);
                 }
-            } catch (error) {
-                app.log('Dispute', `Ошибка отправки статуса готовности: ${error.message}`, true);
-            }
-        };
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    app.log('Dispute', 'Статус готовности обновлен успешно');
+                    app.log('Dispute', `Ответ сервера: ${JSON.stringify(data)}`);
+                    
+                    // Явно обновляем локальное состояние на основе ответа сервера
+                    if (state.isCreator) {
+                        state.playerReady = Boolean(data.creatorReady);
+                    } else {
+                        state.playerReady = Boolean(data.opponentReady);
+                    }
+                    
+                    // Обновляем статус оппонента
+                    if (state.isCreator) {
+                        state.opponentReady = Boolean(data.opponentReady);
+                    } else {
+                        state.opponentReady = Boolean(data.creatorReady);
+                    }
+                    
+                    // Обновляем UI для отображения текущего состояния
+                    updatePlayerReadyStatus();
+                    updateOpponentReadyStatus(state.opponentReady);
+                    
+                    // Если оба готовы, запускаем подбрасывание
+                    if (data.bothReady && !state.bothReady) {
+                        state.bothReady = true;
+                        checkBothReady();
+                    }
+                } else {
+                    app.log('Dispute', 'Ошибка обновления статуса готовности на сервере', true);
+                }
+            })
+            .catch(error => {
+                app.log('Dispute', `Ошибка обновления статуса готовности: ${error.message}`, true);
+                
+                // Повторная попытка через 2 секунды
+                setTimeout(() => sendReadyStatus(), 2000);
+            });
+        }
+    } catch (error) {
+        app.log('Dispute', `Ошибка отправки статуса готовности: ${error.message}`, true);
+    }
+};
         
         /**
          * Симуляция готовности оппонента (для демо-режима)
