@@ -626,6 +626,7 @@ exports.notifyDisputeParticipant = async (telegramId, dispute) => {
 };
 
 // Обновление статуса готовности игрока
+// Обновление статуса готовности игрока
 exports.updatePlayerReadyStatus = async (req, res) => {
     try {
         const { disputeId, userTelegramId, ready } = req.body;
@@ -633,9 +634,13 @@ exports.updatePlayerReadyStatus = async (req, res) => {
         console.log('Обновление статуса готовности:', { disputeId, userTelegramId, ready });
         
         // Проверяем существование спора
-        const dispute = await Dispute.findById(disputeId);
+        const dispute = await Dispute.findById(disputeId)
+            .populate('creator', 'telegramId firstName lastName username')
+            .populate('opponent', 'telegramId firstName lastName username');
+        
         if (!dispute) {
-            return res.status(404).json({ message: 'Спор не найден' });
+            console.log('Спор не найден:', disputeId);
+            return res.status(404).json({ message: 'Спор не найден', success: false });
         }
         
         // Проверяем, что пользователь является участником спора
@@ -644,25 +649,19 @@ exports.updatePlayerReadyStatus = async (req, res) => {
         
         if (!isCreator && !isOpponent) {
             console.log('Пользователь не является участником спора:', userTelegramId);
-            console.log('Создатель:', dispute.creatorTelegramId);
-            console.log('Оппонент:', dispute.opponentTelegramId);
             return res.status(403).json({ 
                 message: 'Вы не являетесь участником этого спора',
-                debug: { 
-                    userTelegramId, 
-                    creatorTelegramId: dispute.creatorTelegramId, 
-                    opponentTelegramId: dispute.opponentTelegramId,
-                    isCreator, 
-                    isOpponent
-                }
+                success: false 
             });
         }
         
-        // Обновляем статус готовности
+        // Обновляем статус готовности с явным преобразованием в boolean
         if (isCreator) {
-            dispute.creatorReady = ready;
+            dispute.creatorReady = ready === true || ready === 'true';
+            console.log(`Статус создателя обновлен: ${dispute.creatorReady}`);
         } else if (isOpponent) {
-            dispute.opponentReady = ready;
+            dispute.opponentReady = ready === true || ready === 'true';
+            console.log(`Статус оппонента обновлен: ${dispute.opponentReady}`);
         }
         
         await dispute.save();
@@ -670,35 +669,55 @@ exports.updatePlayerReadyStatus = async (req, res) => {
         // Проверяем, готовы ли оба игрока
         const bothReady = dispute.creatorReady && dispute.opponentReady;
         
-        // Логируем обновление статуса
-        console.log(`Обновлен статус готовности для спора ${dispute._id}. Пользователь: ${userTelegramId}, готов: ${ready}. Оба готовы: ${bothReady}`);
+        console.log(`Обновлен статус готовности для спора ${dispute._id}. Создатель: ${dispute.creatorReady}, Оппонент: ${dispute.opponentReady}, Оба: ${bothReady}`);
         
-        // Если оба игрока готовы, начинаем подбрасывание монетки
-        let resultData = null;
-        if (bothReady && isCreator) {
-            // Только создатель запускает процесс определения результата
-            try {
-                console.log('Оба участника готовы, определяем результат спора');
-                const result = await this.determineDisputeResult(dispute);
-                resultData = result;
-            } catch (resultError) {
-                console.error('Ошибка определения результата спора:', resultError);
-            }
-        }
-        
-        // Отправляем статус готовности другому участнику
-        await this.sendReadyStatusNotification(dispute, isCreator);
-        
+        // Возвращаем текущий статус обоих игроков
         res.status(200).json({ 
             success: true, 
             bothReady,
             creatorReady: dispute.creatorReady,
             opponentReady: dispute.opponentReady,
-            result: resultData
         });
+        
     } catch (error) {
         console.error('Ошибка обновления статуса готовности:', error);
-        res.status(500).json({ message: 'Server error', error: error.message });
+        res.status(500).json({ message: 'Server error', error: error.message, success: false });
+    }
+};
+
+// Получение статуса комнаты спора - улучшенная версия
+exports.getDisputeRoomStatus = async (req, res) => {
+    try {
+        const { disputeId } = req.params;
+        
+        // Проверяем существование спора
+        const dispute = await Dispute.findById(disputeId)
+            .populate('creator', 'telegramId firstName lastName username')
+            .populate('opponent', 'telegramId firstName lastName username');
+        
+        if (!dispute) {
+            return res.status(404).json({ message: 'Спор не найден', success: false });
+        }
+        
+        // Возвращаем детальный статус комнаты
+        res.status(200).json({
+            success: true,
+            disputeId: dispute._id,
+            roomId: dispute.roomId,
+            creatorReady: dispute.creatorReady === true,
+            opponentReady: dispute.opponentReady === true,
+            bothReady: dispute.creatorReady === true && dispute.opponentReady === true,
+            status: dispute.status,
+            result: dispute.result,
+            winnerTelegramId: dispute.winnerTelegramId,
+            creatorTelegramId: dispute.creatorTelegramId,
+            opponentTelegramId: dispute.opponentTelegramId,
+            // Добавляем метку времени для предотвращения кэширования
+            timestamp: Date.now()
+        });
+    } catch (error) {
+        console.error('Ошибка получения статуса комнаты спора:', error);
+        res.status(500).json({ message: 'Server error', success: false });
     }
 };
 

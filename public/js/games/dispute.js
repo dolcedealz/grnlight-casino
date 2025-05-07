@@ -61,7 +61,8 @@
             result: null,
             hasFinished: false,
             soundEnabled: true,
-            closed: false
+            closed: false,
+            userInteracted: false // Флаг для отслеживания взаимодействия пользователя
         };
         
         // Звуковые эффекты
@@ -774,7 +775,7 @@
                     const isOpponentUpdate = state.isCreator ? 'opponentReady' : 'playerReady';
                     
                     state[isOpponentUpdate] = data.opponentReady;
-                    updateOpponentReadyStatus(data.opponentReady);
+                    updateOpponentReadyStatus(state.opponentReady);
                 }
                 
                 // Проверяем, готовы ли оба игрока
@@ -799,7 +800,7 @@
                 if (data.isCreator !== state.isCreator) {
                     // Обновление от другого игрока
                     state.opponentReady = data.ready;
-                    updateOpponentReadyStatus(data.ready);
+                    updateOpponentReadyStatus(state.opponentReady);
                     checkBothReady();
                 }
             } catch (error) {
@@ -1033,7 +1034,6 @@
                 }
                 
                 // Определяем, является ли пользователь создателем спора
-                // Определяем, является ли пользователь создателем спора
                 if (disputeData.creator && disputeData.creator.telegramId === currentUserId) {
                     state.isCreator = true;
                     state.playerSide = disputeData.creatorSide;
@@ -1145,8 +1145,8 @@
                 // Проверяем, есть ли API URL в глобальных переменных
                 const apiUrl = window.GreenLightApp.apiUrl || '/api';
                 
-                // Запрашиваем статус комнаты
-                fetch(`${apiUrl}/disputes/room/${state.disputeId}`)
+                // Запрашиваем статус комнаты, добавляя метку времени для предотвращения кэширования
+                fetch(`${apiUrl}/disputes/room/${state.disputeId}?timestamp=${Date.now()}`)
                     .then(response => {
                         if (!response.ok) {
                             throw new Error(`Ошибка получения статуса комнаты: ${response.status}`);
@@ -1154,18 +1154,26 @@
                         return response.json();
                     })
                     .then(data => {
-                        // Обновляем статусы готовности
-                        if (state.isCreator) {
-                            state.playerReady = data.creatorReady;
+                        app.log('Dispute', `Получен статус комнаты: ${JSON.stringify(data)}`);
+                        
+                        // Важно! НЕ перезаписываем статус готовности игрока, если он активно взаимодействовал
+                        // Это предотвращает "скачки" статуса
+                        let updatedState = false;
+                        
+                        // Обновляем статус оппонента
+                        if (state.isCreator && data.opponentReady !== state.opponentReady) {
                             state.opponentReady = data.opponentReady;
-                        } else {
-                            state.playerReady = data.opponentReady;
+                            updateOpponentReadyStatus(state.opponentReady);
+                            updatedState = true;
+                        } else if (!state.isCreator && data.creatorReady !== state.opponentReady) {
                             state.opponentReady = data.creatorReady;
+                            updateOpponentReadyStatus(state.opponentReady);
+                            updatedState = true;
                         }
                         
-                        // Обновляем UI
-                        updatePlayerReadyStatus();
-                        updateOpponentReadyStatus(state.opponentReady);
+                        if (updatedState) {
+                            app.log('Dispute', `Обновлен статус готовности: моя=${state.playerReady}, оппонент=${state.opponentReady}`);
+                        }
                         
                         // Проверяем готовность обоих игроков
                         if (data.bothReady && !state.bothReady) {
@@ -1263,6 +1271,9 @@
                 // Воспроизводим звук нажатия
                 playSound('click');
                 
+                // Отмечаем, что пользователь взаимодействовал с готовностью
+                state.userInteracted = true;
+                
                 // Инвертируем текущий статус
                 state.playerReady = !state.playerReady;
                 
@@ -1326,10 +1337,10 @@
                     };
                     
                     window.Telegram.WebApp.sendData(JSON.stringify(readyData));
-                    app.log('Dispute', `Отправлен статус готовности: ${state.playerReady}`);
+                    app.log('Dispute', `Отправлен статус готовности через Telegram WebApp: ${state.playerReady}`);
                 } else {
                     // В демо-режиме отправляем запрос через fetch
-                    app.log('Dispute', 'Демо-режим: отправка статуса готовности через fetch');
+                    app.log('Dispute', 'Отправка статуса готовности через fetch');
                     
                     // Проверяем, есть ли API URL в глобальных переменных
                     const apiUrl = window.GreenLightApp.apiUrl || '/api';
@@ -1355,26 +1366,46 @@
                         return response.json();
                     })
                     .then(data => {
-                        app.log('Dispute', 'Статус готовности обновлен успешно');
-                        
-                        // Если оба готовы, запускаем подбрасывание
-                        if (data.bothReady && !state.bothReady) {
-                            state.bothReady = true;
-                            checkBothReady();
+                        if (data.success) {
+                            app.log('Dispute', 'Статус готовности обновлен успешно');
+                            
+                            // Явно обновляем локальное состояние на основе ответа сервера
+                            if (state.isCreator) {
+                                state.playerReady = data.creatorReady;
+                            } else {
+                                state.playerReady = data.opponentReady;
+                            }
+                            
+                            // Обновляем статус оппонента
+                            if (state.isCreator) {
+                                state.opponentReady = data.opponentReady;
+                            } else {
+                                state.opponentReady = data.creatorReady;
+                            }
+                            
+                            // Обновляем UI для отображения текущего состояния
+                            updatePlayerReadyStatus();
+                            updateOpponentReadyStatus(state.opponentReady);
+                            
+                            // Если оба готовы, запускаем подбрасывание
+                            if (data.bothReady && !state.bothReady) {
+                                state.bothReady = true;
+                                checkBothReady();
+                            }
+                        } else {
+                            app.log('Dispute', 'Ошибка обновления статуса готовности на сервере', true);
                         }
                     })
                     .catch(error => {
                         app.log('Dispute', `Ошибка обновления статуса готовности: ${error.message}`, true);
                         
-                        // Симулируем ответ оппонента в демо-режиме
-                        simulateOpponentReady();
+                        // Не сбрасываем готовность при ошибке сети
+                        // Вместо этого пробуем еще раз через некоторое время
+                        setTimeout(() => sendReadyStatus(), 2000);
                     });
                 }
             } catch (error) {
                 app.log('Dispute', `Ошибка отправки статуса готовности: ${error.message}`, true);
-                
-                // Симулируем ответ оппонента в случае ошибки
-                simulateOpponentReady();
             }
         };
         

@@ -189,6 +189,7 @@ async function handleDisputeRoomConnect(ctx, data) {
 }
 
 // Обработчик статуса готовности игрока
+// Обработчик web_app_data - улучшенная версия для обработки статуса готовности игрока
 async function handlePlayerReady(ctx, data) {
   try {
       console.log('Обработка статуса готовности игрока:', data);
@@ -196,7 +197,9 @@ async function handlePlayerReady(ctx, data) {
       const { disputeId, isCreator, ready } = data;
       
       // Получаем данные спора из базы данных
-      const dispute = await Dispute.findById(disputeId);
+      const dispute = await Dispute.findById(disputeId)
+          .populate('creator', 'telegramId firstName lastName username')
+          .populate('opponent', 'telegramId firstName lastName username');
       
       if (!dispute) {
           ctx.reply('❌ Спор не найден');
@@ -214,16 +217,10 @@ async function handlePlayerReady(ctx, data) {
           return;
       }
       
-      // Определяем роль пользователя
+      // Определяем роль пользователя и обновляем соответствующее поле
       const userRole = dispute.creatorTelegramId === userId ? 'creator' : 'opponent';
       
-      // Проверяем совпадение роли
-      if ((userRole === 'creator' && !isCreator) || (userRole === 'opponent' && isCreator)) {
-          ctx.reply('❌ Несоответствие роли пользователя');
-          return;
-      }
-      
-      // Обновляем статус готовности
+      // Обновляем статус готовности в базе данных
       if (userRole === 'creator') {
           dispute.creatorReady = ready;
       } else {
@@ -235,19 +232,31 @@ async function handlePlayerReady(ctx, data) {
       // Определяем, готовы ли оба игрока
       const bothReady = dispute.creatorReady && dispute.opponentReady;
       
-      // Отправляем уведомление другому участнику
+      // Отправляем сообщение ОБОИМ участникам
       const otherParticipantId = userRole === 'creator' ? dispute.opponentTelegramId : dispute.creatorTelegramId;
       
+      // Более явное и гарантированное уведомление обоих участников
       if (otherParticipantId) {
           try {
               await bot.telegram.sendMessage(
                   otherParticipantId,
-                  `📢 Участник ${ctx.from.first_name} ${ready ? 'готов' : 'отменил готовность'} к спору.\n\n${bothReady ? '⚠️ Оба участника готовы! Начинается подбрасывание монетки!' : ''}`
+                  `📢 Участник ${ctx.from.first_name} ${ready ? 'готов' : 'отменил готовность'} к спору.\n\n${bothReady ? '⚠️ Оба участника готовы! Начинается подбрасывание монетки!' : ''}`,
+                  {
+                      reply_markup: {
+                          inline_keyboard: [[
+                              { text: '🎮 Перейти к спору', web_app: { url: `${process.env.WEBAPP_URL}?dispute=${disputeId}` } }
+                          ]]
+                      }
+                  }
               );
+              console.log(`Уведомление о готовности отправлено пользователю ${otherParticipantId}`);
           } catch (notifyError) {
               console.error('Ошибка отправки уведомления о готовности:', notifyError);
           }
       }
+      
+      // Уведомляем также инициатора действия
+      await ctx.reply(`✅ Вы ${ready ? 'подтвердили' : 'отменили'} готовность к спору`);
       
       // Если оба игрока готовы и пользователь - создатель, запускаем определение результата
       if (bothReady && userRole === 'creator') {
@@ -256,14 +265,11 @@ async function handlePlayerReady(ctx, data) {
               determineDisputeResult(dispute);
           }, 3000);
       }
-      
-      ctx.reply(`✅ Статус готовности обновлен: ${ready ? 'готов' : 'не готов'}`);
   } catch (error) {
       console.error('Ошибка при обработке статуса готовности:', error);
       ctx.reply('❌ Произошла ошибка при обновлении статуса готовности');
   }
 }
-
 // Определение результата спора
 async function determineDisputeResult(dispute) {
   try {
