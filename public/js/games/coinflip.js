@@ -1,6 +1,6 @@
 /**
  * coinflip.js - Улучшенная версия игры "Монетка"
- * Версия 2.0.0
+ * Версия 3.0.0
  * 
  * Особенности:
  * - Современный дизайн с улучшенной анимацией
@@ -9,6 +9,7 @@
  * - Совместимость с системой регистрации игр
  * - Адаптивный дизайн
  * - Поддержка русского языка
+ * - Поддержка режима спора между двумя игроками
  */
 
 // Предотвращаем конфликты с другими модулями
@@ -25,7 +26,7 @@
     }
     
     const app = window.GreenLightApp;
-    app.log('CoinFlip', 'Инициализация улучшенного модуля Монетка v2.0.0');
+    app.log('CoinFlip', 'Инициализация улучшенного модуля Монетка v3.0.0');
     
     // Игровая логика в замыкании для изоляции
     const coinFlipGame = (function() {
@@ -49,7 +50,8 @@
             initializationStarted: false,
             chosenSide: null,
             betAmount: 10,
-            soundEnabled: true
+            soundEnabled: true,
+            disputeMode: false
         };
         
         // Звуковые эффекты
@@ -58,6 +60,125 @@
             win: null,
             lose: null,
             click: null
+        };
+        
+        /**
+         * Инициализация игры с защитой от повторной инициализации
+         */
+        const init = async function() {
+            // Защита от повторной инициализации
+            if (state.initialized || state.initializationStarted) {
+                app.log('CoinFlip', 'Инициализация уже выполнена или выполняется');
+                return true;
+            }
+            
+            // Проверяем, находимся ли мы в режиме спора
+            const urlParams = new URLSearchParams(window.location.search);
+            const disputeId = urlParams.get('dispute');
+            
+            // Если мы в режиме спора, делегируем инициализацию moduleDispute
+            if (disputeId) {
+                app.log('CoinFlip', 'Обнаружен параметр dispute, переключаемся в режим спора');
+                state.disputeMode = true;
+                
+                // Проверяем наличие модуля dispute
+                if (window.disputeGame && typeof window.disputeGame.init === 'function') {
+                    return window.disputeGame.init();
+                } else {
+                    // Загрузка модуля dispute, если он еще не загружен
+                    app.log('CoinFlip', 'Модуль dispute не найден, пытаемся загрузить');
+                    return loadDisputeModule().then(() => {
+                        if (window.disputeGame && typeof window.disputeGame.init === 'function') {
+                            return window.disputeGame.init();
+                        } else {
+                            app.log('CoinFlip', 'Не удалось загрузить модуль dispute', true);
+                            return false;
+                        }
+                    });
+                }
+            }
+            
+            state.initializationStarted = true;
+            app.log('CoinFlip', 'Начало инициализации игры');
+            
+            try {
+                // Устанавливаем таймаут для инициализации
+                const initPromise = new Promise(async (resolve) => {
+                    try {
+                        // Сначала создаем интерфейс
+                        if (!createGameInterface()) {
+                            app.log('CoinFlip', 'Не удалось создать интерфейс игры', true);
+                            resolve(false);
+                            return;
+                        }
+                        
+                        // Загружаем аудио
+                        await loadAudio();
+                        
+                        // Получаем DOM элементы
+                        await findDOMElements();
+                        
+                        // Проверяем UI элементы
+                        app.log('CoinFlip', 'Проверка UI элементов');
+                        
+                        // Добавляем обработчики событий
+                        setupEventListeners();
+                        
+                        state.initialized = true;
+                        app.log('CoinFlip', 'Инициализация успешно завершена');
+                        resolve(true);
+                    } catch (innerError) {
+                        app.log('CoinFlip', `Ошибка в процессе инициализации: ${innerError.message}`, true);
+                        resolve(false);
+                    }
+                });
+                
+                // Устанавливаем таймаут (3 секунды)
+                const timeoutPromise = new Promise((resolve) => {
+                    setTimeout(() => {
+                        app.log('CoinFlip', 'Таймаут инициализации', true);
+                        resolve(false);
+                    }, 3000);
+                });
+                
+                // Используем Promise.race для предотвращения зависания
+                const result = await Promise.race([initPromise, timeoutPromise]);
+                
+                return result;
+                
+            } catch (error) {
+                app.log('CoinFlip', `Критическая ошибка инициализации: ${error.message}`, true);
+                state.initializationStarted = false;
+                return false;
+            }
+        };
+        
+        /**
+         * Функция для загрузки модуля dispute
+         */
+        const loadDisputeModule = function() {
+            return new Promise((resolve, reject) => {
+                if (window.disputeGame) {
+                    resolve(true);
+                    return;
+                }
+                
+                const script = document.createElement('script');
+                script.src = 'js/games/dispute.js';
+                script.async = true;
+                
+                script.onload = function() {
+                    app.log('CoinFlip', 'Модуль dispute успешно загружен');
+                    resolve(true);
+                };
+                
+                script.onerror = function() {
+                    app.log('CoinFlip', 'Ошибка загрузки модуля dispute', true);
+                    resolve(false);
+                };
+                
+                document.body.appendChild(script);
+            });
         };
         
         /**
@@ -248,71 +369,6 @@
                 return true;
             } catch (error) {
                 app.log('CoinFlip', `Ошибка создания интерфейса: ${error.message}`, true);
-                return false;
-            }
-        };
-        
-        /**
-         * Инициализация игры с защитой от повторной инициализации
-         */
-        const init = async function() {
-            // Защита от повторной инициализации
-            if (state.initialized || state.initializationStarted) {
-                app.log('CoinFlip', 'Инициализация уже выполнена или выполняется');
-                return true;
-            }
-            
-            state.initializationStarted = true;
-            app.log('CoinFlip', 'Начало инициализации игры');
-            
-            try {
-                // Устанавливаем таймаут для инициализации
-                const initPromise = new Promise(async (resolve) => {
-                    try {
-                        // Сначала создаем интерфейс
-                        if (!createGameInterface()) {
-                            app.log('CoinFlip', 'Не удалось создать интерфейс игры', true);
-                            resolve(false);
-                            return;
-                        }
-                        
-                        // Загружаем аудио
-                        await loadAudio();
-                        
-                        // Получаем DOM элементы
-                        await findDOMElements();
-                        
-                        // Проверяем UI элементы
-                        app.log('CoinFlip', 'Проверка UI элементов');
-                        
-                        // Добавляем обработчики событий
-                        setupEventListeners();
-                        
-                        state.initialized = true;
-                        app.log('CoinFlip', 'Инициализация успешно завершена');
-                        resolve(true);
-                    } catch (innerError) {
-                        app.log('CoinFlip', `Ошибка в процессе инициализации: ${innerError.message}`, true);
-                        resolve(false);
-                    }
-                });
-                
-                // Устанавливаем таймаут (3 секунды)
-                const timeoutPromise = new Promise((resolve) => {
-                    setTimeout(() => {
-                        app.log('CoinFlip', 'Таймаут инициализации', true);
-                        resolve(false);
-                    }, 3000);
-                });
-                
-                // Используем Promise.race для предотвращения зависания
-                const result = await Promise.race([initPromise, timeoutPromise]);
-                
-                return result;
-                
-            } catch (error) {
-                app.log('CoinFlip', `Критическая ошибка инициализации: ${error.message}`, true);
-                state.initializationStarted = false;
                 return false;
             }
         };
@@ -945,7 +1001,8 @@
                         coinResult: !!elements.coinResult
                     },
                     soundEnabled: state.soundEnabled,
-                    chosenSide: state.chosenSide
+                    chosenSide: state.chosenSide,
+                    disputeMode: state.disputeMode
                 };
             },
             

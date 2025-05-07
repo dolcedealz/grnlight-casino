@@ -1,12 +1,13 @@
 /**
  * dispute.js - Улучшенная версия режима спора с монеткой
- * Версия 2.1.0
+ * Версия 3.0.0
  * 
  * Особенности:
  * - Поддержка комнаты для двух участников спора
  * - Механизм готовности игроков
  * - Интеграция с Telegram для обновления сообщений
  * - Автоматический запуск монетки при готовности обоих участников
+ * - Изолированный режим работы
  */
 
 // Предотвращаем конфликты и обеспечиваем изолированную среду
@@ -23,7 +24,7 @@
     }
     
     const app = window.GreenLightApp;
-    app.log('Dispute', 'Инициализация модуля Dispute v2.1.0');
+    app.log('Dispute', 'Инициализация модуля Dispute v3.0.0');
     
     // Игровая логика в замыкании для изоляции
     const disputeGame = (function() {
@@ -37,7 +38,10 @@
             creatorInfo: null,
             opponentInfo: null,
             waitingMessage: null,
-            resultMessage: null
+            resultMessage: null,
+            disputeSubject: null,
+            disputeAmount: null,
+            closeBtn: null
         };
         
         // Глобальное состояние спора
@@ -55,14 +59,18 @@
             opponentReady: false,
             bothReady: false,
             result: null,
-            hasFinished: false
+            hasFinished: false,
+            soundEnabled: true,
+            closed: false
         };
         
         // Звуковые эффекты
         let sounds = {
             flip: null,
             win: null,
-            lose: null
+            lose: null,
+            click: null,
+            ready: null
         };
         
         /**
@@ -90,6 +98,9 @@
                 
                 state.disputeId = disputeId;
                 state.roomId = roomId || generateRoomId();
+                
+                // Добавляем стили для режима спора
+                addStyles();
                 
                 // Создаем UI элементы
                 await createUI();
@@ -123,8 +134,326 @@
                 return true;
             } catch (error) {
                 app.log('Dispute', `Ошибка инициализации: ${error.message}`, true);
+                state.initializationStarted = false;
                 return false;
             }
+        };
+        
+        /**
+         * Добавление стилей для режима спора
+         */
+        const addStyles = function() {
+            if (document.getElementById('dispute-styles')) return;
+            
+            const styleElement = document.createElement('style');
+            styleElement.id = 'dispute-styles';
+            styleElement.textContent = `
+                .dispute-container {
+                    max-width: 500px;
+                    margin: 0 auto;
+                    padding: 20px;
+                    background: linear-gradient(135deg, #1a1a1a, #2a2a2a);
+                    border-radius: 15px;
+                    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+                    color: white;
+                    font-family: 'Arial', sans-serif;
+                }
+                
+                .dispute-container.isolated-mode {
+                    position: fixed;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    z-index: 9999;
+                    width: 90%;
+                    max-height: 90vh;
+                    overflow-y: auto;
+                }
+                
+                .dispute-overlay {
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background: rgba(0, 0, 0, 0.8);
+                    z-index: 9998;
+                }
+                
+                .dispute-header {
+                    text-align: center;
+                    margin-bottom: 20px;
+                    padding-bottom: 10px;
+                    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                }
+                
+                .dispute-header h2 {
+                    margin: 0;
+                    color: #1db954;
+                    font-size: 24px;
+                }
+                
+                .dispute-id {
+                    font-size: 12px;
+                    color: #777;
+                    margin-top: 5px;
+                }
+                
+                .players-section {
+                    margin-bottom: 20px;
+                }
+                
+                .players-section h3 {
+                    font-size: 18px;
+                    margin-bottom: 10px;
+                    color: #f2c94c;
+                }
+                
+                .players-list {
+                    display: flex;
+                    gap: 15px;
+                }
+                
+                .player-info {
+                    flex: 1;
+                    background: rgba(0, 0, 0, 0.2);
+                    padding: 15px;
+                    border-radius: 10px;
+                    border: 1px solid rgba(255, 255, 255, 0.1);
+                }
+                
+                .player-name {
+                    font-weight: bold;
+                    margin-bottom: 5px;
+                }
+                
+                .player-side {
+                    margin-bottom: 10px;
+                    color: #f2c94c;
+                }
+                
+                .ready-status {
+                    display: inline-block;
+                    padding: 3px 8px;
+                    border-radius: 5px;
+                    font-size: 12px;
+                    font-weight: bold;
+                }
+                
+                .ready-status.not-ready {
+                    background-color: rgba(255, 69, 58, 0.2);
+                    color: #ff453a;
+                }
+                
+                .ready-status.ready {
+                    background-color: rgba(76, 217, 100, 0.2);
+                    color: #4cd964;
+                }
+                
+                .dispute-content {
+                    background: rgba(0, 0, 0, 0.2);
+                    padding: 15px;
+                    border-radius: 10px;
+                    margin-bottom: 20px;
+                    text-align: center;
+                }
+                
+                .dispute-subject {
+                    font-size: 18px;
+                    margin-bottom: 10px;
+                }
+                
+                .dispute-amount {
+                    font-size: 24px;
+                    color: #f2c94c;
+                    font-weight: bold;
+                }
+                
+                .waiting-message {
+                    text-align: center;
+                    padding: 15px;
+                    margin-bottom: 20px;
+                    background: rgba(242, 201, 76, 0.1);
+                    border-radius: 10px;
+                    color: #f2c94c;
+                    font-weight: bold;
+                }
+                
+                .coin-container {
+                    position: relative;
+                    height: 150px;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    margin-bottom: 20px;
+                    perspective: 1000px;
+                }
+                
+                .coin {
+                    position: relative;
+                    width: 100px;
+                    height: 100px;
+                    transform-style: preserve-3d;
+                    transition: transform 0.5s;
+                }
+                
+                .coin .heads,
+                .coin .tails,
+                .coin-side.heads,
+                .coin-side.tails {
+                    position: absolute;
+                    width: 100%;
+                    height: 100%;
+                    border-radius: 50%;
+                    backface-visibility: hidden;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    font-size: 30px;
+                    font-weight: bold;
+                }
+                
+                .coin .heads,
+                .coin-side.heads {
+                    background: radial-gradient(#FFD700, #B8860B);
+                    z-index: 2;
+                }
+                
+                .coin .heads::before,
+                .coin-side.heads::before {
+                    content: "O";
+                }
+                
+                .coin .tails,
+                .coin-side.tails {
+                    background: radial-gradient(#C0C0C0, #808080);
+                    transform: rotateY(180deg);
+                }
+                
+                .coin .tails::before,
+                .coin-side.tails::before {
+                    content: "P";
+                }
+                
+                .coin.heads {
+                    transform: rotateY(0deg);
+                }
+                
+                .coin.tails {
+                    transform: rotateY(180deg);
+                }
+                
+                .coin.flipping {
+                    animation: flip-coin 3s forwards;
+                }
+                
+                @keyframes flip-coin {
+                    0% { transform: rotateY(0); }
+                    100% { transform: rotateY(1800deg); }
+                }
+                
+                @keyframes flip-to-heads {
+                    0% { transform: rotateY(0); }
+                    100% { transform: rotateY(1800deg); }
+                }
+                
+                @keyframes flip-to-tails {
+                    0% { transform: rotateY(0); }
+                    100% { transform: rotateY(1980deg); }
+                }
+                
+                .coin.heads-result {
+                    animation: flip-to-heads 3s forwards;
+                }
+                
+                .coin.tails-result {
+                    animation: flip-to-tails 3s forwards;
+                }
+                
+                .result-message {
+                    text-align: center;
+                    padding: 15px;
+                    margin-bottom: 20px;
+                    border-radius: 10px;
+                    font-weight: bold;
+                    font-size: 18px;
+                }
+                
+                .result-message.win {
+                    background: rgba(76, 217, 100, 0.1);
+                    color: #4cd964;
+                }
+                
+                .result-message.lose {
+                    background: rgba(255, 69, 58, 0.1);
+                    color: #ff453a;
+                }
+                
+                .result-message.hidden {
+                    display: none;
+                }
+                
+                .dispute-controls {
+                    display: flex;
+                    gap: 15px;
+                    margin-bottom: 20px;
+                }
+                
+                .action-btn, .action-btn.secondary {
+                    flex: 1;
+                    padding: 15px;
+                    border: none;
+                    border-radius: 10px;
+                    font-weight: bold;
+                    cursor: pointer;
+                    transition: all 0.3s;
+                }
+                
+                .action-btn {
+                    background: #1db954;
+                    color: white;
+                }
+                
+                .action-btn:hover {
+                    background: #15ad49;
+                    transform: translateY(-2px);
+                    box-shadow: 0 5px 15px rgba(29, 185, 84, 0.3);
+                }
+                
+                .action-btn:active {
+                    transform: translateY(1px);
+                }
+                
+                .action-btn.disabled {
+                    background: #888;
+                    cursor: not-allowed;
+                    transform: none;
+                    box-shadow: none;
+                }
+                
+                .action-btn.secondary {
+                    background: #333;
+                    color: white;
+                }
+                
+                .action-btn.secondary:hover {
+                    background: #444;
+                    transform: translateY(-2px);
+                }
+                
+                .action-btn.secondary:active {
+                    transform: translateY(1px);
+                }
+                
+                .dispute-footer {
+                    text-align: center;
+                    font-size: 12px;
+                    color: #777;
+                }
+            `;
+            document.head.appendChild(styleElement);
+            
+            app.log('Dispute', 'Стили для режима спора добавлены');
         };
         
         /**
@@ -132,39 +461,36 @@
          */
         const activateDisputeScreen = function() {
             try {
+                app.log('Dispute', 'Активация экрана спора');
+                
+                // Создаем оверлей для изолированного режима
+                const overlay = document.createElement('div');
+                overlay.className = 'dispute-overlay';
+                document.body.appendChild(overlay);
+                
+                // Скрываем основной контент приложения
+                const appContent = document.getElementById('app-content');
+                if (appContent) {
+                    appContent.style.display = 'none';
+                }
+                
                 // Скрываем все экраны
                 document.querySelectorAll('.screen').forEach(screen => {
                     screen.classList.remove('active');
+                    screen.style.display = 'none';
                 });
                 
-                // Проверяем наличие элемента disputeContainer
-                if (!elements.disputeContainer) {
-                    app.log('Dispute', 'Элемент disputeContainer не найден', true);
-                    return;
+                // Скрываем навигацию
+                const bottomNav = document.querySelector('.bottom-nav');
+                if (bottomNav) {
+                    bottomNav.style.display = 'none';
                 }
                 
-                // Создаем временный экран для отображения спора, если нужно
-                let disputeScreen = document.getElementById('dispute-screen');
-                if (!disputeScreen) {
-                    disputeScreen = document.createElement('div');
-                    disputeScreen.id = 'dispute-screen';
-                    disputeScreen.className = 'screen';
-                    
-                    // Находим контейнер для экранов
-                    const mainContent = document.querySelector('.main-content');
-                    if (mainContent) {
-                        mainContent.appendChild(disputeScreen);
-                    } else {
-                        document.body.appendChild(disputeScreen);
-                    }
+                // Отображаем контейнер спора
+                if (elements.disputeContainer) {
+                    elements.disputeContainer.style.display = 'block';
+                    document.body.appendChild(elements.disputeContainer);
                 }
-                
-                // Очищаем экран спора и добавляем контейнер спора
-                disputeScreen.innerHTML = '';
-                disputeScreen.appendChild(elements.disputeContainer);
-                
-                // Активируем экран спора
-                disputeScreen.classList.add('active');
                 
                 app.log('Dispute', 'Экран спора активирован');
             } catch (error) {
@@ -196,6 +522,8 @@
                 sounds.flip = new Audio('https://assets.mixkit.co/sfx/preview/mixkit-arcade-mechanical-bling-210.mp3');
                 sounds.win = new Audio('https://assets.mixkit.co/sfx/preview/mixkit-winning-chimes-2015.mp3');
                 sounds.lose = new Audio('https://assets.mixkit.co/sfx/preview/mixkit-negative-tone-interface-tap-2301.mp3');
+                sounds.click = new Audio('https://assets.mixkit.co/sfx/preview/mixkit-modern-technology-select-3124.mp3');
+                sounds.ready = new Audio('https://assets.mixkit.co/sfx/preview/mixkit-quick-win-video-game-notification-269.mp3');
                 
                 // Предзагрузка звуков
                 Object.values(sounds).forEach(sound => {
@@ -216,12 +544,12 @@
         const playSound = function(soundName) {
             try {
                 const sound = sounds[soundName];
-                if (sound) {
-                    sound.currentTime = 0;
-                    sound.play().catch(e => {
-                        // Игнорируем ошибки автовоспроизведения
-                    });
-                }
+                if (!sound || !state.soundEnabled) return;
+                
+                sound.currentTime = 0;
+                sound.play().catch(e => {
+                    // Игнорируем ошибки автовоспроизведения
+                });
             } catch (error) {
                 app.log('Dispute', `Ошибка воспроизведения звука: ${error.message}`, true);
             }
@@ -233,15 +561,10 @@
         const createUI = async function() {
             return new Promise((resolve) => {
                 try {
-                    // Находим контейнер для игры или создаем его
-                    let disputeContainer = document.getElementById('dispute-container');
-                    
-                    // Если контейнер не существует, создаем его
-                    if (!disputeContainer) {
-                        disputeContainer = document.createElement('div');
-                        disputeContainer.id = 'dispute-container';
-                        document.body.appendChild(disputeContainer);
-                    }
+                    // Создаем основной контейнер
+                    const disputeContainer = document.createElement('div');
+                    disputeContainer.className = 'dispute-container isolated-mode';
+                    disputeContainer.id = 'dispute-container';
                     
                     // Создаем HTML разметку
                     disputeContainer.innerHTML = `
@@ -285,8 +608,8 @@
                         <div id="result-message" class="result-message hidden"></div>
                         
                         <div class="dispute-controls">
-                            <button id="ready-btn" class="ready-btn">Я ГОТОВ</button>
-                            <button id="close-btn" class="close-btn">ЗАКРЫТЬ</button>
+                            <button id="ready-btn" class="action-btn">Я ГОТОВ</button>
+                            <button id="close-btn" class="action-btn secondary">ЗАКРЫТЬ</button>
                         </div>
                         
                         <div class="dispute-footer">
@@ -296,291 +619,13 @@
                         </div>
                     `;
                     
-                    // Добавляем стили, если их нет
-                    if (!document.getElementById('dispute-styles')) {
-                        const styleElement = document.createElement('style');
-                        styleElement.id = 'dispute-styles';
-                        styleElement.textContent = `
-                            #dispute-container {
-                                max-width: 500px;
-                                margin: 0 auto;
-                                padding: 20px;
-                                background: linear-gradient(135deg, #1a1a1a, #2a2a2a);
-                                border-radius: 15px;
-                                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-                                color: white;
-                                font-family: 'Arial', sans-serif;
-                            }
-                            
-                            .dispute-header {
-                                text-align: center;
-                                margin-bottom: 20px;
-                                padding-bottom: 10px;
-                                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-                            }
-                            
-                            .dispute-header h2 {
-                                margin: 0;
-                                color: #1db954;
-                                font-size: 24px;
-                            }
-                            
-                            .dispute-id {
-                                font-size: 12px;
-                                color: #777;
-                                margin-top: 5px;
-                            }
-                            
-                            .players-section {
-                                margin-bottom: 20px;
-                            }
-                            
-                            .players-section h3 {
-                                font-size: 18px;
-                                margin-bottom: 10px;
-                                color: #f2c94c;
-                            }
-                            
-                            .players-list {
-                                display: flex;
-                                gap: 15px;
-                            }
-                            
-                            .player-info {
-                                flex: 1;
-                                background: rgba(0, 0, 0, 0.2);
-                                padding: 15px;
-                                border-radius: 10px;
-                                border: 1px solid rgba(255, 255, 255, 0.1);
-                            }
-                            
-                            .player-name {
-                                font-weight: bold;
-                                margin-bottom: 5px;
-                            }
-                            
-                            .player-side {
-                                margin-bottom: 10px;
-                                color: #f2c94c;
-                            }
-                            
-                            .ready-status {
-                                display: inline-block;
-                                padding: 3px 8px;
-                                border-radius: 5px;
-                                font-size: 12px;
-                                font-weight: bold;
-                            }
-                            
-                            .ready-status.not-ready {
-                                background-color: rgba(255, 69, 58, 0.2);
-                                color: #ff453a;
-                            }
-                            
-                            .ready-status.ready {
-                                background-color: rgba(76, 217, 100, 0.2);
-                                color: #4cd964;
-                            }
-                            
-                            .dispute-content {
-                                background: rgba(0, 0, 0, 0.2);
-                                padding: 15px;
-                                border-radius: 10px;
-                                margin-bottom: 20px;
-                                text-align: center;
-                            }
-                            
-                            .dispute-subject {
-                                font-size: 18px;
-                                margin-bottom: 10px;
-                            }
-                            
-                            .dispute-amount {
-                                font-size: 24px;
-                                color: #f2c94c;
-                                font-weight: bold;
-                            }
-                            
-                            .waiting-message {
-                                text-align: center;
-                                padding: 15px;
-                                margin-bottom: 20px;
-                                background: rgba(242, 201, 76, 0.1);
-                                border-radius: 10px;
-                                color: #f2c94c;
-                                font-weight: bold;
-                            }
-                            
-                            .coin-container {
-                                position: relative;
-                                height: 150px;
-                                display: flex;
-                                justify-content: center;
-                                align-items: center;
-                                margin-bottom: 20px;
-                                perspective: 1000px;
-                            }
-                            
-                            .coin {
-                                position: relative;
-                                width: 100px;
-                                height: 100px;
-                                transform-style: preserve-3d;
-                                transition: transform 0.5s;
-                            }
-                            
-                            .coin .heads,
-                            .coin .tails {
-                                position: absolute;
-                                width: 100%;
-                                height: 100%;
-                                border-radius: 50%;
-                                backface-visibility: hidden;
-                                display: flex;
-                                justify-content: center;
-                                align-items: center;
-                                font-size: 30px;
-                                font-weight: bold;
-                            }
-                            
-                            .coin .heads {
-                                background: radial-gradient(#FFD700, #B8860B);
-                                z-index: 2;
-                            }
-                            
-                            .coin .heads::before {
-                                content: "H";
-                            }
-                            
-                            .coin .tails {
-                                background: radial-gradient(#C0C0C0, #808080);
-                                transform: rotateY(180deg);
-                            }
-                            
-                            .coin .tails::before {
-                                content: "T";
-                            }
-                            
-                            .coin.heads {
-                                transform: rotateY(0deg);
-                            }
-                            
-                            .coin.tails {
-                                transform: rotateY(180deg);
-                            }
-                            
-                            .coin.flipping {
-                                animation: flip-coin 3s forwards;
-                            }
-                            
-                            @keyframes flip-coin {
-                                0% { transform: rotateY(0); }
-                                100% { transform: rotateY(1800deg); }
-                            }
-                            
-                            @keyframes flip-to-heads {
-                                0% { transform: rotateY(0); }
-                                100% { transform: rotateY(1800deg); }
-                            }
-                            
-                            @keyframes flip-to-tails {
-                                0% { transform: rotateY(0); }
-                                100% { transform: rotateY(1980deg); }
-                            }
-                            
-                            .coin.heads-result {
-                                animation: flip-to-heads 3s forwards;
-                            }
-                            
-                            .coin.tails-result {
-                                animation: flip-to-tails 3s forwards;
-                            }
-                            
-                            .result-message {
-                                text-align: center;
-                                padding: 15px;
-                                margin-bottom: 20px;
-                                border-radius: 10px;
-                                font-weight: bold;
-                                font-size: 18px;
-                            }
-                            
-                            .result-message.win {
-                                background: rgba(76, 217, 100, 0.1);
-                                color: #4cd964;
-                            }
-                            
-                            .result-message.lose {
-                                background: rgba(255, 69, 58, 0.1);
-                                color: #ff453a;
-                            }
-                            
-                            .result-message.hidden {
-                                display: none;
-                            }
-                            
-                            .dispute-controls {
-                                display: flex;
-                                gap: 15px;
-                                margin-bottom: 20px;
-                            }
-                            
-                            .ready-btn, .close-btn {
-                                flex: 1;
-                                padding: 15px;
-                                border: none;
-                                border-radius: 10px;
-                                font-weight: bold;
-                                cursor: pointer;
-                                transition: all 0.3s;
-                            }
-                            
-                            .ready-btn {
-                                background: #1db954;
-                                color: white;
-                            }
-                            
-                            .ready-btn:hover {
-                                background: #15ad49;
-                                transform: translateY(-2px);
-                                box-shadow: 0 5px 15px rgba(29, 185, 84, 0.3);
-                            }
-                            
-                            .ready-btn:active {
-                                transform: translateY(1px);
-                            }
-                            
-                            .ready-btn.disabled {
-                                background: #888;
-                                cursor: not-allowed;
-                                transform: none;
-                                box-shadow: none;
-                            }
-                            
-                            .close-btn {
-                                background: #333;
-                                color: white;
-                            }
-                            
-                            .close-btn:hover {
-                                background: #444;
-                                transform: translateY(-2px);
-                            }
-                            
-                            .close-btn:active {
-                                transform: translateY(1px);
-                            }
-                            
-                            .dispute-footer {
-                                text-align: center;
-                                font-size: 12px;
-                                color: #777;
-                            }
-                        `;
-                        document.head.appendChild(styleElement);
-                    }
-                    
+                    // Сохраняем контейнер в элементах
                     elements.disputeContainer = disputeContainer;
+                    
+                    // Добавляем контейнер в документ
+                    document.body.appendChild(disputeContainer);
+                    
+                    app.log('Dispute', 'Интерфейс спора создан успешно');
                     resolve(true);
                 } catch (error) {
                     app.log('Dispute', `Ошибка создания UI: ${error.message}`, true);
@@ -875,6 +920,17 @@
         };
         
         /**
+         * Обновление данных спора из ответа сервера
+         */
+        const updateDisputeData = function(disputeData) {
+            if (!disputeData) return;
+            
+            state.disputeData = disputeData;
+            updateUserInfo(disputeData);
+            updateDisputeUI(disputeData);
+        };
+        
+        /**
          * Обновление UI с данными спора
          */
         const updateDisputeUI = function(disputeData) {
@@ -977,6 +1033,7 @@
                 }
                 
                 // Определяем, является ли пользователь создателем спора
+                // Определяем, является ли пользователь создателем спора
                 if (disputeData.creator && disputeData.creator.telegramId === currentUserId) {
                     state.isCreator = true;
                     state.playerSide = disputeData.creatorSide;
@@ -1007,58 +1064,45 @@
             try {
                 app.log('Dispute', `Подключение к комнате спора ${state.roomId}`);
                 
-                // Отправляем сообщение в родительское окно Telegram
-                if (window.Telegram && window.Telegram.WebApp) {
-                    const connectData = {
-                        type: 'dispute_room_connect',
+                // Отправляем запрос на создание комнаты
+                const apiUrl = window.GreenLightApp.apiUrl || '/api';
+                
+                // Отправляем запрос на создание комнаты
+                fetch(`${apiUrl}/disputes/room/create`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
                         disputeId: state.disputeId,
                         roomId: state.roomId,
-                        isCreator: state.isCreator
-                    };
-                    
-                    // Отправляем данные на сервер через Telegram WebApp
-                    app.log('Dispute', 'Отправка данных через Telegram WebApp');
-                    window.Telegram.WebApp.sendData(JSON.stringify(connectData));
-                } else {
-                    // В демо-режиме отправляем запрос через fetch
-                    app.log('Dispute', 'Демо-режим: отправка запроса через fetch');
-                    
-                    // Проверяем, есть ли API URL в глобальных переменных
-                    const apiUrl = window.GreenLightApp.apiUrl || '/api';
-                    
-                    // Отправляем запрос на создание комнаты
-                    fetch(`${apiUrl}/disputes/room/create`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            disputeId: state.disputeId,
-                            roomId: state.roomId,
-                            userTelegramId: state.isCreator ? 
-                                (state.disputeData.creator && state.disputeData.creator.telegramId) : 
-                                (state.disputeData.opponent && state.disputeData.opponent.telegramId)
-                        })
+                        userTelegramId: window.GreenLightApp && window.GreenLightApp.user ? 
+                            window.GreenLightApp.user.telegramId : null
                     })
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error(`Ошибка создания комнаты: ${response.status}`);
-                        }
-                        return response.json();
-                    })
-                    .then(data => {
-                        app.log('Dispute', 'Комната спора создана успешно');
-                        
-                        // Запускаем проверку статуса комнаты
-                        startRoomStatusCheck();
-                    })
-                    .catch(error => {
-                        app.log('Dispute', `Ошибка создания комнаты: ${error.message}`, true);
-                        
-                        // Симулируем подключение к комнате в демо-режиме
-                        simulateRoomConnection();
-                    });
-                }
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Ошибка создания комнаты: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    app.log('Dispute', 'Комната спора создана успешно');
+                    
+                    // Обновляем данные спора из ответа
+                    if (data.dispute) {
+                        updateDisputeData(data.dispute);
+                    }
+                    
+                    // Запускаем проверку статуса комнаты
+                    startRoomStatusCheck();
+                })
+                .catch(error => {
+                    app.log('Dispute', `Ошибка создания комнаты: ${error.message}`, true);
+                    
+                    // Симулируем подключение к комнате в демо-режиме
+                    simulateRoomConnection();
+                });
             } catch (error) {
                 app.log('Dispute', `Ошибка подключения к комнате: ${error.message}`, true);
                 
@@ -1216,8 +1260,16 @@
                 // Игнорируем, если подбрасывание уже началось
                 if (state.isFlipping || state.bothReady) return;
                 
+                // Воспроизводим звук нажатия
+                playSound('click');
+                
                 // Инвертируем текущий статус
                 state.playerReady = !state.playerReady;
+                
+                // Если статус изменился на "готов", воспроизводим соответствующий звук
+                if (state.playerReady) {
+                    playSound('ready');
+                }
                 
                 // Обновляем UI
                 updatePlayerReadyStatus();
@@ -1625,12 +1677,46 @@
                 app.log('Dispute', `Ошибка запроса закрытия комнаты: ${error.message}`, true);
             }
             
-            // Закрываем мини-приложение
+            // Воспроизводим звук нажатия
+            playSound('click');
+            
+            // Удаляем оверлей
+            const overlay = document.querySelector('.dispute-overlay');
+            if (overlay) {
+                document.body.removeChild(overlay);
+            }
+            
+            // Удаляем контейнер спора
+            if (elements.disputeContainer) {
+                document.body.removeChild(elements.disputeContainer);
+            }
+            
+            // Восстанавливаем основной контент приложения
+            const appContent = document.getElementById('app-content');
+            if (appContent) {
+                appContent.style.display = 'block';
+            }
+            
+            // Восстанавливаем экраны
+            document.querySelectorAll('.screen').forEach(screen => {
+                screen.style.display = 'block';
+            });
+            
+            // Восстанавливаем навигацию
+            const bottomNav = document.querySelector('.bottom-nav');
+            if (bottomNav) {
+                bottomNav.style.display = 'block';
+            }
+            
+            // Активируем главный экран
+            const welcomeScreen = document.getElementById('welcome-screen');
+            if (welcomeScreen) {
+                welcomeScreen.classList.add('active');
+            }
+            
+            // Закрываем мини-приложение Telegram
             if (window.Telegram && window.Telegram.WebApp) {
                 window.Telegram.WebApp.close();
-            } else {
-                // В демо-режиме просто перенаправляем на главную
-                window.location.href = '/';
             }
         };
         
