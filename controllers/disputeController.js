@@ -575,7 +575,7 @@ exports.notifyDisputeParticipant = async (telegramId, dispute) => {
         }
         
         // Формируем URL для комнаты спора
-        const roomUrl = `https://t.me/${process.env.TELEGRAM_BOT_USERNAME}?start=dispute_${dispute._id}`;
+        const roomUrl = `${process.env.WEBAPP_URL}?dispute=${dispute._id}`;
         
         // Формируем текст уведомления
         const messageText = `🔔 <b>Приглашение в комнату спора</b>\n\n`
@@ -588,9 +588,10 @@ exports.notifyDisputeParticipant = async (telegramId, dispute) => {
         const inlineKeyboard = {
             inline_keyboard: [
                 [
+                    // ВАЖНО: Изменяем тип кнопки с web_app на url
                     {
                         text: 'Присоединиться к спору 👑',
-                        web_app: { url: `${process.env.WEBAPP_URL}?dispute=${dispute._id}` }
+                        url: roomUrl
                     }
                 ]
             ]
