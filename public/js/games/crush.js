@@ -1,10 +1,10 @@
 /**
  * crush.js - Оптимизированная версия игры Crush с общим графиком для всех игроков
- * Версия 4.1.0
+ * Версия 4.2.0
  * 
  * Особенности:
  * - Общий график и история для всех игроков
- * - 10-секундная пауза между раундами
+ * - 15-секундная пауза между раундами
  * - Улучшенный компактный пользовательский интерфейс
  * - Защита от мошенничества (нет вывода точки краша)
  * - Расширенная анимация и визуальные эффекты
@@ -25,7 +25,7 @@
     }
     
     const app = window.GreenLightApp;
-    app.log('Crush', 'Инициализация модуля игры Crush v4.1.0');
+    app.log('Crush', 'Инициализация модуля игры Crush v4.2.0');
     
     // Игровая логика в замыкании для изоляции
     const crushGame = (function() {
@@ -81,10 +81,10 @@
         };
         
         // Константы игры
-        const WAITING_TIME_BETWEEN_ROUNDS = 15; // Увеличено время ожидания до 15 сек
-        const MAX_HISTORY_SIZE = 15;  // Увеличен размер истории
+        const WAITING_TIME_BETWEEN_ROUNDS = 15; // 15 секунд ожидания между раундами
+        const MAX_HISTORY_SIZE = 15;  // Размер истории
         const GAME_UPDATE_INTERVAL = 16;  // 60 FPS для плавной анимации
-        const TIMER_UPDATE_INTERVAL = 100;  // Более частое обновление таймера
+        const TIMER_UPDATE_INTERVAL = 1000;  // 1 секунда для более точного отсчета таймера
         
         // Звуковые эффекты (симуляция)
         const sounds = {
@@ -127,6 +127,9 @@
                         updateGamePhaseDisplay();
                         initializeSounds();
                         
+                        // Применяем оптимизацию после создания UI
+                        optimizePerformance();
+                        
                         userState.initialized = true;
                         app.log('Crush', 'Инициализация успешно завершена');
                         resolve(true);
@@ -149,6 +152,52 @@
             } catch (error) {
                 app.log('Crush', `Критическая ошибка инициализации: ${error.message}`, true);
                 return false;
+            }
+        };
+        
+        /**
+         * Оптимизация производительности
+         */
+        const optimizePerformance = function() {
+            try {
+                // Используем requestAnimationFrame для анимаций вместо setInterval где возможно
+                // Применяем технику дросселирования (throttling) для тяжелых функций
+                // Минимизируем операции с DOM
+                
+                // Дебаунс функция для обработчиков событий
+                const debounce = function(func, delay) {
+                    let timer;
+                    return function(...args) {
+                        clearTimeout(timer);
+                        timer = setTimeout(() => func.apply(this, args), delay);
+                    };
+                };
+                
+                // Применяем дебаунс к обработчику изменения размера окна
+                window.removeEventListener('resize', handleResize);
+                window.addEventListener('resize', debounce(handleResize, 200));
+                
+                // Оптимизация отрисовки графика
+                if (graphCanvas) {
+                    // Устанавливаем оптимальный размер canvas для лучшей производительности
+                    const containerWidth = elements.crushGraph ? elements.crushGraph.clientWidth : 600;
+                    const containerHeight = elements.crushGraph ? elements.crushGraph.clientHeight : 300;
+                    
+                    // Учитываем pixel ratio для ретина дисплеев
+                    const dpr = window.devicePixelRatio || 1;
+                    graphCanvas.width = containerWidth * dpr;
+                    graphCanvas.height = containerHeight * dpr;
+                    graphCanvas.style.width = `${containerWidth}px`;
+                    graphCanvas.style.height = `${containerHeight}px`;
+                    
+                    if (graphCtx) {
+                        graphCtx.scale(dpr, dpr);
+                    }
+                }
+                
+                app.log('Crush', 'Оптимизация производительности применена');
+            } catch (error) {
+                app.log('Crush', `Ошибка оптимизации: ${error.message}`, true);
             }
         };
         
@@ -281,7 +330,7 @@
                                 </div>
                                 
                                 <div id="betting-phase-info" class="betting-phase-info">
-                                    <p>Разместите ставку до начала раунда!</p>
+                                    <p>Период размещения ставок. Сделайте вашу ставку до начала следующего раунда.</p>
                                 </div>
                                 
                                 <div id="crush-result" class="result"></div>
@@ -385,13 +434,21 @@
                     return;
                 }
                 
+                // Создаем новый canvas с учетом pixel ratio
+                const dpr = window.devicePixelRatio || 1;
+                const containerWidth = elements.crushGraph.clientWidth || 600;
+                const containerHeight = elements.crushGraph.clientHeight || 300;
+                
                 graphCanvas = document.createElement('canvas');
                 graphCanvas.id = 'crush-canvas';
-                graphCanvas.width = elements.crushGraph.clientWidth || 600;
-                graphCanvas.height = elements.crushGraph.clientHeight || 300;
+                graphCanvas.width = containerWidth * dpr;
+                graphCanvas.height = containerHeight * dpr;
+                graphCanvas.style.width = `${containerWidth}px`;
+                graphCanvas.style.height = `${containerHeight}px`;
                 elements.crushGraph.appendChild(graphCanvas);
                 
                 graphCtx = graphCanvas.getContext('2d');
+                graphCtx.scale(dpr, dpr);
                 
                 // Улучшение качества отрисовки
                 graphCtx.imageSmoothingEnabled = true;
@@ -440,7 +497,17 @@
                     });
                 }
                 
-                window.addEventListener('resize', handleResize);
+                // Используем debounce для обработчика изменения размера
+                const debounce = function(func, delay) {
+                    let timer;
+                    return function(...args) {
+                        clearTimeout(timer);
+                        timer = setTimeout(() => func.apply(this, args), delay);
+                    };
+                };
+                
+                const debouncedResize = debounce(handleResize, 200);
+                window.addEventListener('resize', debouncedResize);
                 
                 app.log('Crush', 'Обработчики событий установлены');
             } catch (error) {
@@ -454,8 +521,16 @@
         const handleResize = function() {
             try {
                 if (graphCanvas && elements.crushGraph) {
-                    graphCanvas.width = elements.crushGraph.clientWidth || 600;
-                    graphCanvas.height = elements.crushGraph.clientHeight || 300;
+                    const dpr = window.devicePixelRatio || 1;
+                    const containerWidth = elements.crushGraph.clientWidth || 600;
+                    const containerHeight = elements.crushGraph.clientHeight || 300;
+                    
+                    graphCanvas.width = containerWidth * dpr;
+                    graphCanvas.height = containerHeight * dpr;
+                    graphCanvas.style.width = `${containerWidth}px`;
+                    graphCanvas.style.height = `${containerHeight}px`;
+                    
+                    graphCtx.scale(dpr, dpr);
                     redrawGraph();
                 }
             } catch (error) {
@@ -480,14 +555,14 @@
         };
         
         /**
-         * Рисование сетки графика
+         * Рисование сетки графика с улучшенным визуальным представлением
          */
         const drawGrid = function() {
             try {
                 if (!graphCtx) return;
                 
-                const width = graphCanvas.width;
-                const height = graphCanvas.height;
+                const width = graphCanvas.width / (window.devicePixelRatio || 1);
+                const height = graphCanvas.height / (window.devicePixelRatio || 1);
                 
                 // Фон с более тонким градиентом для глубины
                 const bgGradient = graphCtx.createLinearGradient(0, 0, 0, height);
@@ -531,11 +606,11 @@
                     graphCtx.lineTo(width, yPos);
                     graphCtx.stroke();
                     
-                    // Добавляем метку множителя (только для основных уровней)
+                    // Добавляем метку множителя (только для основных уровней) с увеличенным шрифтом
                     if (multiplier === 1 || multiplier === 2 || multiplier === 5 || 
                         multiplier === 10 || multiplier === 20) {
-                        graphCtx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-                        graphCtx.font = '11px Arial';
+                        graphCtx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+                        graphCtx.font = 'bold 13px Arial'; // Увеличиваем размер шрифта
                         graphCtx.textAlign = 'left';
                         graphCtx.fillText(`${multiplier}×`, 5, yPos - 5);
                     }
@@ -554,18 +629,18 @@
                     graphCtx.lineTo(xPos, height);
                     graphCtx.stroke();
                     
-                    // Добавляем метку времени каждые 5 секунд
+                    // Добавляем метку времени каждые 5 секунд с увеличенным шрифтом
                     if (second % 5 === 0 && second > 0) {
-                        graphCtx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-                        graphCtx.font = '11px Arial';
+                        graphCtx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+                        graphCtx.font = 'bold 13px Arial'; // Увеличиваем размер шрифта
                         graphCtx.textAlign = 'center';
                         graphCtx.fillText(`${second}с`, xPos, height - 5);
                     }
                 }
                 
                 // Добавляем метку 0с в начале
-                graphCtx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-                graphCtx.font = '11px Arial';
+                graphCtx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+                graphCtx.font = 'bold 13px Arial'; // Увеличиваем размер шрифта
                 graphCtx.textAlign = 'left';
                 graphCtx.fillText('0с', 5, height - 5);
                 
@@ -718,25 +793,16 @@
                     }
                 }
                 
-                // Исправление ошибки - сообщение "дождитесь следующего раунда" не исчезает
+                // Обновленное поведение для сообщения о ставке
                 if (elements.bettingPhaseInfo) {
                     if (globalState.isWaitingForNextRound) {
-                        // Фаза ожидания раунда - показываем сообщение о ставке
+                        // Только во время паузы показываем сообщение
                         elements.bettingPhaseInfo.style.display = 'block';
                         elements.bettingPhaseInfo.innerHTML = `
-                            <p class="betting-phase-message">Сделайте ставку до начала раунда!</p>
+                            <p class="betting-phase-message">Период размещения ставок. Сделайте вашу ставку до начала следующего раунда.</p>
                         `;
-                    } else if (globalState.isActiveRound && !userState.hasBetInCurrentRound) {
-                        // Активный раунд без ставки - показываем сообщение об ожидании
-                        elements.bettingPhaseInfo.style.display = 'block';
-                        elements.bettingPhaseInfo.innerHTML = `
-                            <p class="betting-phase-message">Дождитесь следующего раунда для ставки</p>
-                        `;
-                    } else if (globalState.isActiveRound && userState.hasBetInCurrentRound) {
-                        // Активный раунд со ставкой - скрываем сообщение
-                        elements.bettingPhaseInfo.style.display = 'none';
                     } else {
-                        // Любой другой случай - скрываем сообщение
+                        // Во время активного раунда скрываем сообщение полностью
                         elements.bettingPhaseInfo.style.display = 'none';
                     }
                 }
@@ -807,7 +873,7 @@
         };
         
         /**
-         * Запуск таймера ожидания
+         * Запуск таймера ожидания - теперь использует ровно 1 секунду на шаг для более точного отсчета
          */
         const startWaitingForNextRound = function() {
             try {
@@ -832,6 +898,7 @@
                     playSound('countdown');
                 }
                 
+                // Используем интервал в 1 секунду для более точного отсчета
                 globalState.roundTimerInterval = setInterval(() => {
                     try {
                         globalState.waitingTimeLeft--;
@@ -851,7 +918,7 @@
                         app.log('Crush', `Ошибка в таймере: ${error.message}`, true);
                         clearInterval(globalState.roundTimerInterval);
                     }
-                }, TIMER_UPDATE_INTERVAL);
+                }, TIMER_UPDATE_INTERVAL); // Интервал 1000 мс (1 секунда)
                 
                 app.log('Crush', `Ожидание следующего раунда: ${WAITING_TIME_BETWEEN_ROUNDS} секунд`);
             } catch (error) {
@@ -1024,20 +1091,21 @@
         };
         
         /**
-         * Перерисовка графика
+         * Перерисовка графика с улучшенным визуальным представлением
          */
         const redrawGraph = function() {
             try {
                 if (!graphCtx || !graphCanvas) return;
                 
-                graphCtx.clearRect(0, 0, graphCanvas.width, graphCanvas.height);
+                const dpr = window.devicePixelRatio || 1;
+                const width = graphCanvas.width / dpr;
+                const height = graphCanvas.height / dpr;
+                
+                graphCtx.clearRect(0, 0, width, height);
                 
                 drawGrid();
                 
                 if (globalState.graphPoints.length < 2) return;
-                
-                const width = graphCanvas.width;
-                const height = graphCanvas.height;
                 
                 // Приближаем график, фокусируясь на меньшем диапазоне значений множителя
                 // и меньшем временном отрезке для более детальной визуализации
@@ -1045,17 +1113,19 @@
                 
                 // Динамическое масштабирование оси Y (множителя)
                 // Начинаем с небольшого значения для лучшей детализации начала
-                let maxMult = 5; // Начальное значение для лучшей детализации
+                // Улучшено для более наглядного отображения
+                let maxMult = 4; // Уменьшаем начальное значение для лучшей видимости малых множителей
                 
                 // Автоматически увеличиваем масштаб по мере роста множителя
-                if (currentMultiplier > maxMult * 0.65) {
-                    maxMult = Math.max(maxMult, currentMultiplier * 1.35);
+                if (currentMultiplier > maxMult * 0.6) {
+                    maxMult = Math.max(maxMult, currentMultiplier * 1.3);
                 }
                 
                 // Масштабирование временной оси - показываем до 15 секунд
                 // но для начальной фазы показываем более короткий отрезок времени
                 const elapsedTime = (Date.now() - globalState.roundStartTime) / 1000;
-                const maxTime = Math.min(15, Math.max(5, elapsedTime * 1.5));
+                // Используем более короткий интервал времени для лучшей детализации
+                const maxTime = Math.min(12, Math.max(4, elapsedTime * 1.3));
                 
                 // Рисуем линию графика с плавной кривой
                 graphCtx.beginPath();
@@ -1107,7 +1177,7 @@
                 
                 // Настраиваем стиль линии
                 graphCtx.strokeStyle = lineGradient;
-                graphCtx.lineWidth = 4; // Чуть толще для лучшей видимости
+                graphCtx.lineWidth = 5; // Увеличиваем толщину для лучшей видимости
                 graphCtx.lineCap = 'round';
                 graphCtx.lineJoin = 'round';
                 
@@ -1147,7 +1217,7 @@
                 
                 // Текущая точка - рисуем яркий маркер
                 graphCtx.beginPath();
-                graphCtx.arc(lastX, lastY, 8, 0, Math.PI * 2); // Чуть больше для заметности
+                graphCtx.arc(lastX, lastY, 8, 0, Math.PI * 2); // Больше для заметности
                 
                 // Градиентная заливка для точки
                 const dotGradient = graphCtx.createRadialGradient(lastX, lastY, 0, lastX, lastY, 8);
@@ -1170,9 +1240,10 @@
                 graphCtx.fillStyle = 'rgba(0, 200, 83, 0.1)';
                 graphCtx.fill();
                 
-                // Рисуем метку текущего множителя над точкой, если множитель > 1.5
-                if (lastPoint.multiplier > 1.5) {
-                    graphCtx.font = '14px Arial';
+                // Рисуем метку текущего множителя над точкой, если множитель > 1.3
+                if (lastPoint.multiplier > 1.3) {
+                    const fontSize = 16; // Увеличиваем размер шрифта
+                    graphCtx.font = `bold ${fontSize}px Arial`;
                     graphCtx.fillStyle = '#fff';
                     graphCtx.textAlign = 'center';
                     graphCtx.fillText(`${lastPoint.multiplier.toFixed(2)}×`, lastX, lastY - 20);
@@ -1372,17 +1443,18 @@
                 
                 const lastPoint = globalState.graphPoints[globalState.graphPoints.length - 1];
                 
-                const width = graphCanvas.width;
-                const height = graphCanvas.height;
+                const dpr = window.devicePixelRatio || 1;
+                const width = graphCanvas.width / dpr;
+                const height = graphCanvas.height / dpr;
                 
                 // Используем тот же метод расчета координат, что и в функции redrawGraph
-                const maxMult = 5;
-                if (lastPoint.multiplier > maxMult * 0.65) {
-                    maxMult = Math.max(maxMult, lastPoint.multiplier * 1.35);
+                let maxMult = 4;
+                if (lastPoint.multiplier > maxMult * 0.6) {
+                    maxMult = Math.max(maxMult, lastPoint.multiplier * 1.3);
                 }
                 
                 const elapsedTime = (Date.now() - globalState.roundStartTime) / 1000;
-                const maxTime = Math.min(15, Math.max(5, elapsedTime * 1.5));
+                const maxTime = Math.min(12, Math.max(4, elapsedTime * 1.3));
                 
                 const crashX = (lastPoint.time / maxTime) * width;
                 const normalizedMult = (lastPoint.multiplier - 1) / (maxMult - 1);
@@ -1544,13 +1616,13 @@
                             graphCtx.stroke();
                         }
                         
-                        // Текст "CRASH" появляется при взрыве
+                        // Текст "CRASH" появляется при взрыве - увеличенный
                         if (progress > 0.1) {
                             const textOpacity = progress < 0.4 ? 
                                                 progress / 0.4 : 
                                                 1 - (progress - 0.4) / 0.6;
                             
-                            const textSize = 40 + Math.sin(progress * Math.PI * 4) * 5;
+                            const textSize = 50 + Math.sin(progress * Math.PI * 4) * 5; // Увеличенный размер
                             
                             graphCtx.font = `bold ${textSize}px Arial`;
                             graphCtx.textAlign = 'center';
@@ -1573,8 +1645,8 @@
                             graphCtx.fillStyle = textGradient;
                             graphCtx.fillText("CRASH", crashX, crashY - 60);
                             
-                            // Отображение значения краша
-                            graphCtx.font = `bold 24px Arial`;
+                            // Отображение значения краша - увеличенное
+                            graphCtx.font = `bold 30px Arial`; // Увеличенный размер
                             graphCtx.fillStyle = '#ffffff';
                             graphCtx.shadowBlur = 5;
                             graphCtx.fillText(`${lastPoint.multiplier.toFixed(2)}×`, crashX, crashY + 60);
@@ -1856,7 +1928,7 @@
                         .multiplier-display {
                             position: relative;
                             text-align: center;
-                            padding: 5px 15px;
+                            padding: 8px 20px;
                             border-radius: 10px 10px 0 0;
                             background: rgba(0, 0, 0, 0.2);
                             margin-bottom: -10px;
@@ -1864,15 +1936,15 @@
                         }
                         
                         .multiplier-value {
-                            font-size: 36px;
+                            font-size: 42px; /* Увеличенный размер */
                             font-weight: bold;
                             transition: all 0.2s ease;
                             text-shadow: 0 0 10px currentColor;
                         }
                         
                         .multiplier-x {
-                            font-size: 24px;
-                            opacity: 0.7;
+                            font-size: 28px; /* Увеличенный размер */
+                            opacity: 0.8;
                         }
                         
                         .multiplier-value.crashed {
@@ -1909,7 +1981,7 @@
                         
                         .crush-graph {
                             width: 100%;
-                            height: 380px; /* Увеличиваем высоту графика */
+                            height: 400px; /* Увеличенная высота для лучшей видимости */
                             background: linear-gradient(135deg, #14171f, #1a1e30);
                             border-radius: 10px;
                             border: 1px solid rgba(255, 255, 255, 0.1);
@@ -1922,19 +1994,24 @@
                             top: 50%;
                             left: 50%;
                             transform: translate(-50%, -50%);
-                            background: rgba(0, 0, 0, 0.7);
-                            border-radius: 10px;
-                            padding: 15px 20px;
+                            background: rgba(0, 0, 0, 0.8);
+                            border-radius: 12px;
+                            padding: 20px 25px;
                             text-align: center;
                             color: #fff;
                             backdrop-filter: blur(5px);
-                            max-width: 300px;
-                            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+                            max-width: 400px; /* Увеличенный размер */
+                            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.4);
+                            z-index: 10;
+                            border: 1px solid rgba(242, 201, 76, 0.3);
                         }
                         
                         .betting-phase-message {
                             margin: 0;
-                            font-weight: bold;
+                            font-size: 16px; /* Увеличенный размер */
+                            line-height: 1.5;
+                            font-weight: 500;
+                            color: #FFD54F;
                         }
                         
                         .result {
@@ -2198,7 +2275,7 @@
                             display: flex;
                             justify-content: center;
                             align-items: center;
-                            padding: 5px;
+                            padding: 6px;
                             border-radius: 5px;
                             font-size: 12px;
                             font-weight: bold;
@@ -2285,17 +2362,12 @@
                             }
                             
                             .crush-graph {
-                                height: 250px;
+                                height: 300px;
                             }
                             
                             .history-items {
                                 grid-template-columns: repeat(3, 1fr);
                             }
-                        }
-                        
-                        /* Исправления для лучшей видимости сообщений */
-                        .betting-phase-info {
-                            z-index: 10;
                         }
                         
                         /* Улучшенная заметность сообщения об ожидании */
@@ -2318,40 +2390,7 @@
                     app.log('Crush', `Ошибка добавления стилей: ${error.message}`, true);
                 }
             }
-        };
-    })();
+        }   // ← закрыли тело addStyles
+    })    // ← закрыли возвращаемый объект
     
-    // Регистрируем игру
-    try {
-        if (window.registerGame) {
-            window.registerGame('crushGame', crushGame);
-            app.log('Crush', 'Игра зарегистрирована через новую систему registerGame');
-        }
-        
-        window.crushGame = crushGame;
-        app.log('Crush', 'Игра экспортирована в глобальное пространство имен');
-        
-        crushGame.addStyles();
-        
-        document.addEventListener('DOMContentLoaded', function() {
-            setTimeout(() => {
-                if (!crushGame.getStatus().user.initialized && !crushGame.getStatus().user.initializationStarted) {
-                    app.log('Crush', 'Запускаем автоматическую инициализацию');
-                    crushGame.init();
-                }
-            }, 500);
-        });
-        
-        if (document.readyState === 'complete' || document.readyState === 'interactive') {
-            setTimeout(() => {
-                if (!crushGame.getStatus().user.initialized && !crushGame.getStatus().user.initializationStarted) {
-                    app.log('Crush', 'Запускаем автоматическую инициализацию (DOM уже загружен)');
-                    crushGame.init();
-                }
-            }, 500);
-        }
-        
-    } catch (error) {
-        app.log('Crush', `Ошибка регистрации игры: ${error.message}`, true);
-    }
 })();
