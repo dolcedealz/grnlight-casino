@@ -1,6 +1,6 @@
 /**
  * dispute.js - Улучшенная версия режима спора с монеткой
- * Версия 3.0.0
+ * Версия 3.1.0
  * 
  * Особенности:
  * - Поддержка комнаты для двух участников спора
@@ -24,7 +24,7 @@
     }
     
     const app = window.GreenLightApp;
-    app.log('Dispute', 'Инициализация модуля Dispute v3.0.0');
+    app.log('Dispute', 'Инициализация модуля Dispute v3.1.0');
     
     // Игровая логика в замыкании для изоляции
     const disputeGame = (function() {
@@ -62,7 +62,9 @@
             hasFinished: false,
             soundEnabled: true,
             closed: false,
-            userInteracted: false // Флаг для отслеживания взаимодействия пользователя
+            userInteracted: false, // Флаг для отслеживания взаимодействия пользователя
+            lastStatusUpdate: 0,   // Время последнего обновления статуса
+            readyAttempts: 0       // Счетчик попыток отправки статуса готовности
         };
         
         // Звуковые эффекты
@@ -91,6 +93,7 @@
                 // Проверяем URL параметры для получения disputeId и roomId
                 const disputeId = getUrlParameter('dispute');
                 const roomId = getUrlParameter('room');
+                const isCreatorParam = getUrlParameter('isCreator');
                 
                 if (!disputeId) {
                     app.log('Dispute', 'Отсутствует ID спора в URL', true);
@@ -99,6 +102,9 @@
                 
                 state.disputeId = disputeId;
                 state.roomId = roomId || generateRoomId();
+                state.isCreator = isCreatorParam === 'true';
+                
+                app.log('Dispute', `Инициализация спора: ID=${disputeId}, isCreator=${state.isCreator}`);
                 
                 // Добавляем стили для режима спора
                 addStyles();
@@ -131,6 +137,9 @@
                 
                 // Активируем экран спора вместо основного меню
                 activateDisputeScreen();
+                
+                // Запускаем частую проверку статуса
+                startRoomStatusCheck();
                 
                 return true;
             } catch (error) {
@@ -540,20 +549,40 @@
         };
         
         /**
-         * Воспроизведение звука
+         * Воспроизведение звукового эффекта с проверкой безопасности
          */
-        const playSound = function(soundName) {
+        const playSound = function(sound) {
+            if (!state.soundEnabled || !sounds[sound]) return;
+            
             try {
-                const sound = sounds[soundName];
-                if (!sound || !state.soundEnabled) return;
-                
-                sound.currentTime = 0;
-                sound.play().catch(e => {
-                    // Игнорируем ошибки автовоспроизведения
+                // Сбрасываем в начало, если уже воспроизводится
+                sounds[sound].currentTime = 0;
+                sounds[sound].play().catch(e => {
+                    // Игнорируем ошибки автовоспроизведения (частые на мобильных)
                 });
             } catch (error) {
-                app.log('Dispute', `Ошибка воспроизведения звука: ${error.message}`, true);
+                // Игнорируем любые ошибки аудио
             }
+        };
+        
+        /**
+         * Включение/выключение звука
+         */
+        const toggleSound = function() {
+            state.soundEnabled = !state.soundEnabled;
+            
+            // Обновляем иконку
+            const soundIcon = document.getElementById('sound-icon');
+            if (soundIcon) {
+                soundIcon.textContent = state.soundEnabled ? '🔊' : '🔇';
+            }
+            
+            // Воспроизводим звук нажатия, если звук включен
+            if (state.soundEnabled) {
+                playSound('click');
+            }
+            
+            app.log('Dispute', `Звук ${state.soundEnabled ? 'включен' : 'выключен'}`);
         };
         
         /**
@@ -1015,9 +1044,9 @@
                 
                 // Если ID не получен, используем демо-режим
                 if (!currentUserId) {
-                    app.log('Dispute', 'ID пользователя не найден, используем демо-режим');
+                    app.log('Dispute', 'ID пользователя не найден, используем значение из URL');
                     
-                    // В демо-режиме пытаемся определить роль из URL
+                    // В демо-режиме определяем роль из URL
                     const isCreatorParam = getUrlParameter('isCreator');
                     state.isCreator = isCreatorParam ? (isCreatorParam === 'true') : true;
                     
@@ -1034,11 +1063,13 @@
                 }
                 
                 // Определяем, является ли пользователь создателем спора
-                if (disputeData.creator && disputeData.creator.telegramId === currentUserId) {
+                if (disputeData.creator && 
+                    String(disputeData.creator.telegramId) === String(currentUserId)) {
                     state.isCreator = true;
                     state.playerSide = disputeData.creatorSide;
                     state.opponentSide = disputeData.opponentSide;
-                } else if (disputeData.opponent && disputeData.opponent.telegramId === currentUserId) {
+                } else if (disputeData.opponent && 
+                           String(disputeData.opponent.telegramId) === String(currentUserId)) {
                     state.isCreator = false;
                     state.playerSide = disputeData.opponentSide;
                     state.opponentSide = disputeData.creatorSide;
@@ -1111,8 +1142,34 @@
             }
         };
         
-       
-        // Проверка статуса комнаты
+        /**
+         * Периодическая проверка статуса комнаты
+         */
+        const startRoomStatusCheck = function() {
+            app.log('Dispute', 'Запуск проверки статуса комнаты');
+            
+            if (state.roomStatusInterval) {
+                clearInterval(state.roomStatusInterval);
+            }
+            
+            // ВАЖНО: Уменьшим интервал до 1 секунды для более частых проверок
+            state.roomStatusInterval = setInterval(() => {
+                checkRoomStatus();
+            }, 1000); // Используем 1000 мс вместо 3000 мс
+            
+            // Запустим первую проверку сразу
+            checkRoomStatus();
+            
+            // Добавим дополнительную проверку через 500 мс,
+            // чтобы гарантировать получение первого ответа
+            setTimeout(() => {
+                checkRoomStatus();
+            }, 500);
+        };
+        
+        /**
+         * Проверка статуса комнаты
+         */
         const checkRoomStatus = function() {
             try {
                 // Не проверяем, если игра уже завершена
@@ -1127,89 +1184,101 @@
                 // Проверяем, есть ли API URL в глобальных переменных
                 const apiUrl = window.GreenLightApp.apiUrl || '/api';
                 
-                // ВАЖНО: Выводим данные о запросе для отладки
-                app.log('Dispute', `Запрос статуса комнаты ${state.disputeId}, isCreator=${state.isCreator}`);
+                // Добавляем метку времени и nocache параметр
+                const timestamp = Date.now();
+                const url = `${apiUrl}/disputes/room/${state.disputeId}?t=${timestamp}&nocache=true`;
                 
-                // Запрашиваем статус комнаты, добавляя метку времени и параметр обхода кэша
-                fetch(`${apiUrl}/disputes/room/${state.disputeId}?timestamp=${Date.now()}&nocache=true`)
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error(`Ошибка получения статуса комнаты: ${response.status}`);
+                app.log('Dispute', `Запрос статуса комнаты: ${url}`);
+                
+                // Запрашиваем статус комнаты с принудительным обходом кэша
+                fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'Cache-Control': 'no-cache, no-store, must-revalidate',
+                        'Pragma': 'no-cache',
+                        'Expires': '0'
+                    }
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Ошибка получения статуса комнаты: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    app.log('Dispute', `Получен статус комнаты: ${JSON.stringify(data)}`);
+                    
+                    // Логируем текущее состояние перед обновлением
+                    app.log('Dispute', `Текущее состояние: playerReady=${state.playerReady}, opponentReady=${state.opponentReady}, bothReady=${state.bothReady}`);
+                    
+                    // Получаем актуальные статусы в зависимости от роли
+                    const serverPlayerReady = state.isCreator ? data.creatorReady : data.opponentReady;
+                    const serverOpponentReady = state.isCreator ? data.opponentReady : data.creatorReady;
+                    
+                    // Проверяем, соответствует ли статус игрока на сервере
+                    if (serverPlayerReady !== state.playerReady) {
+                        app.log('Dispute', `КРИТИЧНО: Статус игрока на сервере (${serverPlayerReady}) не соответствует локальному (${state.playerReady})`);
+                        
+                        // Если на сервере не обновился статус, повторно отправляем
+                        if (state.playerReady && !serverPlayerReady) {
+                            app.log('Dispute', 'Повторная отправка статуса готовности на сервер');
+                            sendReadyStatusViaAPI();
                         }
-                        return response.json();
-                    })
-                    .then(data => {
-                        // ВАЖНО: Логируем все данные полностью для диагностики
-                        app.log('Dispute', `Получен статус комнаты: ${JSON.stringify(data)}`);
-                        
-                        // Выводим текущее состояние игрока для диагностики
-                        app.log('Dispute', `Текущее состояние: playerReady=${state.playerReady}, opponentReady=${state.opponentReady}, bothReady=${state.bothReady}`);
-                        
-                        // Важно! НЕ перезаписываем статус готовности игрока, если он активно взаимодействовал
-                        let updatedState = false;
-                        
-                        // ВАЖНО: Принудительно обновляем соответствующий статус оппонента
-                        if (state.isCreator) {
-                            // Если я создатель, то мой оппонент - opponent
-                            const remoteOpponentReady = Boolean(data.opponentReady);
-                            
-                            // Всегда логируем состояние, даже если оно не изменилось
-                            app.log('Dispute', `Статус оппонента с сервера: ${remoteOpponentReady} (текущий: ${state.opponentReady})`);
-                            
-                            if (remoteOpponentReady !== state.opponentReady) {
-                                app.log('Dispute', `Обновление готовности оппонента: ${state.opponentReady} -> ${remoteOpponentReady}`);
-                                state.opponentReady = remoteOpponentReady;
-                                updateOpponentReadyStatus(remoteOpponentReady);
-                                updatedState = true;
-                            }
-                        } else {
-                            // Если я оппонент, то мой оппонент - creator
-                            const remoteCreatorReady = Boolean(data.creatorReady);
-                            
-                            // Всегда логируем состояние, даже если оно не изменилось
-                            app.log('Dispute', `Статус создателя с сервера: ${remoteCreatorReady} (текущий: ${state.opponentReady})`);
-                            
-                            if (remoteCreatorReady !== state.opponentReady) {
-                                app.log('Dispute', `Обновление готовности создателя: ${state.opponentReady} -> ${remoteCreatorReady}`);
-                                state.opponentReady = remoteCreatorReady;
-                                updateOpponentReadyStatus(remoteCreatorReady);
-                                updatedState = true;
-                            }
-                        }
-                        
-                        // Обновляем UI при изменении состояния
-                        if (updatedState) {
-                            app.log('Dispute', `Обновлены статусы готовности: моя=${state.playerReady}, оппонент=${state.opponentReady}`);
-                            
-                            // ВАЖНО: Проверяем, готовы ли оба игрока после обновления
-                            if (state.playerReady && state.opponentReady && !state.bothReady) {
-                                app.log('Dispute', '👍 Оба игрока готовы после обновления статусов!');
-                                state.bothReady = true;
-                                checkBothReady();
-                            }
-                        }
-                        
-                        // ВАЖНО: Всегда проверяем bothReady с сервера, это главный триггер
-                        if (data.bothReady === true && !state.bothReady) {
-                            app.log('Dispute', '🔥 Получен сигнал bothReady=true с сервера!');
-                            state.bothReady = true;
-                            // Принудительно вызываем checkBothReady, даже если локальные статусы не обновились
-                            checkBothReady();
-                        }
-                        
-                        // Проверяем результат
-                        if (data.status === 'completed' && data.result && !state.hasFinished) {
-                            app.log('Dispute', `Получен результат спора: ${data.result}`);
-                            state.result = data.result;
-                            flipCoinWithResult(data.result);
-                        }
-                    })
-                    .catch(error => {
-                        app.log('Dispute', `Ошибка проверки статуса комнаты: ${error.message}`, true);
-                    });
+                    }
+                    
+                    // Обновляем статус оппонента если он изменился
+                    if (serverOpponentReady !== state.opponentReady) {
+                        app.log('Dispute', `Обновление статуса оппонента: ${state.opponentReady} -> ${serverOpponentReady}`);
+                        state.opponentReady = serverOpponentReady;
+                        updateOpponentReadyStatus(serverOpponentReady);
+                    }
+                    
+                    // Проверяем статус bothReady (самый важный триггер)
+                    if (data.bothReady && !state.bothReady) {
+                        app.log('Dispute', '🔥 Сервер сообщает, что оба игрока готовы!');
+                        state.bothReady = true;
+                        checkBothReady();
+                    } else if (state.playerReady && state.opponentReady && !state.bothReady) {
+                        // Если локально оба готовы, но флаг не установлен
+                        app.log('Dispute', '🔥 Локально оба игрока готовы, устанавливаем bothReady=true');
+                        state.bothReady = true;
+                        checkBothReady();
+                    }
+                    
+                    // Проверяем результат спора
+                    if (data.status === 'completed' && data.result && !state.hasFinished) {
+                        app.log('Dispute', `Получен результат спора: ${data.result}`);
+                        state.result = data.result;
+                        flipCoinWithResult(data.result);
+                    }
+                })
+                .catch(error => {
+                    app.log('Dispute', `Ошибка проверки статуса комнаты: ${error.message}`, true);
+                    
+                    // При ошибке повторяем запрос через короткое время
+                    setTimeout(checkRoomStatus, 500);
+                });
             } catch (error) {
                 app.log('Dispute', `Ошибка проверки статуса комнаты: ${error.message}`, true);
             }
+        };
+        
+        /**
+         * Принудительное обновление статуса
+         */
+        const triggerForcedStatusUpdate = function() {
+            app.log('Dispute', 'Запуск принудительного обновления статуса');
+            
+            // Принудительно запрашиваем статус комнаты 3 раза с небольшими интервалами
+            checkRoomStatus();
+            
+            setTimeout(() => {
+                checkRoomStatus();
+            }, 300);
+            
+            setTimeout(() => {
+                checkRoomStatus();
+            }, 700);
         };
         
         /**
@@ -1272,6 +1341,13 @@
                 }
                 
                 app.log('Dispute', `Статус готовности оппонента: ${ready}`);
+                
+                // Проверяем, готовы ли оба игрока
+                if (state.playerReady && state.opponentReady && !state.bothReady) {
+                    app.log('Dispute', 'Оба игрока готовы после обновления статуса оппонента');
+                    state.bothReady = true;
+                    checkBothReady();
+                }
             } catch (error) {
                 app.log('Dispute', `Ошибка обновления статуса готовности оппонента: ${error.message}`, true);
             }
@@ -1305,10 +1381,17 @@
                 // Отправляем сообщение об изменении статуса
                 sendReadyStatus();
                 
-                // Проверяем, готовы ли оба игрока
-                checkBothReady();
+                // ВАЖНО: Также немедленно проверяем, готовы ли оба игрока
+                if (state.playerReady && state.opponentReady) {
+                    app.log('Dispute', 'Оба игрока готовы по локальным данным, устанавливаем bothReady=true');
+                    state.bothReady = true;
+                    checkBothReady();
+                }
                 
                 app.log('Dispute', `Статус готовности игрока: ${state.playerReady}`);
+                
+                // Запускаем дополнительную проверку через 1 секунду
+                setTimeout(() => triggerForcedStatusUpdate(), 1000);
             } catch (error) {
                 app.log('Dispute', `Ошибка переключения статуса готовности: ${error.message}`, true);
             }
@@ -1341,99 +1424,156 @@
         /**
          * Отправка статуса готовности
          */
-        /**
- * Отправка статуса готовности
- */
-const sendReadyStatus = function() {
-    try {
-        // Отправляем сообщение в родительское окно Telegram
-        if (window.Telegram && window.Telegram.WebApp) {
-            const readyData = {
-                type: 'player_ready',
-                disputeId: state.disputeId,
-                roomId: state.roomId,
-                isCreator: state.isCreator,
-                ready: state.playerReady
-            };
-            
-            window.Telegram.WebApp.sendData(JSON.stringify(readyData));
-            app.log('Dispute', `Отправлен статус готовности через Telegram WebApp: ${state.playerReady}`);
-        } else {
-            // В демо-режиме отправляем запрос через fetch
-            app.log('Dispute', 'Отправка статуса готовности через fetch');
-            
-            // Проверяем, есть ли API URL в глобальных переменных
-            const apiUrl = window.GreenLightApp.apiUrl || '/api';
-            
-            // Формируем данные для отправки, убедившись, что готовность передается как boolean
-            const readyData = {
-                disputeId: state.disputeId,
-                userTelegramId: state.isCreator ? 
-                    (state.disputeData.creator && state.disputeData.creator.telegramId) : 
-                    (state.disputeData.opponent && state.disputeData.opponent.telegramId),
-                ready: Boolean(state.playerReady) // Гарантированно boolean
-            };
-            
-            // Отображаем данные для отладки
-            app.log('Dispute', `Отправка статуса на сервер: ${JSON.stringify(readyData)}`);
-            
-            // Отправляем запрос на обновление статуса готовности
-            fetch(`${apiUrl}/disputes/room/ready`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(readyData)
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`Ошибка обновления статуса готовности: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                if (data.success) {
-                    app.log('Dispute', 'Статус готовности обновлен успешно');
-                    app.log('Dispute', `Ответ сервера: ${JSON.stringify(data)}`);
+        const sendReadyStatus = function() {
+            try {
+                // Отправляем сообщение в родительское окно Telegram
+                if (window.Telegram && window.Telegram.WebApp) {
+                    const readyData = {
+                        type: 'player_ready',
+                        disputeId: state.disputeId,
+                        roomId: state.roomId,
+                        isCreator: state.isCreator,
+                        ready: state.playerReady
+                    };
                     
-                    // Явно обновляем локальное состояние на основе ответа сервера
-                    if (state.isCreator) {
-                        state.playerReady = Boolean(data.creatorReady);
-                    } else {
-                        state.playerReady = Boolean(data.opponentReady);
-                    }
+                    window.Telegram.WebApp.sendData(JSON.stringify(readyData));
+                    app.log('Dispute', `Отправлен статус готовности через Telegram WebApp: ${state.playerReady}`);
                     
-                    // Обновляем статус оппонента
-                    if (state.isCreator) {
-                        state.opponentReady = Boolean(data.opponentReady);
-                    } else {
-                        state.opponentReady = Boolean(data.creatorReady);
-                    }
-                    
-                    // Обновляем UI для отображения текущего состояния
-                    updatePlayerReadyStatus();
-                    updateOpponentReadyStatus(state.opponentReady);
-                    
-                    // Если оба готовы, запускаем подбрасывание
-                    if (data.bothReady && !state.bothReady) {
-                        state.bothReady = true;
-                        checkBothReady();
-                    }
+                    // Дополнительно форсируем обновление статуса через API
+                    // чтобы обойти проблему с отсутствием уведомлений
+                    sendReadyStatusViaAPI();
                 } else {
-                    app.log('Dispute', 'Ошибка обновления статуса готовности на сервере', true);
+                    // В демо-режиме отправляем запрос через fetch
+                    sendReadyStatusViaAPI();
                 }
-            })
-            .catch(error => {
-                app.log('Dispute', `Ошибка обновления статуса готовности: ${error.message}`, true);
+            } catch (error) {
+                app.log('Dispute', `Ошибка отправки статуса готовности: ${error.message}`, true);
+                // При ошибке пробуем отправить через API
+                sendReadyStatusViaAPI();
+            }
+        };
+        
+        /**
+         * Отправка статуса готовности через API напрямую
+         */
+        const sendReadyStatusViaAPI = function() {
+            try {
+                app.log('Dispute', 'Отправка статуса готовности через fetch API');
                 
-                // Повторная попытка через 2 секунды
-                setTimeout(() => sendReadyStatus(), 2000);
-            });
-        }
-    } catch (error) {
-        app.log('Dispute', `Ошибка отправки статуса готовности: ${error.message}`, true);
-    }
-};
+                // Ограничиваем количество попыток
+                if (state.readyAttempts > 10) {
+                    app.log('Dispute', 'Превышено максимальное количество попыток отправки статуса', true);
+                    return;
+                }
+                
+                state.readyAttempts++;
+                
+                // Проверяем, есть ли API URL в глобальных переменных
+                const apiUrl = window.GreenLightApp.apiUrl || '/api';
+                
+                // Определяем ID пользователя
+                let userTelegramId;
+                
+                if (state.isCreator && state.disputeData && state.disputeData.creator) {
+                    userTelegramId = state.disputeData.creator.telegramId || state.disputeData.creatorTelegramId;
+                } else if (!state.isCreator && state.disputeData && state.disputeData.opponent) {
+                    userTelegramId = state.disputeData.opponent.telegramId || state.disputeData.opponentTelegramId;
+                } else if (state.disputeData) {
+                    // Резервный вариант
+                    userTelegramId = state.isCreator ? 
+                        state.disputeData.creatorTelegramId : 
+                        state.disputeData.opponentTelegramId;
+                }
+                
+                if (!userTelegramId) {
+                    app.log('Dispute', 'Ошибка: не удалось определить telegramId пользователя', true);
+                    return; // Прерываем выполнение, если нет ID
+                }
+                
+                // Формируем данные с явными типами
+                const readyData = {
+                    disputeId: state.disputeId,
+                    userTelegramId: String(userTelegramId),
+                    ready: Boolean(state.playerReady)
+                };
+                
+                // Добавляем метку времени для предотвращения кэширования
+                const timestamp = Date.now();
+                
+                // Отображаем данные для отладки
+                app.log('Dispute', `Отправка статуса на сервер: ${JSON.stringify(readyData)}`);
+                
+                // Отправляем запрос на обновление статуса готовности
+                fetch(`${apiUrl}/disputes/room/ready?t=${timestamp}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Cache-Control': 'no-cache, no-store'
+                    },
+                    body: JSON.stringify(readyData)
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Ошибка обновления статуса готовности: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    state.readyAttempts = 0; // Сброс счетчика при успехе
+                    
+                    if (data.success) {
+                        app.log('Dispute', 'Статус готовности обновлен успешно');
+                        app.log('Dispute', `Ответ сервера: ${JSON.stringify(data)}`);
+                        
+                        // Проверяем, что сервер действительно обновил статус
+                        const serverReportedStatus = state.isCreator ? data.creatorReady : data.opponentReady;
+                        
+                        if (serverReportedStatus !== state.playerReady) {
+                            app.log('Dispute', `ВНИМАНИЕ: Сервер вернул другой статус игрока (${serverReportedStatus}) чем отправили (${state.playerReady})`, true);
+                            
+                            // В случае несоответствия повторно отправляем статус
+                            setTimeout(() => sendReadyStatusViaAPI(), 500);
+                        }
+                        
+                        // Обновляем статус оппонента на основе данных с сервера
+                        const opponentStatus = state.isCreator ? data.opponentReady : data.creatorReady;
+                        if (opponentStatus !== state.opponentReady) {
+                            app.log('Dispute', `Обновление статуса оппонента с сервера: ${opponentStatus}`);
+                            state.opponentReady = opponentStatus;
+                            updateOpponentReadyStatus(opponentStatus);
+                        }
+                        
+                        // Проверяем на bothReady
+                        if (data.bothReady) {
+                            app.log('Dispute', 'Сервер сообщает, что оба игрока готовы!');
+                            state.bothReady = true;
+                            checkBothReady();
+                        } else if (state.playerReady && state.opponentReady && !state.bothReady) {
+                            // Двойная проверка
+                            app.log('Dispute', 'Проверка: локально оба игрока готовы, но флаг bothReady не установлен');
+                            state.bothReady = true;
+                            checkBothReady();
+                        }
+                        
+                        // ВАЖНО: Делаем принудительную проверку статуса через секунду
+                        setTimeout(() => checkRoomStatus(), 1000);
+                    } else {
+                        app.log('Dispute', `Ошибка обновления статуса на сервере: ${data.message || 'Неизвестная ошибка'}`, true);
+                        
+                        // В случае ошибки повторяем попытку
+                        setTimeout(() => sendReadyStatusViaAPI(), 1000);
+                    }
+                })
+                .catch(error => {
+                    app.log('Dispute', `Ошибка запроса обновления статуса: ${error.message}`, true);
+                    
+                    // Повторная попытка через секунду
+                    setTimeout(() => sendReadyStatusViaAPI(), 1000);
+                });
+            } catch (error) {
+                app.log('Dispute', `Ошибка в функции sendReadyStatusViaAPI: ${error.message}`, true);
+            }
+        };
         
         /**
          * Симуляция готовности оппонента (для демо-режима)
@@ -1456,7 +1596,6 @@ const sendReadyStatus = function() {
         /**
          * Проверка готовности обоих игроков
          */
-        // Проверка готовности обоих игроков
         const checkBothReady = function() {
             try {
                 app.log('Dispute', `👀 Проверка готовности обоих игроков: Player=${state.playerReady}, Opponent=${state.opponentReady}, BothReady=${state.bothReady}`);
@@ -1519,7 +1658,7 @@ const sendReadyStatus = function() {
                 }
             }
         };
-             
+        
         /**
          * Запуск автоматического режима (для быстрой демонстрации)
          */
@@ -1821,6 +1960,7 @@ const sendReadyStatus = function() {
         
         // Публичный интерфейс
         return {
+            // Основные методы
             init: init,
             closeDispute: closeDispute,
             
