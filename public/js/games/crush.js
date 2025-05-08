@@ -1,6 +1,6 @@
 /**
  * crush.js - Оптимизированная версия игры Crush с общим графиком для всех игроков
- * Версия 4.2.0
+ * Версия 4.3.5
  * 
  * Особенности:
  * - Общий график и история для всех игроков
@@ -25,7 +25,7 @@
     }
     
     const app = window.GreenLightApp;
-    app.log('Crush', 'Инициализация модуля игры Crush v4.2.0');
+    app.log('Crush', 'Инициализация модуля игры Crush v4.3.5');
     
     // Игровая логика в замыкании для изоляции
     const crushGame = (function() {
@@ -35,6 +35,7 @@
             cashoutBtn: null,
             crushBet: null,
             multiplierDisplay: null,
+            potentialWinDisplay: null,
             crushGraph: null,
             crushResult: null,
             container: null,
@@ -86,12 +87,12 @@
         const GAME_UPDATE_INTERVAL = 16;  // 60 FPS для плавной анимации
         const TIMER_UPDATE_INTERVAL = 1000;  // 1 секунда для более точного отсчета таймера
         
-        // Звуковые эффекты (симуляция)
+        // Звуковые эффекты (предзагрузка для лучшей производительности)
         const sounds = {
-            bet: new Audio('sounds/bet.mp3'),
-            countdown: new Audio('sounds/countdown.mp3'),
-            crash: new Audio('sounds/crash.mp3'),
-            cashout: new Audio('sounds/cashout.mp3')
+            bet: null,
+            countdown: null,
+            crash: null,
+            cashout: null
         };
         
         /**
@@ -109,23 +110,42 @@
             try {
                 const initPromise = new Promise(async (resolve) => {
                     try {
-                        await findDOMElements();
+                        // Создаем контейнер игры
                         createGameContainer();
+                        
+                        // Добавляем стили
+                        addStyles();
+                        
+                        // Настраиваем UI
                         setupUI();
+                        
+                        // Находим DOM элементы
+                        await findDOMElements();
+                        
+                        // Настраиваем Canvas
                         setupCanvas();
+                        
+                        // Настраиваем обработчики событий
                         setupEventListeners();
+                        
+                        // Инициализируем звуки
+                        initializeSounds();
+                        
+                        // Сбрасываем график
                         resetGraph();
                         
+                        // Загружаем историю, если она пуста
                         if (globalState.gameHistory.length === 0) {
                             loadHistory();
                         }
                         
+                        // Запускаем ожидание нового раунда, если игра не активна
                         if (!globalState.isActiveRound && !globalState.isWaitingForNextRound) {
                             startWaitingForNextRound();
                         }
                         
+                        // Обновляем отображение фазы игры
                         updateGamePhaseDisplay();
-                        initializeSounds();
                         
                         // Применяем оптимизацию после создания UI
                         optimizePerformance();
@@ -151,7 +171,654 @@
                 
             } catch (error) {
                 app.log('Crush', `Критическая ошибка инициализации: ${error.message}`, true);
+                userState.initializationStarted = false;
                 return false;
+            }
+        };
+        
+        /**
+         * Добавление стилей для игры
+         */
+        const addStyles = function() {
+            try {
+                if (document.getElementById('crush-styles')) return;
+                
+                const styleElement = document.createElement('style');
+                styleElement.id = 'crush-styles';
+                styleElement.textContent = `
+                    .crush-container {
+                        max-width: 960px;
+                        margin: 0 auto;
+                        padding: 15px;
+                        background: linear-gradient(135deg, #1c2133, #14171f);
+                        border-radius: 16px;
+                        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+                        overflow: hidden;
+                        color: #fff;
+                    }
+                    
+                    .crush-layout {
+                        display: flex;
+                        flex-direction: column;
+                        gap: 15px;
+                    }
+                    
+                    /* Верхняя панель */
+                    .crush-header {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        background: rgba(0, 0, 0, 0.2);
+                        border-radius: 10px;
+                        padding: 10px 15px;
+                        margin-bottom: 10px;
+                    }
+                    
+                    .game-info {
+                        display: flex;
+                        gap: 15px;
+                    }
+                    
+                    .info-item {
+                        display: flex;
+                        align-items: center;
+                        gap: 5px;
+                    }
+                    
+                    .info-icon {
+                        font-size: 16px;
+                    }
+                    
+                    .info-value {
+                        font-weight: bold;
+                        color: #f2c94c;
+                    }
+                    
+                    .info-label {
+                        font-size: 12px;
+                        color: rgba(255, 255, 255, 0.7);
+                    }
+                    
+                    .game-phase {
+                        display: flex;
+                        align-items: center;
+                        gap: 10px;
+                    }
+                    
+                    .phase-indicator {
+                        font-size: 14px;
+                        font-weight: bold;
+                        padding: 5px 10px;
+                        border-radius: 5px;
+                        background: rgba(0, 0, 0, 0.3);
+                        transition: all 0.3s ease;
+                    }
+                    
+                    .phase-indicator.active-round {
+                        background: rgba(0, 200, 83, 0.2);
+                        color: #00c853;
+                    }
+                    
+                    .phase-indicator.waiting {
+                        background: rgba(242, 201, 76, 0.2);
+                        color: #f2c94c;
+                    }
+                    
+                    .round-timer {
+                        font-size: 14px;
+                        color: #f2c94c;
+                    }
+                    
+                    .time-value {
+                        font-weight: bold;
+                    }
+                    
+                    /* Основная область с графиком и коэффициентом */
+                    .crush-main {
+                        display: flex;
+                        flex-direction: column;
+                        gap: 10px;
+                    }
+                    
+                    /* Панель коэффициента и текущего выигрыша */
+                    .multiplier-row {
+                        display: flex;
+                        align-items: center;
+                        gap: 20px;
+                        padding: 10px;
+                        background: rgba(0, 0, 0, 0.2);
+                        border-radius: 10px;
+                    }
+                    
+                    .multiplier-container {
+                        display: flex;
+                        flex-direction: column;
+                        align-items: flex-start;
+                    }
+                    
+                    .multiplier-label {
+                        font-size: 14px;
+                        color: rgba(255, 255, 255, 0.7);
+                        margin-bottom: 3px;
+                    }
+                    
+                    .multiplier-display {
+                        position: relative;
+                    }
+                    
+                    .multiplier-value {
+                        font-size: 42px;
+                        font-weight: bold;
+                        transition: all 0.2s ease;
+                        text-shadow: 0 0 10px currentColor;
+                    }
+                    
+                    .multiplier-x {
+                        font-size: 28px;
+                        opacity: 0.8;
+                    }
+                    
+                    .multiplier-value.crashed {
+                        color: #ff1744 !important;
+                        animation: crash-flash 0.3s 3;
+                    }
+                    
+                    .multiplier-value.cashed-out {
+                        color: #2196f3 !important;
+                    }
+                    
+                    /* Цветовая схема для множителей */
+                    .multiplier-value.level-1 { color: #00c853; }
+                    .multiplier-value.level-2 { color: #64dd17; }
+                    .multiplier-value.level-3 { color: #ffd600; }
+                    .multiplier-value.level-4 { color: #ff9100; }
+                    .multiplier-value.level-5 { color: #ff3d00; }
+                    .multiplier-value.level-6 { color: #ff1744; }
+                    
+                    .multiplier-value.pulsate {
+                        animation: pulsate 1s infinite alternate;
+                    }
+                    
+                    @keyframes pulsate {
+                        0% { transform: scale(1); }
+                        100% { transform: scale(1.05); }
+                    }
+                    
+                    @keyframes crash-flash {
+                        0% { opacity: 1; transform: scale(1); }
+                        50% { opacity: 0.5; transform: scale(0.95); }
+                        100% { opacity: 1; transform: scale(1); }
+                    }
+                    
+                    /* Текущий выигрыш */
+                    .current-win-container {
+                        display: flex;
+                        flex-direction: column;
+                        align-items: flex-start;
+                        margin-left: 20px;
+                        border-left: 1px solid rgba(255, 255, 255, 0.1);
+                        padding-left: 20px;
+                        flex-grow: 1;
+                    }
+                    
+                    .current-win-label {
+                        font-size: 14px;
+                        color: rgba(255, 255, 255, 0.7);
+                        margin-bottom: 3px;
+                    }
+                    
+                    .potential-value {
+                        font-size: 32px;
+                        font-weight: bold;
+                        color: #f2c94c;
+                        text-shadow: 0 0 10px rgba(242, 201, 76, 0.5);
+                    }
+                    
+                    /* График игры */
+                    .crush-graph-container {
+                        position: relative;
+                    }
+                    
+                    .crush-graph {
+                        width: 100%;
+                        height: 400px;
+                        background: linear-gradient(135deg, #14171f, #1a1e30);
+                        border-radius: 10px;
+                        border: 1px solid rgba(255, 255, 255, 0.1);
+                        overflow: hidden;
+                        box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.3);
+                    }
+                    
+                    .betting-phase-info {
+                        position: absolute;
+                        top: 50%;
+                        left: 50%;
+                        transform: translate(-50%, -50%);
+                        background: rgba(0, 0, 0, 0.8);
+                        border-radius: 12px;
+                        padding: 20px 25px;
+                        text-align: center;
+                        color: #fff;
+                        backdrop-filter: blur(5px);
+                        max-width: 400px;
+                        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.4);
+                        z-index: 10;
+                        border: 1px solid rgba(242, 201, 76, 0.3);
+                    }
+                    
+                    .betting-phase-message {
+                        margin: 0;
+                        font-size: 16px;
+                        line-height: 1.5;
+                        font-weight: 500;
+                        color: #FFD54F;
+                    }
+                    
+                    .result {
+                        position: absolute;
+                        top: 50%;
+                        left: 50%;
+                        transform: translate(-50%, -50%);
+                        background: rgba(0, 0, 0, 0.8);
+                        border-radius: 15px;
+                        padding: 20px;
+                        text-align: center;
+                        color: #fff;
+                        backdrop-filter: blur(5px);
+                        max-width: 300px;
+                        box-shadow: 0 5px 25px rgba(0, 0, 0, 0.4);
+                        animation: pop-in 0.5s forwards;
+                        z-index: 20;
+                    }
+                    
+                    .result.hidden {
+                        display: none;
+                    }
+                    
+                    @keyframes pop-in {
+                        0% { transform: translate(-50%, -50%) scale(0.8); opacity: 0; }
+                        50% { transform: translate(-50%, -50%) scale(1.05); opacity: 1; }
+                        100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+                    }
+                    
+                    .result.win .cashout-icon {
+                        font-size: 36px;
+                        margin-bottom: 10px;
+                        animation: bounce 1s infinite alternate;
+                    }
+                    
+                    @keyframes bounce {
+                        0% { transform: translateY(0); }
+                        100% { transform: translateY(-10px); }
+                    }
+                    
+                    .result.win .cashout-text {
+                        font-size: 18px;
+                        margin-bottom: 10px;
+                        color: #00c853;
+                    }
+                    
+                    .result.win .win-amount {
+                        font-size: 24px;
+                        font-weight: bold;
+                        color: #f2c94c;
+                        margin-top: 10px;
+                    }
+                    
+                    .result.lose .crash-icon {
+                        font-size: 36px;
+                        margin-bottom: 10px;
+                        animation: shake 0.5s;
+                    }
+                    
+                    @keyframes shake {
+                        0%, 100% { transform: translateX(0); }
+                        20%, 60% { transform: translateX(-5px); }
+                        40%, 80% { transform: translateX(5px); }
+                    }
+                    
+                    .result.lose .crash-text {
+                        font-size: 18px;
+                        margin-bottom: 10px;
+                        color: #ff1744;
+                    }
+                    
+                    .result.lose .lose-message {
+                        font-size: 16px;
+                        color: rgba(255, 255, 255, 0.7);
+                    }
+                    
+                    /* Панель управления */
+                    .crush-controls {
+                        display: flex;
+                        flex-direction: column;
+                        gap: 15px;
+                        background: rgba(0, 0, 0, 0.2);
+                        border-radius: 10px;
+                        padding: 15px;
+                        margin-top: 10px;
+                    }
+                    
+                    .bet-panel {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        gap: 15px;
+                    }
+                    
+                    .bet-input-container {
+                        flex: 1;
+                    }
+                    
+                    .bet-input-container label {
+                        display: block;
+                        font-size: 12px;
+                        color: rgba(255, 255, 255, 0.7);
+                        margin-bottom: 5px;
+                    }
+                    
+                    .bet-input-wrapper {
+                        display: flex;
+                        gap: 5px;
+                    }
+                    
+                    #crush-bet {
+                        flex: 1;
+                        padding: 8px 10px;
+                        font-size: 14px;
+                        background: rgba(0, 0, 0, 0.3);
+                        border: 1px solid rgba(255, 255, 255, 0.1);
+                        border-radius: 5px;
+                        color: #fff;
+                        outline: none;
+                        transition: all 0.2s;
+                    }
+                    
+                    #crush-bet:focus {
+                        border-color: #00c853;
+                        box-shadow: 0 0 0 2px rgba(0, 200, 83, 0.2);
+                    }
+                    
+                    #crush-bet:disabled {
+                        opacity: 0.7;
+                        cursor: not-allowed;
+                    }
+                    
+                    .quick-bet-buttons {
+                        display: flex;
+                        gap: 5px;
+                    }
+                    
+                    .quick-bet {
+                        padding: 8px 10px;
+                        background: rgba(0, 0, 0, 0.3);
+                        border: 1px solid rgba(255, 255, 255, 0.1);
+                        border-radius: 5px;
+                        color: #fff;
+                        cursor: pointer;
+                        transition: all 0.2s;
+                    }
+                    
+                    .quick-bet:hover {
+                        background: rgba(255, 255, 255, 0.1);
+                    }
+                    
+                    .auto-settings {
+                        display: flex;
+                        align-items: center;
+                        gap: 10px;
+                    }
+                    
+                    .auto-option {
+                        display: flex;
+                        align-items: center;
+                        gap: 5px;
+                        font-size: 12px;
+                        color: rgba(255, 255, 255, 0.8);
+                    }
+                    
+                    #auto-cashout-at {
+                        width: 60px;
+                        padding: 4px 8px;
+                        font-size: 12px;
+                        background: rgba(0, 0, 0, 0.3);
+                        border: 1px solid rgba(255, 255, 255, 0.1);
+                        border-radius: 4px;
+                        color: #fff;
+                    }
+                    
+                    .auto-settings.disabled {
+                        opacity: 0.5;
+                        pointer-events: none;
+                    }
+                    
+                    .action-buttons {
+                        display: flex;
+                        gap: 10px;
+                    }
+                    
+                    .action-btn {
+                        flex: 1;
+                        padding: 12px 0;
+                        font-size: 14px;
+                        font-weight: bold;
+                        border: none;
+                        border-radius: 6px;
+                        cursor: pointer;
+                        transition: all 0.2s;
+                        text-transform: uppercase;
+                        letter-spacing: 1px;
+                    }
+                    
+                    .primary-btn {
+                        background: #00c853;
+                        color: #fff;
+                        box-shadow: 0 3px 8px rgba(0, 200, 83, 0.3);
+                    }
+                    
+                    .primary-btn:hover:not(:disabled) {
+                        background: #00e676;
+                        transform: translateY(-2px);
+                        box-shadow: 0 5px 15px rgba(0, 200, 83, 0.4);
+                    }
+                    
+                    .secondary-btn {
+                        background: #2196f3;
+                        color: #fff;
+                        box-shadow: 0 3px 8px rgba(33, 150, 243, 0.3);
+                    }
+                    
+                    .secondary-btn:hover:not(:disabled) {
+                        background: #42a5f5;
+                        transform: translateY(-2px);
+                        box-shadow: 0 5px 15px rgba(33, 150, 243, 0.4);
+                    }
+                    
+                    .action-btn:disabled {
+                        background: #444;
+                        color: #aaa;
+                        box-shadow: none;
+                        cursor: not-allowed;
+                    }
+                    
+                    .action-btn.bet-placed {
+                        background: #795548;
+                    }
+                    
+                    .action-btn.win-collected {
+                        background: #795548;
+                    }
+                    
+                    /* История и последние победители */
+                    .panels-row {
+                        display: flex;
+                        gap: 15px;
+                        margin-top: 10px;
+                    }
+                    
+                    .crush-history-panel, .winners-panel {
+                        flex: 1;
+                        background: rgba(0, 0, 0, 0.2);
+                        border-radius: 10px;
+                        overflow: hidden;
+                    }
+                    
+                    .panel-header {
+                        background: rgba(0, 0, 0, 0.3);
+                        padding: 10px 15px;
+                    }
+                    
+                    .panel-header h3 {
+                        margin: 0;
+                        font-size: 14px;
+                        font-weight: 500;
+                        color: rgba(255, 255, 255, 0.8);
+                    }
+                    
+                    .history-items {
+                        display: grid;
+                        grid-template-columns: repeat(5, 1fr);
+                        gap: 5px;
+                        padding: 10px;
+                    }
+                    
+                    .history-item {
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        padding: 6px;
+                        border-radius: 5px;
+                        font-size: 12px;
+                        font-weight: bold;
+                        color: #fff;
+                        transition: all 0.2s;
+                    }
+                    
+                    .history-item:hover {
+                        transform: scale(1.05);
+                    }
+                    
+                    /* Цвета для истории множителей */
+                    .history-item.level-1 { background: #00c853; }
+                    .history-item.level-2 { background: #64dd17; }
+                    .history-item.level-3 { background: #ffd600; }
+                    .history-item.level-4 { background: #ff9100; }
+                    .history-item.level-5 { background: #ff3d00; }
+                    .history-item.level-6 { background: #ff1744; }
+                    
+                    .winners-list {
+                        padding: 10px;
+                        display: flex;
+                        flex-direction: column;
+                        gap: 5px;
+                    }
+                    
+                    .winner-item {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        padding: 5px 10px;
+                        font-size: 12px;
+                        border-radius: 5px;
+                        background: rgba(255, 255, 255, 0.05);
+                        transition: all 0.2s;
+                    }
+                    
+                    .winner-item:hover {
+                        background: rgba(255, 255, 255, 0.1);
+                    }
+                    
+                    .winner-name {
+                        flex: 1;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                        white-space: nowrap;
+                    }
+                    
+                    .winner-bet {
+                        color: #fff;
+                        margin-right: 5px;
+                    }
+                    
+                    .winner-multiplier {
+                        color: #f2c94c;
+                        font-weight: bold;
+                        min-width: 50px;
+                        text-align: right;
+                    }
+                    
+                    .winner-amount {
+                        color: #00c853;
+                        font-weight: bold;
+                        margin-left: 10px;
+                        min-width: 60px;
+                        text-align: right;
+                    }
+                    
+                    /* Улучшенная заметность сообщения об ожидании */
+                    @keyframes pulse-message {
+                        0% { background-color: rgba(0, 0, 0, 0.7); }
+                        50% { background-color: rgba(10, 15, 30, 0.75); }
+                        100% { background-color: rgba(0, 0, 0, 0.7); }
+                    }
+                    
+                    .betting-phase-message {
+                        animation: pulse-message 2s infinite;
+                        color: #ffeb3b;
+                        text-shadow: 0 0 5px rgba(255, 235, 59, 0.5);
+                    }
+                    
+                    /* Адаптивный дизайн */
+                    @media (max-width: 768px) {
+                        .panels-row {
+                            flex-direction: column;
+                        }
+                        
+                        .crush-header {
+                            flex-direction: column;
+                            align-items: flex-start;
+                            gap: 10px;
+                        }
+                        
+                        .multiplier-row {
+                            flex-direction: column;
+                            align-items: flex-start;
+                        }
+                        
+                        .current-win-container {
+                            margin-left: 0;
+                            border-left: none;
+                            padding-left: 0;
+                            margin-top: 10px;
+                        }
+                        
+                        .bet-panel {
+                            flex-direction: column;
+                            align-items: flex-start;
+                        }
+                        
+                        .bet-input-container {
+                            width: 100%;
+                        }
+                        
+                        .bet-input-wrapper {
+                            width: 100%;
+                        }
+                        
+                        .crush-graph {
+                            height: 300px;
+                        }
+                        
+                        .history-items {
+                            grid-template-columns: repeat(3, 1fr);
+                        }
+                    }
+                `;
+                
+                document.head.appendChild(styleElement);
+                app.log('Crush', 'Стили для игры добавлены');
+            } catch (error) {
+                app.log('Crush', `Ошибка добавления стилей: ${error.message}`, true);
             }
         };
         
@@ -178,10 +845,10 @@
                 window.addEventListener('resize', debounce(handleResize, 200));
                 
                 // Оптимизация отрисовки графика
-                if (graphCanvas) {
+                if (graphCanvas && elements.crushGraph) {
                     // Устанавливаем оптимальный размер canvas для лучшей производительности
-                    const containerWidth = elements.crushGraph ? elements.crushGraph.clientWidth : 600;
-                    const containerHeight = elements.crushGraph ? elements.crushGraph.clientHeight : 300;
+                    const containerWidth = elements.crushGraph.clientWidth || 600;
+                    const containerHeight = elements.crushGraph.clientHeight || 300;
                     
                     // Учитываем pixel ratio для ретина дисплеев
                     const dpr = window.devicePixelRatio || 1;
@@ -195,6 +862,11 @@
                     }
                 }
                 
+                // Обновление потенциального выигрыша при изменении ставки
+                if (elements.crushBet) {
+                    elements.crushBet.addEventListener('input', updatePotentialWin);
+                }
+                
                 app.log('Crush', 'Оптимизация производительности применена');
             } catch (error) {
                 app.log('Crush', `Ошибка оптимизации: ${error.message}`, true);
@@ -205,12 +877,26 @@
          * Инициализация звуков
          */
         const initializeSounds = function() {
-            // Настройка громкости
-            Object.values(sounds).forEach(sound => {
-                sound.volume = 0.3;
-                // Предзагрузка звуков
-                sound.load();
-            });
+            try {
+                // Создаем и настраиваем аудио элементы
+                sounds.bet = new Audio('https://assets.mixkit.co/sfx/preview/mixkit-arcade-game-jump-coin-216.mp3');
+                sounds.countdown = new Audio('https://assets.mixkit.co/sfx/preview/mixkit-tick-tock-clock-timer-1045.mp3');
+                sounds.crash = new Audio('https://assets.mixkit.co/sfx/preview/mixkit-explosion-impact-1682.mp3');
+                sounds.cashout = new Audio('https://assets.mixkit.co/sfx/preview/mixkit-winning-chimes-2015.mp3');
+                
+                // Настройка громкости
+                Object.values(sounds).forEach(sound => {
+                    if (sound) {
+                        sound.volume = 0.3;
+                        // Предзагрузка звуков
+                        sound.load();
+                    }
+                });
+                
+                app.log('Crush', 'Звуки инициализированы успешно');
+            } catch (error) {
+                app.log('Crush', `Ошибка инициализации звуков: ${error.message}`, true);
+            }
         };
         
         /**
@@ -220,7 +906,9 @@
             try {
                 if (sounds[soundName]) {
                     sounds[soundName].currentTime = 0;
-                    sounds[soundName].play().catch(() => {});
+                    sounds[soundName].play().catch(() => {
+                        // Игнорируем ошибки автовоспроизведения
+                    });
                 }
             } catch (error) {
                 // Игнорируем ошибки звука
@@ -231,7 +919,7 @@
          * Поиск DOM элементов
          */
         const findDOMElements = async function() {
-            return new Promise((resolve, reject) => {
+            return new Promise((resolve) => {
                 try {
                     setTimeout(() => {
                         // Основные элементы
@@ -239,6 +927,7 @@
                         elements.cashoutBtn = document.getElementById('cash-crush-btn');
                         elements.crushBet = document.getElementById('crush-bet');
                         elements.multiplierDisplay = document.getElementById('multiplier');
+                        elements.potentialWinDisplay = document.getElementById('potential-win');
                         elements.crushGraph = document.getElementById('crush-graph');
                         elements.crushResult = document.getElementById('crush-result');
                         elements.autoEnabled = document.getElementById('auto-enabled');
@@ -250,11 +939,22 @@
                         elements.currentBets = document.getElementById('current-bets');
                         elements.lastWinners = document.getElementById('last-winners');
                         
+                        // Проверка критических элементов
+                        if (!elements.crushGraph) {
+                            app.log('Crush', 'Элемент графика не найден', true);
+                        }
+                        if (!elements.startBtn) {
+                            app.log('Crush', 'Кнопка ставки не найдена', true);
+                        }
+                        if (!elements.cashoutBtn) {
+                            app.log('Crush', 'Кнопка забрать не найдена', true);
+                        }
+                        
                         resolve();
                     }, 100);
                 } catch (error) {
                     app.log('Crush', `Ошибка при поиске DOM элементов: ${error.message}`, true);
-                    reject(error);
+                    resolve(); // Всё равно резолвим, чтобы продолжить инициализацию
                 }
             });
         };
@@ -267,17 +967,36 @@
                 const crushScreen = document.getElementById('crush-screen');
                 
                 if (!crushScreen) {
-                    app.log('Crush', 'Контейнер crush-screen не найден', true);
-                    return;
+                    app.log('Crush', 'Контейнер crush-screen не найден, создаем новый', true);
+                    
+                    // Пытаемся найти основной контейнер приложения
+                    const mainContent = document.querySelector('.main-content');
+                    if (mainContent) {
+                        // Создаем новый экран
+                        const newScreen = document.createElement('div');
+                        newScreen.id = 'crush-screen';
+                        newScreen.className = 'screen';
+                        mainContent.appendChild(newScreen);
+                        
+                        // Используем новый экран
+                        elements.container = document.createElement('div');
+                        elements.container.className = 'crush-container';
+                        newScreen.appendChild(elements.container);
+                        
+                        app.log('Crush', 'Создан новый экран и контейнер для игры');
+                        return;
+                    } else {
+                        app.log('Crush', 'Не найден контейнер .main-content', true);
+                        return;
+                    }
                 }
                 
                 elements.container = crushScreen.querySelector('.crush-container');
                 
                 if (!elements.container) {
-                    const container = document.createElement('div');
-                    container.className = 'crush-container';
-                    crushScreen.appendChild(container);
-                    elements.container = container;
+                    elements.container = document.createElement('div');
+                    elements.container.className = 'crush-container';
+                    crushScreen.appendChild(elements.container);
                     app.log('Crush', 'Создан контейнер для игры');
                 }
                 
@@ -291,40 +1010,59 @@
          */
         const setupUI = function() {
             try {
-                if (elements.container && elements.container.querySelector('#crush-graph')) {
+                if (!elements.container) {
+                    app.log('Crush', 'Контейнер игры не найден для настройки UI', true);
+                    return;
+                }
+                
+                if (elements.container.querySelector('#crush-graph')) {
                     app.log('Crush', 'Интерфейс уже создан');
                     return;
                 }
                 
                 elements.container.innerHTML = `
                     <div class="crush-layout">
-                        <div class="crush-main-column">
-                            <div class="crush-top-bar">
-                                <div class="game-info">
-                                    <div class="info-item">
-                                        <span class="info-icon">👥</span>
-                                        <span id="players-online" class="info-value">${globalState.playersOnline}</span>
-                                        <span class="info-label">онлайн</span>
-                                    </div>
-                                    <div class="info-item">
-                                        <span class="info-icon">💰</span>
-                                        <span id="current-bets" class="info-value">0</span>
-                                        <span class="info-label">ставок</span>
+                        <!-- Верхняя панель с информацией -->
+                        <div class="crush-header">
+                            <div class="game-info">
+                                <div class="info-item">
+                                    <span class="info-icon">👥</span>
+                                    <span id="players-online" class="info-value">${globalState.playersOnline}</span>
+                                    <span class="info-label">онлайн</span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="info-icon">💰</span>
+                                    <span id="current-bets" class="info-value">0</span>
+                                    <span class="info-label">ставок</span>
+                                </div>
+                            </div>
+                            <div class="game-phase">
+                                <div id="current-phase" class="phase-indicator">Ожидание игры</div>
+                                <div id="next-round-timer" class="round-timer">
+                                    Следующий раунд: <span class="time-value">10</span>с
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Основная область с графиком -->
+                        <div class="crush-main">
+                            <!-- Панель коэффициента и текущего выигрыша -->
+                            <div class="multiplier-row">
+                                <div class="multiplier-container">
+                                    <div class="multiplier-label">Текущий коэффициент</div>
+                                    <div class="multiplier-display">
+                                        <div id="multiplier" class="multiplier-value">1.00<span class="multiplier-x">×</span></div>
                                     </div>
                                 </div>
-                                <div class="game-phase">
-                                    <div id="current-phase" class="phase-indicator">Ожидание игры</div>
-                                    <div id="next-round-timer" class="round-timer">
-                                        Следующий раунд: <span class="time-value">10</span>с
-                                    </div>
+                                
+                                <div class="current-win-container">
+                                    <div class="current-win-label">Потенциальный выигрыш</div>
+                                    <div id="potential-win" class="potential-value">0 ⭐</div>
                                 </div>
                             </div>
                             
-                            <div class="crush-center">
-                                <div class="multiplier-display">
-                                    <div id="multiplier" class="multiplier-value">1.00<span class="multiplier-x">×</span></div>
-                                </div>
-                                
+                            <!-- График игры -->
+                            <div class="crush-graph-container">
                                 <div id="crush-graph" class="crush-graph">
                                     <!-- Canvas будет создан динамически -->
                                 </div>
@@ -335,39 +1073,41 @@
                                 
                                 <div id="crush-result" class="result hidden"></div>
                             </div>
-                            
-                            <div class="crush-controls">
-                                <div class="bet-panel">
-                                    <div class="bet-input-container">
-                                        <label for="crush-bet">Ставка:</label>
-                                        <div class="bet-input-wrapper">
-                                            <input type="number" id="crush-bet" min="1" max="1000" value="10">
-                                            <div class="quick-bet-buttons">
-                                                <button class="quick-bet" data-amount="5">5</button>
-                                                <button class="quick-bet" data-amount="10">10</button>
-                                                <button class="quick-bet" data-amount="50">50</button>
-                                                <button class="quick-bet" data-amount="100">100</button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    
-                                    <div id="auto-settings" class="auto-settings">
-                                        <div class="auto-option">
-                                            <input type="checkbox" id="auto-enabled">
-                                            <label for="auto-enabled">Авто-вывод при</label>
-                                            <input type="number" id="auto-cashout-at" min="1.1" step="0.1" value="2.0">×
+                        </div>
+                        
+                        <!-- Панель управления -->
+                        <div class="crush-controls">
+                            <div class="bet-panel">
+                                <div class="bet-input-container">
+                                    <label for="crush-bet">Ставка:</label>
+                                    <div class="bet-input-wrapper">
+                                        <input type="number" id="crush-bet" min="1" max="1000" value="10">
+                                        <div class="quick-bet-buttons">
+                                            <button class="quick-bet" data-amount="5">5</button>
+                                            <button class="quick-bet" data-amount="10">10</button>
+                                            <button class="quick-bet" data-amount="50">50</button>
+                                            <button class="quick-bet" data-amount="100">100</button>
                                         </div>
                                     </div>
                                 </div>
                                 
-                                <div class="action-buttons">
-                                    <button id="start-crush-btn" class="action-btn primary-btn">СДЕЛАТЬ СТАВКУ</button>
-                                    <button id="cash-crush-btn" class="action-btn secondary-btn" disabled>ЗАБРАТЬ</button>
+                                <div id="auto-settings" class="auto-settings">
+                                    <div class="auto-option">
+                                        <input type="checkbox" id="auto-enabled">
+                                        <label for="auto-enabled">Авто-вывод при</label>
+                                        <input type="number" id="auto-cashout-at" min="1.1" step="0.1" value="2.0">×
+                                    </div>
                                 </div>
+                            </div>
+                            
+                            <div class="action-buttons">
+                                <button id="start-crush-btn" class="action-btn primary-btn">СДЕЛАТЬ СТАВКУ</button>
+                                <button id="cash-crush-btn" class="action-btn secondary-btn" disabled>ЗАБРАТЬ</button>
                             </div>
                         </div>
                         
-                        <div class="crush-side-column">
+                        <!-- История и победители (внизу) -->
+                        <div class="panels-row">
                             <div class="crush-history-panel">
                                 <div class="panel-header">
                                     <h3>История</h3>
@@ -390,6 +1130,7 @@
                 elements.cashoutBtn = document.getElementById('cash-crush-btn');
                 elements.crushBet = document.getElementById('crush-bet');
                 elements.multiplierDisplay = document.getElementById('multiplier');
+                elements.potentialWinDisplay = document.getElementById('potential-win');
                 elements.crushGraph = document.getElementById('crush-graph');
                 elements.crushResult = document.getElementById('crush-result');
                 elements.autoEnabled = document.getElementById('auto-enabled');
@@ -407,13 +1148,34 @@
                     button.addEventListener('click', function() {
                         if (elements.crushBet) {
                             elements.crushBet.value = this.dataset.amount;
+                            // Обновляем потенциальный выигрыш при изменении ставки
+                            updatePotentialWin();
                         }
                     });
                 });
                 
+                // Инициализируем потенциальный выигрыш
+                updatePotentialWin();
+                
                 app.log('Crush', 'Интерфейс игры успешно создан');
             } catch (error) {
                 app.log('Crush', `Ошибка создания интерфейса: ${error.message}`, true);
+            }
+        };
+        
+        /**
+         * Обновление отображения потенциального выигрыша
+         */
+        const updatePotentialWin = function() {
+            try {
+                if (!elements.crushBet || !elements.potentialWinDisplay) return;
+                
+                const betAmount = parseInt(elements.crushBet.value) || 0;
+                const potentialWin = Math.floor(betAmount * globalState.currentMultiplier);
+                
+                elements.potentialWinDisplay.textContent = `${potentialWin} ⭐`;
+            } catch (error) {
+                app.log('Crush', `Ошибка обновления потенциального выигрыша: ${error.message}`, true);
             }
         };
         
@@ -470,6 +1232,7 @@
         const setupEventListeners = function() {
             try {
                 if (elements.startBtn) {
+                    // Очищаем текущие обработчики для предотвращения дублирования
                     const newStartBtn = elements.startBtn.cloneNode(true);
                     if (elements.startBtn.parentNode) {
                         elements.startBtn.parentNode.replaceChild(newStartBtn, elements.startBtn);
@@ -480,6 +1243,7 @@
                 }
                 
                 if (elements.cashoutBtn) {
+                    // Очищаем текущие обработчики для предотвращения дублирования
                     const newCashoutBtn = elements.cashoutBtn.cloneNode(true);
                     if (elements.cashoutBtn.parentNode) {
                         elements.cashoutBtn.parentNode.replaceChild(newCashoutBtn, elements.cashoutBtn);
@@ -499,6 +1263,11 @@
                     elements.autoCashoutAt.addEventListener('input', function() {
                         userState.autoCashoutMultiplier = parseFloat(this.value) || 2.0;
                     });
+                }
+                
+                // Обновление потенциального выигрыша при изменении ставки
+                if (elements.crushBet) {
+                    elements.crushBet.addEventListener('input', updatePotentialWin);
                 }
                 
                 // Используем debounce для обработчика изменения размера
@@ -534,7 +1303,10 @@
                     graphCanvas.style.width = `${containerWidth}px`;
                     graphCanvas.style.height = `${containerHeight}px`;
                     
-                    graphCtx.scale(dpr, dpr);
+                    graphCtx.setTransform(1, 0, 0, 1, 0, 0); // Сбрасываем трансформацию
+                    graphCtx.scale(dpr, dpr); // Применяем новый масштаб
+                    
+                    // Перерисовываем график с текущими данными
                     redrawGraph();
                 }
             } catch (error) {
@@ -547,13 +1319,17 @@
          */
         const resetGraph = function() {
             try {
-                if (!graphCtx) return;
+                if (!graphCtx || !graphCanvas) {
+                    app.log('Crush', 'Canvas недоступен для сброса графика', true);
+                    return;
+                }
                 
-                graphCtx.clearRect(0, 0, graphCanvas.width / (window.devicePixelRatio || 1), 
-                                   graphCanvas.height / (window.devicePixelRatio || 1));
+                const dpr = window.devicePixelRatio || 1;
+                graphCtx.clearRect(0, 0, graphCanvas.width / dpr, graphCanvas.height / dpr);
                 drawGrid();
                 globalState.graphPoints = [];
                 
+                app.log('Crush', 'График успешно сброшен');
             } catch (error) {
                 app.log('Crush', `Ошибка сброса графика: ${error.message}`, true);
             }
@@ -564,10 +1340,14 @@
          */
         const drawGrid = function() {
             try {
-                if (!graphCtx) return;
+                if (!graphCtx || !graphCanvas) {
+                    app.log('Crush', 'Canvas недоступен для рисования сетки', true);
+                    return;
+                }
                 
-                const width = graphCanvas.width / (window.devicePixelRatio || 1);
-                const height = graphCanvas.height / (window.devicePixelRatio || 1);
+                const dpr = window.devicePixelRatio || 1;
+                const width = graphCanvas.width / dpr;
+                const height = graphCanvas.height / dpr;
                 
                 // Фон с более тонким градиентом для глубины
                 const bgGradient = graphCtx.createLinearGradient(0, 0, 0, height);
@@ -649,6 +1429,7 @@
                 graphCtx.textAlign = 'left';
                 graphCtx.fillText('0с', 5, height - 5);
                 
+                app.log('Crush', 'Сетка графика успешно нарисована');
             } catch (error) {
                 app.log('Crush', `Ошибка рисования сетки: ${error.message}`, true);
             }
@@ -677,6 +1458,7 @@
                 updateHistoryDisplay();
                 updateLastWinners();
                 
+                app.log('Crush', 'История игр успешно загружена');
             } catch (error) {
                 app.log('Crush', `Ошибка загрузки истории: ${error.message}`, true);
             }
@@ -748,18 +1530,23 @@
                 // Генерируем случайных победителей для демонстрации
                 const winners = [];
                 for (let i = 0; i < 5; i++) {
+                    const bet = Math.floor(Math.random() * 500) + 50;
+                    const multiplier = (1 + Math.random() * 5).toFixed(2);
+                    
                     winners.push({
                         name: `Player${Math.floor(Math.random() * 1000)}`,
-                        amount: Math.floor(Math.random() * 1000) + 100,
-                        multiplier: (1 + Math.random() * 5).toFixed(2)
+                        amount: Math.floor(bet * parseFloat(multiplier)),
+                        bet: bet,
+                        multiplier: multiplier
                     });
                 }
                 
                 winnersList.innerHTML = winners.map(winner => `
                     <div class="winner-item">
                         <span class="winner-name">${winner.name}</span>
-                        <span class="winner-amount">+${winner.amount}</span>
+                        <span class="winner-bet">${winner.bet}</span>
                         <span class="winner-multiplier">${winner.multiplier}×</span>
+                        <span class="winner-amount">+${winner.amount}</span>
                     </div>
                 `).join('');
                 
@@ -822,6 +1609,10 @@
                     elements.currentBets.textContent = globalState.currentRoundBets;
                 }
                 
+                // Обновляем потенциальный выигрыш
+                updatePotentialWin();
+                
+                // Обновляем состояние кнопок
                 updateButtonsState();
                 
             } catch (error) {
@@ -860,6 +1651,11 @@
                     }
                 }
                 
+                // Обработка поля ввода ставки
+                if (elements.crushBet) {
+                    elements.crushBet.disabled = globalState.isActiveRound && userState.hasBetInCurrentRound;
+                }
+                
                 const autoSettings = document.getElementById('auto-settings');
                 if (autoSettings) {
                     if (globalState.isActiveRound && userState.hasBetInCurrentRound && !userState.hasCollectedWin) {
@@ -893,6 +1689,7 @@
                 if (elements.crushResult) {
                     elements.crushResult.style.display = 'none';
                     elements.crushResult.innerHTML = '';
+                    elements.crushResult.className = 'result hidden';
                 }
                 
                 // Явно показываем сообщение о ставке
@@ -900,13 +1697,20 @@
                     elements.bettingPhaseInfo.style.display = 'block';
                 }
                 
+                // Сбрасываем множитель
+                globalState.currentMultiplier = 1.0;
+                updateMultiplierDisplay();
+                updatePotentialWin();
+                
+                // Обновляем отображение фазы игры
                 updateGamePhaseDisplay();
                 
+                // Очищаем существующий интервал
                 if (globalState.roundTimerInterval) {
                     clearInterval(globalState.roundTimerInterval);
                 }
                 
-                // Звук обратного отсчета
+                // Звук обратного отсчета для последних секунд
                 if (globalState.waitingTimeLeft <= 3) {
                     playSound('countdown');
                 }
@@ -958,17 +1762,27 @@
                     elements.bettingPhaseInfo.style.display = 'none';
                 }
                 
+                // Сбрасываем график
                 resetGraph();
+                
+                // Обновляем отображение фазы игры
                 updateGamePhaseDisplay();
+                
+                // Обновляем множитель
                 updateMultiplierDisplay();
                 
+                // Добавляем начальную точку на график
                 addGraphPoint(1.00);
                 
+                // Запускаем игровой интервал
                 startGameInterval();
                 
+                // Тактильная обратная связь для игрока, сделавшего ставку
                 if (window.casinoApp && userState.hasBetInCurrentRound) {
                     window.casinoApp.provideTactileFeedback('medium');
                 }
+                
+                app.log('Crush', 'Новый раунд успешно начат');
             } catch (error) {
                 app.log('Crush', `Ошибка запуска нового раунда: ${error.message}`, true);
                 startWaitingForNextRound();
@@ -980,10 +1794,12 @@
          */
         const startGameInterval = function() {
             try {
+                // Очищаем существующий интервал
                 if (globalState.gameInterval) {
                     clearInterval(globalState.gameInterval);
                 }
                 
+                // Запускаем новый интервал
                 globalState.gameInterval = setInterval(() => {
                     try {
                         if (!globalState.isActiveRound) {
@@ -999,6 +1815,7 @@
                     }
                 }, GAME_UPDATE_INTERVAL);
                 
+                app.log('Crush', 'Игровой интервал успешно запущен');
             } catch (error) {
                 app.log('Crush', `Ошибка запуска игрового интервала: ${error.message}`, true);
                 finishRound();
@@ -1025,7 +1842,11 @@
                 // Добавляем 1, чтобы множитель всегда начинался с 1.00
                 globalState.currentMultiplier = 1 + combinedGrowth;
                 
+                // Обновляем отображение множителя
                 updateMultiplierDisplay();
+                
+                // Обновляем потенциальный выигрыш
+                updatePotentialWin();
                 
                 // Добавляем точки с разной частотой в зависимости от времени
                 // Чаще точки в начале для лучшей детализации
@@ -1113,16 +1934,22 @@
          */
         const redrawGraph = function() {
             try {
-                if (!graphCtx || !graphCanvas) return;
+                if (!graphCtx || !graphCanvas) {
+                    app.log('Crush', 'Canvas недоступен для перерисовки графика', true);
+                    return;
+                }
                 
                 const dpr = window.devicePixelRatio || 1;
                 const width = graphCanvas.width / dpr;
                 const height = graphCanvas.height / dpr;
                 
+                // Очищаем холст
                 graphCtx.clearRect(0, 0, width, height);
                 
+                // Рисуем сетку
                 drawGrid();
                 
+                // Если недостаточно точек для рисования линии, выходим
                 if (globalState.graphPoints.length < 2) return;
                 
                 // Приближаем график, фокусируясь на меньшем диапазоне значений множителя
@@ -1258,7 +2085,7 @@
                 graphCtx.fillStyle = 'rgba(0, 200, 83, 0.1)';
                 graphCtx.fill();
                 
-                // Рисуем метку текущего множителя над точкой, если множитель > 1.3
+                // Рисуем метку текущего множителя над точкой,
                 if (lastPoint.multiplier > 1.3) {
                     const fontSize = 16; // Увеличиваем размер шрифта
                     graphCtx.font = `bold ${fontSize}px Arial`;
@@ -1267,6 +2094,7 @@
                     graphCtx.fillText(`${lastPoint.multiplier.toFixed(2)}×`, lastX, lastY - 20);
                 }
                 
+                app.log('Crush', 'График успешно перерисован');
             } catch (error) {
                 app.log('Crush', `Ошибка перерисовки графика: ${error.message}`, true);
             }
@@ -1288,6 +2116,8 @@
                 if (isNaN(userState.betAmount) || userState.betAmount <= 0) {
                     if (window.casinoApp && window.casinoApp.showNotification) {
                         window.casinoApp.showNotification('Пожалуйста, введите корректную ставку');
+                    } else {
+                        alert('Пожалуйста, введите корректную ставку');
                     }
                     return;
                 }
@@ -1296,6 +2126,8 @@
                     userState.betAmount > window.GreenLightApp.user.balance) {
                     if (window.casinoApp && window.casinoApp.showNotification) {
                         window.casinoApp.showNotification('Недостаточно средств для ставки');
+                    } else {
+                        alert('Недостаточно средств для ставки');
                     }
                     return;
                 }
@@ -1355,7 +2187,6 @@
                 updateGamePhaseDisplay();
                 
                 if (elements.crushResult) {
-                    elements.crushResult.style.display = 'block';
                     elements.crushResult.innerHTML = `
                         <div class="cashout-animation">
                             <div class="cashout-icon">💰</div>
@@ -1364,6 +2195,7 @@
                         </div>
                     `;
                     elements.crushResult.className = 'result win';
+                    elements.crushResult.style.display = 'block';
                 }
                 
                 if (elements.multiplierDisplay) {
@@ -1406,7 +2238,6 @@
                 
                 if (userState.hasBetInCurrentRound && !userState.hasCollectedWin) {
                     if (elements.crushResult) {
-                        elements.crushResult.style.display = 'block';
                         elements.crushResult.innerHTML = `
                             <div class="crash-animation">
                                 <div class="crash-icon">💥</div>
@@ -1415,6 +2246,7 @@
                             </div>
                         `;
                         elements.crushResult.className = 'result lose';
+                        elements.crushResult.style.display = 'block';
                     }
                     
                     playSound('crash');
@@ -1745,7 +2577,7 @@
         
         /**
          * Генерация точки краша
-         * ВНИМАНИЕ: Результат НЕ выводится в консоль!
+         * Важно: результат НЕ выводится в консоль для защиты от мошенничества
          */
         const generateCrashPoint = function() {
             try {
@@ -1800,7 +2632,7 @@
                 return crashPoint;
             } catch (error) {
                 app.log('Crush', `Ошибка генерации точки краша: ${error.message}`, true);
-                return 2.0;
+                return 2.0; // Возвращаем безопасное значение при ошибке
             }
         };
         
@@ -1809,7 +2641,6 @@
             init: init,
             placeBet: placeBet,
             cashout: cashout,
-            createUI: setupUI,
             
             getStatus: function() {
                 return {
@@ -1834,224 +2665,40 @@
             },
             
             // Добавление стилей
-            addStyles: function() {
-                try {
-                    if (document.getElementById('crush-styles')) return;
-                    
-                    const styleElement = document.createElement('style');
-                    styleElement.id = 'crush-styles';
-                    styleElement.textContent = `
-                        .crush-container {
-                            max-width: 960px;
-                            margin: 0 auto;
-                            padding: 15px;
-                            background: linear-gradient(135deg, #1c2133, #14171f);
-                            border-radius: 16px;
-                            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
-                            overflow: hidden;
-                            color: #fff;
-                        }
-                        
-                        .crush-layout {
-                            display: grid;
-                            grid-template-columns: 3fr 1fr;
-                            gap: 15px;
-                        }
-                        
-                        /* Основная колонка */
-                        .crush-main-column {
-                            display: flex;
-                            flex-direction: column;
-                            gap: 15px;
-                        }
-                        
-                        /* Верхняя панель */
-                        .crush-top-bar {
-                            display: flex;
-                            justify-content: space-between;
-                            align-items: center;
-                            background: rgba(0, 0, 0, 0.2);
-                            border-radius: 10px;
-                            padding: 10px 15px;
-                        }
-                        
-                        .game-info {
-                            display: flex;
-                            gap: 15px;
-                        }
-                        
-                        .info-item {
-                            display: flex;
-                            align-items: center;
-                            gap: 5px;
-                        }
-                        
-                        .info-icon {
-                            font-size: 16px;
-                        }
-                        
-                        .info-value {
-                            font-weight: bold;
-                            color: #f2c94c;
-                        }
-                        
-                        .info-label {
-                            font-size: 12px;
-                            color: rgba(255, 255, 255, 0.7);
-                        }
-                        
-                        .game-phase {
-                            display: flex;
-                            align-items: center;
-                            gap: 10px;
-                        }
-                        
-                        .phase-indicator {
-                            font-size: 14px;
-                            font-weight: bold;
-                            padding: 5px 10px;
-                            border-radius: 5px;
-                            background: rgba(0, 0, 0, 0.3);
-                            transition: all 0.3s ease;
-                        }
-                        
-                        .phase-indicator.active-round {
-                            background: rgba(0, 200, 83, 0.2);
-                            color: #00c853;
-                        }
-                        
-                        .phase-indicator.waiting {
-                            background: rgba(242, 201, 76, 0.2);
-                            color: #f2c94c;
-                        }
-                        
-                        .round-timer {
-                            font-size: 14px;
-                            color: #f2c94c;
-                        }
-                        
-                        .time-value {
-                            font-weight: bold;
-                        }
-                        
-                        /* Центральная часть */
-                        .crush-center {
-                            position: relative;
-                            display: flex;
-                            flex-direction: column;
-                            align-items: center;
-                            gap: 15px;
-                        }
-                        
-                        .multiplier-display {
-                            position: relative;
-                            text-align: center;
-                            padding: 8px 20px;
-                            border-radius: 10px 10px 0 0;
-                            background: rgba(0, 0, 0, 0.2);
-                            margin-bottom: -10px;
-                            z-index: 1;
-                        }
-                        
-                        .multiplier-value {
-                            font-size: 42px; /* Увеличенный размер */
-                            font-weight: bold;
-                            transition: all 0.2s ease;
-                            text-shadow: 0 0 10px currentColor;
-                        }
-                        
-                        .multiplier-x {
-                            font-size: 28px; /* Увеличенный размер */
-                            opacity: 0.8;
-                        }
-                        
-                        .multiplier-value.crashed {
-                            color: #ff1744 !important;
-                            animation: crash-flash 0.3s 3;
-                        }
-                        
-                        .multiplier-value.cashed-out {
-                            color: #2196f3 !important;
-                        }
-                        
-                        /* Цветовая схема для множителей */
-                        .multiplier-value.level-1 { color: #00c853; }
-                        .multiplier-value.level-2 { color: #64dd17; }
-                        .multiplier-value.level-3 { color: #ffd600; }
-                        .multiplier-value.level-4 { color: #ff9100; }
-                        .multiplier-value.level-5 { color: #ff3d00; }
-                        .multiplier-value.level-6 { color: #ff1744; }
-                        
-                        .multiplier-value.pulsate {
-                            animation: pulsate 1s infinite alternate;
-                        }
-                        
-                        @keyframes pulsate {
-                            0% { transform: scale(1); }
-                            100% { transform: scale(1.05); }
-                        }
-                        
-                        @keyframes crash-flash {
-                            0% { opacity: 1; transform: scale(1); }
-                            50% { opacity: 0.5; transform: scale(0.95); }
-                            100% { opacity: 1; transform: scale(1); }
-                        }
-                        
-                        .crush-graph {
-                            width: 100%;
-                            height: 400px; /* Увеличенная высота для лучшей видимости */
-                            background: linear-gradient(135deg, #14171f, #1a1e30);
-                            border-radius: 10px;
-                            border: 1px solid rgba(255, 255, 255, 0.1);
-                            overflow: hidden;
-                            box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.3);
-                            position: relative;
-                        }
-                        
-                        .betting-phase-info {
-                            position: absolute;
-                            top: 50%;
-                            left: 50%;
-                            transform: translate(-50%, -50%);
-                            background: rgba(0, 0, 0, 0.8);
-                            border-radius: 12px;
-                            padding: 20px 25px;
-                            text`;
-                    document.head.appendChild(styleElement);
-                    
-                    app.log('Crush', 'Стили для игры добавлены');
-                } catch (error) {
-                    app.log('Crush', `Ошибка добавления стилей: ${error.message}`, true);
-                }
-            }
+            addStyles: addStyles
         };
     })();
     
-    // Регистрируем игру
+    // Регистрируем игру во всех форматах для максимальной совместимости
     try {
+        // 1. Добавляем стили
+        crushGame.addStyles();
+        
+        // 2. Регистрация через систему registerGame
         if (window.registerGame) {
             window.registerGame('crushGame', crushGame);
-            app.log('Crush', 'Игра зарегистрирована через новую систему registerGame');
+            app.log('Crush', 'Игра зарегистрирована через систему registerGame');
         }
         
+        // 3. Экспорт в глобальное пространство имен (для обратной совместимости)
         window.crushGame = crushGame;
         app.log('Crush', 'Игра экспортирована в глобальное пространство имен');
         
-        crushGame.addStyles();
-        
+        // 4. Автоматическая инициализация при загрузке страницы
         document.addEventListener('DOMContentLoaded', function() {
             setTimeout(() => {
                 if (!crushGame.getStatus().user.initialized && !crushGame.getStatus().user.initializationStarted) {
-                    app.log('Crush', 'Запускаем автоматическую инициализацию');
+                    app.log('Crush', 'Запуск автоматической инициализации');
                     crushGame.init();
                 }
             }, 500);
         });
         
+        // 5. Если DOM уже загружен, инициализируем немедленно
         if (document.readyState === 'complete' || document.readyState === 'interactive') {
             setTimeout(() => {
                 if (!crushGame.getStatus().user.initialized && !crushGame.getStatus().user.initializationStarted) {
-                    app.log('Crush', 'Запускаем автоматическую инициализацию (DOM уже загружен)');
+                    app.log('Crush', 'Запуск автоматической инициализации (DOM уже загружен)');
                     crushGame.init();
                 }
             }, 500);
