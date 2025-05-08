@@ -1,11 +1,11 @@
 /**
  * crush.js - Оптимизированная версия игры Crush с общим графиком для всех игроков
- * Версия 4.0.0
+ * Версия 4.1.0
  * 
  * Особенности:
  * - Общий график и история для всех игроков
  * - 10-секундная пауза между раундами
- * - Улучшенный пользовательский интерфейс
+ * - Улучшенный компактный пользовательский интерфейс
  * - Защита от мошенничества (нет вывода точки краша)
  * - Расширенная анимация и визуальные эффекты
  * - Автоматические ставки и выход
@@ -25,7 +25,7 @@
     }
     
     const app = window.GreenLightApp;
-    app.log('Crush', 'Инициализация модуля игры Crush v4.0.0');
+    app.log('Crush', 'Инициализация модуля игры Crush v4.1.0');
     
     // Игровая логика в замыкании для изоляции
     const crushGame = (function() {
@@ -248,83 +248,92 @@
                 }
                 
                 elements.container.innerHTML = `
-                    <div class="game-info-bar">
-                        <div class="info-item">
-                            <span class="info-icon">👥</span>
-                            <span id="players-online" class="info-value">${globalState.playersOnline}</span>
-                            <span class="info-label">игроков онлайн</span>
-                        </div>
-                        <div class="info-item">
-                            <span class="info-icon">💰</span>
-                            <span id="current-bets" class="info-value">0</span>
-                            <span class="info-label">ставок в раунде</span>
-                        </div>
-                    </div>
-                    
-                    <div class="game-phase-display">
-                        <div id="current-phase" class="phase-indicator">Ожидание начала игры</div>
-                        <div id="next-round-timer" class="round-timer">
-                            Следующий раунд через: <span class="time-value">10</span> сек.
-                        </div>
-                    </div>
-                    
-                    <div class="game-controls">
-                        <div class="bet-section">
-                            <div class="bet-control">
-                                <label for="crush-bet">Ставка:</label>
-                                <div class="bet-input-group">
-                                    <input type="number" id="crush-bet" min="1" max="1000" value="10">
-                                    <div class="quick-bet-buttons">
-                                        <button class="quick-bet" data-amount="5">5</button>
-                                        <button class="quick-bet" data-amount="10">10</button>
-                                        <button class="quick-bet" data-amount="50">50</button>
-                                        <button class="quick-bet" data-amount="100">100</button>
+                    <div class="crush-layout">
+                        <div class="crush-main-column">
+                            <div class="crush-top-bar">
+                                <div class="game-info">
+                                    <div class="info-item">
+                                        <span class="info-icon">👥</span>
+                                        <span id="players-online" class="info-value">${globalState.playersOnline}</span>
+                                        <span class="info-label">онлайн</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <span class="info-icon">💰</span>
+                                        <span id="current-bets" class="info-value">0</span>
+                                        <span class="info-label">ставок</span>
+                                    </div>
+                                </div>
+                                <div class="game-phase">
+                                    <div id="current-phase" class="phase-indicator">Ожидание игры</div>
+                                    <div id="next-round-timer" class="round-timer">
+                                        Следующий раунд: <span class="time-value">10</span>с
                                     </div>
                                 </div>
                             </div>
                             
-                            <div id="auto-settings" class="auto-settings">
-                                <div class="auto-option">
-                                    <input type="checkbox" id="auto-enabled">
-                                    <label for="auto-enabled">Авто-вывод при</label>
-                                    <input type="number" id="auto-cashout-at" min="1.1" step="0.1" value="2.0">x
+                            <div class="crush-center">
+                                <div class="multiplier-display">
+                                    <div id="multiplier" class="multiplier-value">1.00<span class="multiplier-x">×</span></div>
+                                </div>
+                                
+                                <div id="crush-graph" class="crush-graph">
+                                    <!-- Canvas будет создан динамически -->
+                                </div>
+                                
+                                <div id="betting-phase-info" class="betting-phase-info">
+                                    <p>Разместите ставку до начала раунда!</p>
+                                </div>
+                                
+                                <div id="crush-result" class="result"></div>
+                            </div>
+                            
+                            <div class="crush-controls">
+                                <div class="bet-panel">
+                                    <div class="bet-input-container">
+                                        <label for="crush-bet">Ставка:</label>
+                                        <div class="bet-input-wrapper">
+                                            <input type="number" id="crush-bet" min="1" max="1000" value="10">
+                                            <div class="quick-bet-buttons">
+                                                <button class="quick-bet" data-amount="5">5</button>
+                                                <button class="quick-bet" data-amount="10">10</button>
+                                                <button class="quick-bet" data-amount="50">50</button>
+                                                <button class="quick-bet" data-amount="100">100</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div id="auto-settings" class="auto-settings">
+                                        <div class="auto-option">
+                                            <input type="checkbox" id="auto-enabled">
+                                            <label for="auto-enabled">Авто-вывод при</label>
+                                            <input type="number" id="auto-cashout-at" min="1.1" step="0.1" value="2.0">×
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="action-buttons">
+                                    <button id="start-crush-btn" class="action-btn primary-btn">СДЕЛАТЬ СТАВКУ</button>
+                                    <button id="cash-crush-btn" class="action-btn secondary-btn" disabled>ЗАБРАТЬ</button>
                                 </div>
                             </div>
                         </div>
                         
-                        <div class="multiplier-container">
-                            <div class="multiplier-label">Множитель:</div>
-                            <div id="multiplier" class="multiplier-value">1.00</div>
-                            <div class="multiplier-suffix">x</div>
-                        </div>
-                        
-                        <div id="betting-phase-info" class="betting-phase-info">
-                            <p>Разместите вашу ставку до начала раунда!</p>
-                        </div>
-                        
-                        <div class="crush-buttons">
-                            <button id="start-crush-btn" class="action-btn">СДЕЛАТЬ СТАВКУ</button>
-                            <button id="cash-crush-btn" class="action-btn cashout-btn" disabled>ЗАБРАТЬ</button>
-                        </div>
-                    </div>
-                    
-                    <div id="crush-graph" class="crush-graph">
-                        <!-- Canvas будет создан динамически -->
-                    </div>
-                    
-                    <div class="crush-side-panel">
-                        <div class="crush-history">
-                            <h3>История раундов</h3>
-                            <div class="history-items"></div>
-                        </div>
-                        
-                        <div id="last-winners" class="last-winners">
-                            <h3>Последние выигрыши</h3>
-                            <div class="winners-list"></div>
+                        <div class="crush-side-column">
+                            <div class="crush-history-panel">
+                                <div class="panel-header">
+                                    <h3>История</h3>
+                                </div>
+                                <div class="history-items"></div>
+                            </div>
+                            
+                            <div id="last-winners" class="winners-panel">
+                                <div class="panel-header">
+                                    <h3>Последние выигрыши</h3>
+                                </div>
+                                <div class="winners-list"></div>
+                            </div>
                         </div>
                     </div>
-                    
-                    <div id="crush-result" class="result"></div>
                 `;
                 
                 // Обновляем ссылки на элементы
@@ -378,8 +387,8 @@
                 
                 graphCanvas = document.createElement('canvas');
                 graphCanvas.id = 'crush-canvas';
-                graphCanvas.width = elements.crushGraph.clientWidth || 300;
-                graphCanvas.height = elements.crushGraph.clientHeight || 200;
+                graphCanvas.width = elements.crushGraph.clientWidth || 600;
+                graphCanvas.height = elements.crushGraph.clientHeight || 300;
                 elements.crushGraph.appendChild(graphCanvas);
                 
                 graphCtx = graphCanvas.getContext('2d');
@@ -445,8 +454,8 @@
         const handleResize = function() {
             try {
                 if (graphCanvas && elements.crushGraph) {
-                    graphCanvas.width = elements.crushGraph.clientWidth || 300;
-                    graphCanvas.height = elements.crushGraph.clientHeight || 200;
+                    graphCanvas.width = elements.crushGraph.clientWidth || 600;
+                    graphCanvas.height = elements.crushGraph.clientHeight || 300;
                     redrawGraph();
                 }
             } catch (error) {
@@ -480,35 +489,53 @@
                 const width = graphCanvas.width;
                 const height = graphCanvas.height;
                 
-                // Стиль сетки
-                graphCtx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
-                graphCtx.lineWidth = 1;
+                // Фон
+                graphCtx.fillStyle = 'rgba(20, 25, 30, 0.9)';
+                graphCtx.fillRect(0, 0, width, height);
                 
                 // Горизонтальные линии
-                for (let y = height; y >= 0; y -= height / 5) {
+                const horizontalLines = [1, 2, 5, 10, 20];
+                graphCtx.strokeStyle = 'rgba(255, 255, 255, 0.07)';
+                graphCtx.lineWidth = 1;
+                
+                horizontalLines.forEach(multiplier => {
+                    // Вычисляем положение линии на основе множителя (логарифмически)
+                    const yPos = height - (Math.log(multiplier) / Math.log(20)) * height;
                     graphCtx.beginPath();
-                    graphCtx.moveTo(0, y);
-                    graphCtx.lineTo(width, y);
+                    graphCtx.moveTo(0, yPos);
+                    graphCtx.lineTo(width, yPos);
                     graphCtx.stroke();
-                }
-                
-                // Вертикальные линии
-                for (let x = 0; x < width; x += width / 10) {
-                    graphCtx.beginPath();
-                    graphCtx.moveTo(x, 0);
-                    graphCtx.lineTo(x, height);
-                    graphCtx.stroke();
-                }
-                
-                // Рисуем метки множителей
-                const multiples = [1, 2, 5, 10, 20];
-                graphCtx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-                graphCtx.font = '10px Arial';
-                
-                multiples.forEach(mult => {
-                    const y = height - (mult / 20) * height;
-                    graphCtx.fillText(`${mult}x`, 5, y);
+                    
+                    // Добавляем метку множителя
+                    graphCtx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+                    graphCtx.font = '10px Arial';
+                    graphCtx.textAlign = 'left';
+                    graphCtx.fillText(`${multiplier}×`, 5, yPos - 5);
                 });
+                
+                // Вертикальные линии (время - секунды)
+                graphCtx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+                for (let second = 1; second <= 10; second++) {
+                    if (second % 5 === 0) {
+                        graphCtx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+                    } else {
+                        graphCtx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+                    }
+                    
+                    const xPos = (second / 10) * width;
+                    graphCtx.beginPath();
+                    graphCtx.moveTo(xPos, 0);
+                    graphCtx.lineTo(xPos, height);
+                    graphCtx.stroke();
+                    
+                    // Добавляем метку времени для каждых 5 секунд
+                    if (second % 5 === 0) {
+                        graphCtx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+                        graphCtx.font = '10px Arial';
+                        graphCtx.textAlign = 'center';
+                        graphCtx.fillText(`${second}s`, xPos, height - 5);
+                    }
+                }
                 
             } catch (error) {
                 app.log('Crush', `Ошибка рисования сетки: ${error.message}`, true);
@@ -525,16 +552,13 @@
                 globalState.gameHistory = [];
                 
                 for (let i = 0; i < MAX_HISTORY_SIZE; i++) {
-                    const isCrashed = Math.random() > 0.25;
-                    const crashValue = isCrashed ? 
-                        (1 + Math.random() * Math.random() * 3).toFixed(2) : 
-                        (1 + Math.random() * Math.random() * 10).toFixed(2);
+                    const crashValue = generateRandomCrashValue();
                     
                     globalState.gameHistory.push({
                         roundId: globalState.roundId - i - 1,
                         multiplier: parseFloat(crashValue),
                         timestamp: new Date(Date.now() - i * 60000).toISOString(),
-                        crashed: isCrashed
+                        crashed: true
                     });
                 }
                 
@@ -543,6 +567,24 @@
                 
             } catch (error) {
                 app.log('Crush', `Ошибка загрузки истории: ${error.message}`, true);
+            }
+        };
+        
+        /**
+         * Генерация случайного значения краша
+         */
+        const generateRandomCrashValue = function() {
+            // Генерирует правдоподобное распределение значений краша
+            const random = Math.random();
+            
+            if (random < 0.01) { // 1% вероятность большого краша
+                return (10 + Math.random() * 90).toFixed(2);
+            } else if (random < 0.1) { // 9% вероятность среднего краша
+                return (5 + Math.random() * 5).toFixed(2);
+            } else if (random < 0.4) { // 30% вероятность малого краша
+                return (2 + Math.random() * 3).toFixed(2);
+            } else { // 60% вероятность низкого краша
+                return (1 + Math.random() * 1).toFixed(2);
             }
         };
         
@@ -558,29 +600,29 @@
                 
                 globalState.gameHistory.forEach(item => {
                     const historyItem = document.createElement('div');
-                    historyItem.className = `history-item ${item.crashed ? 'crashed' : 'cashed-out'}`;
+                    historyItem.className = 'history-item';
                     
-                    let colorClass = '';
-                    if (item.multiplier <= 1.5) {
-                        colorClass = 'low';
-                    } else if (item.multiplier <= 3) {
-                        colorClass = 'medium';
-                    } else if (item.multiplier <= 5) {
-                        colorClass = 'high';
-                    } else {
-                        colorClass = 'extreme';
-                    }
-                    
+                    let colorClass = getMultiplierColorClass(item.multiplier);
                     historyItem.classList.add(colorClass);
-                    historyItem.innerHTML = `
-                        <div class="history-multiplier">${item.multiplier.toFixed(2)}x</div>
-                    `;
+                    historyItem.innerHTML = `${item.multiplier.toFixed(2)}×`;
                     
                     historyItems.appendChild(historyItem);
                 });
             } catch (error) {
                 app.log('Crush', `Ошибка обновления истории: ${error.message}`, true);
             }
+        };
+        
+        /**
+         * Определение класса цвета в зависимости от множителя
+         */
+        const getMultiplierColorClass = function(multiplier) {
+            if (multiplier <= 1.5) return 'level-1';
+            if (multiplier <= 3) return 'level-2';
+            if (multiplier <= 5) return 'level-3';
+            if (multiplier <= 10) return 'level-4';
+            if (multiplier <= 20) return 'level-5';
+            return 'level-6';
         };
         
         /**
@@ -604,8 +646,8 @@
                 winnersList.innerHTML = winners.map(winner => `
                     <div class="winner-item">
                         <span class="winner-name">${winner.name}</span>
-                        <span class="winner-amount">+${winner.amount} ⭐</span>
-                        <span class="winner-multiplier">${winner.multiplier}x</span>
+                        <span class="winner-amount">+${winner.amount}</span>
+                        <span class="winner-multiplier">${winner.multiplier}×</span>
                     </div>
                 `).join('');
                 
@@ -624,10 +666,10 @@
                         elements.currentPhaseDisplay.textContent = 'Раунд активен';
                         elements.currentPhaseDisplay.className = 'phase-indicator active-round';
                     } else if (globalState.isWaitingForNextRound) {
-                        elements.currentPhaseDisplay.textContent = 'Ожидание следующего раунда';
+                        elements.currentPhaseDisplay.textContent = 'Ожидание раунда';
                         elements.currentPhaseDisplay.className = 'phase-indicator waiting';
                     } else {
-                        elements.currentPhaseDisplay.textContent = 'Ожидание начала игры';
+                        elements.currentPhaseDisplay.textContent = 'Ожидание игры';
                         elements.currentPhaseDisplay.className = 'phase-indicator idle';
                     }
                 }
@@ -648,12 +690,12 @@
                     if (globalState.isWaitingForNextRound) {
                         elements.bettingPhaseInfo.style.display = 'block';
                         elements.bettingPhaseInfo.innerHTML = `
-                            <p class="betting-phase-message">Сделайте ставку до начала следующего раунда!</p>
+                            <p class="betting-phase-message">Сделайте ставку до начала раунда!</p>
                         `;
                     } else if (globalState.isActiveRound && !userState.hasBetInCurrentRound) {
                         elements.bettingPhaseInfo.style.display = 'block';
                         elements.bettingPhaseInfo.innerHTML = `
-                            <p class="betting-phase-message">Подождите начала следующего раунда для новой ставки.</p>
+                            <p class="betting-phase-message">Дождитесь следующего раунда для ставки</p>
                         `;
                     } else {
                         elements.bettingPhaseInfo.style.display = 'none';
@@ -884,26 +926,28 @@
                 if (!elements.multiplierDisplay) return;
                 
                 const displayMultiplier = Math.floor(globalState.currentMultiplier * 100) / 100;
+                const multiplierText = displayMultiplier.toFixed(2);
                 
-                elements.multiplierDisplay.textContent = displayMultiplier.toFixed(2);
-                
-                elements.multiplierDisplay.classList.remove('low', 'medium', 'high', 'extreme');
-                
-                if (displayMultiplier <= 1.5) {
-                    elements.multiplierDisplay.classList.add('low');
-                } else if (displayMultiplier <= 3) {
-                    elements.multiplierDisplay.classList.add('medium');
-                } else if (displayMultiplier <= 5) {
-                    elements.multiplierDisplay.classList.add('high');
+                // Обновляем только текстовый контент, сохраняя вложенные элементы
+                const xElement = elements.multiplierDisplay.querySelector('.multiplier-x');
+                if (xElement) {
+                    elements.multiplierDisplay.textContent = multiplierText;
+                    elements.multiplierDisplay.appendChild(xElement);
                 } else {
-                    elements.multiplierDisplay.classList.add('extreme');
+                    elements.multiplierDisplay.innerHTML = `${multiplierText}<span class="multiplier-x">×</span>`;
                 }
+                
+                // Удаляем все классы уровней
+                elements.multiplierDisplay.classList.remove('level-1', 'level-2', 'level-3', 'level-4', 'level-5', 'level-6');
+                
+                // Добавляем соответствующий класс
+                elements.multiplierDisplay.classList.add(getMultiplierColorClass(displayMultiplier));
                 
                 // Пульсация при высоких значениях
                 if (displayMultiplier > 5) {
-                    elements.multiplierDisplay.style.transform = `scale(${1 + Math.sin(Date.now() / 100) * 0.05})`;
+                    elements.multiplierDisplay.classList.add('pulsate');
                 } else {
-                    elements.multiplierDisplay.style.transform = 'scale(1)';
+                    elements.multiplierDisplay.classList.remove('pulsate');
                 }
                 
             } catch (error) {
@@ -945,52 +989,102 @@
                 const width = graphCanvas.width;
                 const height = graphCanvas.height;
                 
-                const maxTime = Math.max(10, globalState.graphPoints[globalState.graphPoints.length - 1].time);
-                const maxMult = Math.max(5, ...globalState.graphPoints.map(p => p.multiplier));
+                // Настраиваем максимальные значения для более логичного масштабирования
+                const currentMultiplier = globalState.currentMultiplier;
+                let maxMult = 20; // Начальное максимальное значение для множителя
                 
-                // Рисуем линию графика
+                // Динамически увеличиваем максимальный множитель, если текущий приближается к нему
+                if (currentMultiplier > maxMult * 0.5) {
+                    maxMult = Math.max(maxMult, currentMultiplier * 1.5);
+                }
+                
+                // Максимальное время отображения на графике (в секундах)
+                const maxTime = 20;
+                
+                // Рисуем линию графика с плавной кривой
                 graphCtx.beginPath();
                 
-                const x0 = (globalState.graphPoints[0].time / maxTime) * width;
-                const y0 = height - (globalState.graphPoints[0].multiplier / maxMult) * height;
+                // Начинаем с первой точки
+                const firstPoint = globalState.graphPoints[0];
+                const x0 = (firstPoint.time / maxTime) * width;
+                const y0 = height - (Math.log(firstPoint.multiplier) / Math.log(maxMult)) * height;
                 graphCtx.moveTo(x0, y0);
                 
+                // Создаем градиент для линии
+                const lineGradient = graphCtx.createLinearGradient(0, 0, 0, height);
+                lineGradient.addColorStop(0, '#00c853');   // Зелёный вверху (для высоких множителей)
+                lineGradient.addColorStop(0.3, '#ffab00'); // Оранжевый в середине
+                lineGradient.addColorStop(0.7, '#ff6d00'); // Тёмно-оранжевый
+                lineGradient.addColorStop(1, '#ff1744');   // Красный внизу (для низких множителей)
+                
+                // Улучшенное отображение линии с использованием Bezier кривой
                 for (let i = 1; i < globalState.graphPoints.length; i++) {
-                    const x = (globalState.graphPoints[i].time / maxTime) * width;
-                    const y = height - (globalState.graphPoints[i].multiplier / maxMult) * height;
+                    const prevPoint = globalState.graphPoints[i-1];
+                    const currentPoint = globalState.graphPoints[i];
+                    
+                    const x = (currentPoint.time / maxTime) * width;
+                    const y = height - (Math.log(currentPoint.multiplier) / Math.log(maxMult)) * height;
+                    
+                    // Используем линейную интерполяцию для более плавной кривой
                     graphCtx.lineTo(x, y);
                 }
                 
-                // Настройки линии
-                graphCtx.strokeStyle = 'rgba(0, 168, 107, 0.9)';
+                // Настраиваем стиль линии
+                graphCtx.strokeStyle = lineGradient;
                 graphCtx.lineWidth = 3;
-                graphCtx.shadowColor = 'rgba(0, 168, 107, 0.5)';
-                graphCtx.shadowBlur = 15;
+                graphCtx.lineCap = 'round';
+                graphCtx.lineJoin = 'round';
+                
+                // Добавляем тень для эффектности
+                graphCtx.shadowColor = 'rgba(0, 200, 83, 0.5)';
+                graphCtx.shadowBlur = 10;
+                graphCtx.shadowOffsetX = 0;
+                graphCtx.shadowOffsetY = 0;
+                
+                // Рисуем линию
                 graphCtx.stroke();
                 
-                // Градиентная заливка под графиком
-                const lastX = (globalState.graphPoints[globalState.graphPoints.length - 1].time / maxTime) * width;
-                const lastY = height - (globalState.graphPoints[globalState.graphPoints.length - 1].multiplier / maxMult) * height;
+                // Градиентная заливка под линией
+                const lastPoint = globalState.graphPoints[globalState.graphPoints.length - 1];
+                const lastX = (lastPoint.time / maxTime) * width;
+                const lastY = height - (Math.log(lastPoint.multiplier) / Math.log(maxMult)) * height;
                 
                 graphCtx.lineTo(lastX, height);
-                graphCtx.lineTo(0, height);
+                graphCtx.lineTo(x0, height);
                 graphCtx.closePath();
                 
-                const gradient = graphCtx.createLinearGradient(0, 0, 0, height);
-                gradient.addColorStop(0, 'rgba(0, 168, 107, 0.3)');
-                gradient.addColorStop(1, 'rgba(0, 168, 107, 0)');
-                graphCtx.fillStyle = gradient;
+                // Создаем градиент для заливки
+                const fillGradient = graphCtx.createLinearGradient(0, 0, 0, height);
+                fillGradient.addColorStop(0, 'rgba(0, 200, 83, 0.3)');
+                fillGradient.addColorStop(0.7, 'rgba(0, 200, 83, 0.1)');
+                fillGradient.addColorStop(1, 'rgba(0, 200, 83, 0)');
+                
+                graphCtx.fillStyle = fillGradient;
+                graphCtx.globalAlpha = 0.5; // Полупрозрачная заливка
+                graphCtx.fill();
+                graphCtx.globalAlpha = 1;
+                
+                // Сбрасываем тень
+                graphCtx.shadowColor = 'transparent';
+                graphCtx.shadowBlur = 0;
+                
+                // Текущая точка - рисуем яркий маркер
+                graphCtx.beginPath();
+                graphCtx.arc(lastX, lastY, 6, 0, Math.PI * 2);
+                
+                // Градиентная заливка для точки
+                const dotGradient = graphCtx.createRadialGradient(lastX, lastY, 0, lastX, lastY, 6);
+                dotGradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+                dotGradient.addColorStop(1, 'rgba(0, 200, 83, 0.8)');
+                
+                graphCtx.fillStyle = dotGradient;
                 graphCtx.fill();
                 
-                // Текущая точка
+                // Рисуем ореол вокруг точки
                 graphCtx.beginPath();
-                graphCtx.arc(lastX, lastY, 8, 0, Math.PI * 2);
-                graphCtx.fillStyle = 'rgba(0, 168, 107, 1)';
+                graphCtx.arc(lastX, lastY, 10, 0, Math.PI * 2);
+                graphCtx.fillStyle = 'rgba(0, 200, 83, 0.2)';
                 graphCtx.fill();
-                graphCtx.strokeStyle = 'white';
-                graphCtx.lineWidth = 3;
-                graphCtx.shadowBlur = 10;
-                graphCtx.stroke();
                 
             } catch (error) {
                 app.log('Crush', `Ошибка перерисовки графика: ${error.message}`, true);
@@ -1083,7 +1177,7 @@
                     elements.crushResult.innerHTML = `
                         <div class="cashout-animation">
                             <div class="cashout-icon">💰</div>
-                            <div class="cashout-text">Вы вывели деньги при ${globalState.currentMultiplier.toFixed(2)}x!</div>
+                            <div class="cashout-text">Вы вывели деньги при ${globalState.currentMultiplier.toFixed(2)}×!</div>
                             <div class="win-amount">+${winAmount} ⭐</div>
                         </div>
                     `;
@@ -1134,7 +1228,7 @@
                         elements.crushResult.innerHTML = `
                             <div class="crash-animation">
                                 <div class="crash-icon">💥</div>
-                                <div class="crash-text">Краш при ${globalState.currentMultiplier.toFixed(2)}x!</div>
+                                <div class="crash-text">Краш при ${globalState.currentMultiplier.toFixed(2)}×!</div>
                                 <div class="lose-message">Вы проиграли ${userState.betAmount} ⭐</div>
                             </div>
                         `;
@@ -1189,22 +1283,62 @@
                 const width = graphCanvas.width;
                 const height = graphCanvas.height;
                 
-                const maxTime = Math.max(10, lastPoint.time);
-                const maxMult = Math.max(5, lastPoint.multiplier);
+                const maxMult = 20;
+                const maxTime = 20;
                 
                 const crashX = (lastPoint.time / maxTime) * width;
-                const crashY = height - (lastPoint.multiplier / maxMult) * height;
+                const crashY = height - (Math.log(lastPoint.multiplier) / Math.log(maxMult)) * height;
                 
-                // Анимация взрыва
+                // Улучшенная анимация взрыва
                 let explosionRadius = 0;
+                const maxRadius = 80;
+                const explosionDuration = 800; // ms
+                const startTime = Date.now();
+                
                 const animateExplosion = () => {
-                    if (explosionRadius < 50) {
-                        explosionRadius += 5;
+                    const elapsed = Date.now() - startTime;
+                    const progress = Math.min(1, elapsed / explosionDuration);
+                    
+                    if (progress < 1) {
+                        // Очищаем и перерисовываем график
+                        redrawGraph();
+                        
+                        // Нелинейная функция размера для более реалистичной анимации
+                        explosionRadius = maxRadius * Math.sin(progress * Math.PI);
+                        
+                        // Рисуем радиальный градиент для взрыва
+                        const explosionGradient = graphCtx.createRadialGradient(
+                            crashX, crashY, 0,
+                            crashX, crashY, explosionRadius
+                        );
+                        
+                        explosionGradient.addColorStop(0, 'rgba(255, 55, 55, 0.9)');
+                        explosionGradient.addColorStop(0.2, 'rgba(255, 55, 55, 0.8)');
+                        explosionGradient.addColorStop(0.5, 'rgba(255, 87, 34, 0.6)');
+                        explosionGradient.addColorStop(0.8, 'rgba(255, 87, 34, 0.2)');
+                        explosionGradient.addColorStop(1, 'rgba(255, 87, 34, 0)');
                         
                         graphCtx.beginPath();
                         graphCtx.arc(crashX, crashY, explosionRadius, 0, Math.PI * 2);
-                        graphCtx.fillStyle = `rgba(255, 0, 0, ${0.8 - explosionRadius / 50})`;
+                        graphCtx.fillStyle = explosionGradient;
                         graphCtx.fill();
+                        
+                        // Рисуем "искры" от взрыва
+                        const sparkCount = 8;
+                        const sparkLength = explosionRadius * 0.7;
+                        
+                        for (let i = 0; i < sparkCount; i++) {
+                            const angle = (i / sparkCount) * Math.PI * 2;
+                            const sparkX = crashX + Math.cos(angle) * sparkLength * progress;
+                            const sparkY = crashY + Math.sin(angle) * sparkLength * progress;
+                            
+                            graphCtx.beginPath();
+                            graphCtx.moveTo(crashX, crashY);
+                            graphCtx.lineTo(sparkX, sparkY);
+                            graphCtx.strokeStyle = `rgba(255, 200, 50, ${1 - progress})`;
+                            graphCtx.lineWidth = 2;
+                            graphCtx.stroke();
+                        }
                         
                         requestAnimationFrame(animateExplosion);
                     }
@@ -1275,7 +1409,7 @@
          */
         const generateCrashPoint = function() {
             try {
-                const houseEdge = 0.03; // 3% преимущество казино
+                const houseEdge = 0.05; // 3% преимущество казино
                 
                 // Генерируем случайное число от 0 до 1
                 const randomValue = Math.random();
@@ -1337,130 +1471,352 @@
                     styleElement.id = 'crush-styles';
                     styleElement.textContent = `
                         .crush-container {
-                            padding: 20px;
+                            max-width: 960px;
                             margin: 0 auto;
-                            max-width: 900px;
+                            padding: 15px;
+                            background: linear-gradient(135deg, #1c2133, #14171f);
+                            border-radius: 16px;
+                            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+                            overflow: hidden;
+                            color: #fff;
                         }
                         
-                        .game-info-bar {
+                        .crush-layout {
+                            display: grid;
+                            grid-template-columns: 3fr 1fr;
+                            gap: 15px;
+                        }
+                        
+                        /* Основная колонка */
+                        .crush-main-column {
                             display: flex;
-                            justify-content: center;
-                            gap: 50px;
-                            padding: 15px;
-                            background: rgba(0, 0, 0, 0.3);
+                            flex-direction: column;
+                            gap: 15px;
+                        }
+                        
+                        /* Верхняя панель */
+                        .crush-top-bar {
+                            display: flex;
+                            justify-content: space-between;
+                            align-items: center;
+                            background: rgba(0, 0, 0, 0.2);
                             border-radius: 10px;
-                            margin-bottom: 20px;
+                            padding: 10px 15px;
+                        }
+                        
+                        .game-info {
+                            display: flex;
+                            gap: 15px;
                         }
                         
                         .info-item {
                             display: flex;
                             align-items: center;
-                            gap: 10px;
+                            gap: 5px;
                         }
                         
                         .info-icon {
-                            font-size: 24px;
+                            font-size: 16px;
                         }
                         
                         .info-value {
-                            font-size: 20px;
                             font-weight: bold;
-                            color: var(--gold);
+                            color: #f2c94c;
                         }
                         
                         .info-label {
-                            font-size: 14px;
-                            color: var(--light-gray);
-                            margin-left: 5px;
+                            font-size: 12px;
+                            color: rgba(255, 255, 255, 0.7);
                         }
                         
-                        .game-phase-display {
-                            background: rgba(0, 0, 0, 0.2);
-                            border-radius: 10px;
-                            padding: 15px;
-                            margin-bottom: 20px;
-                            text-align: center;
-                            border: 1px solid var(--primary-green);
+                        .game-phase {
+                            display: flex;
+                            align-items: center;
+                            gap: 10px;
                         }
                         
                         .phase-indicator {
-                            font-size: 20px;
+                            font-size: 14px;
                             font-weight: bold;
-                            margin-bottom: 10px;
+                            padding: 5px 10px;
+                            border-radius: 5px;
+                            background: rgba(0, 0, 0, 0.3);
                             transition: all 0.3s ease;
                         }
                         
                         .phase-indicator.active-round {
-                            color: var(--primary-green);
-                            text-shadow: 0 0 10px var(--primary-green);
+                            background: rgba(0, 200, 83, 0.2);
+                            color: #00c853;
                         }
                         
                         .phase-indicator.waiting {
-                            color: var(--gold);
-                            text-shadow: 0 0 10px var(--gold);
+                            background: rgba(242, 201, 76, 0.2);
+                            color: #f2c94c;
                         }
                         
                         .round-timer {
-                            font-size: 16px;
-                            color: var(--gold);
+                            font-size: 14px;
+                            color: #f2c94c;
                         }
                         
                         .time-value {
                             font-weight: bold;
-                            font-size: 20px;
                         }
                         
-                        .bet-section {
+                        /* Центральная часть */
+                        .crush-center {
+                            position: relative;
                             display: flex;
-                            gap: 20px;
-                            margin-bottom: 20px;
+                            flex-direction: column;
+                            align-items: center;
+                            gap: 15px;
                         }
                         
-                        .bet-control {
+                        .multiplier-display {
+                            position: relative;
+                            text-align: center;
+                            padding: 5px 15px;
+                            border-radius: 10px 10px 0 0;
+                            background: rgba(0, 0, 0, 0.2);
+                            margin-bottom: -10px;
+                            z-index: 1;
+                        }
+                        
+                        .multiplier-value {
+                            font-size: 36px;
+                            font-weight: bold;
+                            transition: all 0.2s ease;
+                            text-shadow: 0 0 10px currentColor;
+                        }
+                        
+                        .multiplier-x {
+                            font-size: 24px;
+                            opacity: 0.7;
+                        }
+                        
+                        .multiplier-value.crashed {
+                            color: #ff1744 !important;
+                            animation: crash-flash 0.3s 3;
+                        }
+                        
+                        .multiplier-value.cashed-out {
+                            color: #2196f3 !important;
+                        }
+                        
+                        /* Цветовая схема для множителей */
+                        .multiplier-value.level-1 { color: #00c853; }
+                        .multiplier-value.level-2 { color: #64dd17; }
+                        .multiplier-value.level-3 { color: #ffd600; }
+                        .multiplier-value.level-4 { color: #ff9100; }
+                        .multiplier-value.level-5 { color: #ff3d00; }
+                        .multiplier-value.level-6 { color: #ff1744; }
+                        
+                        .multiplier-value.pulsate {
+                            animation: pulsate 1s infinite alternate;
+                        }
+                        
+                        @keyframes pulsate {
+                            0% { transform: scale(1); }
+                            100% { transform: scale(1.05); }
+                        }
+                        
+                        @keyframes crash-flash {
+                            0% { opacity: 1; transform: scale(1); }
+                            50% { opacity: 0.5; transform: scale(0.95); }
+                            100% { opacity: 1; transform: scale(1); }
+                        }
+                        
+                        .crush-graph {
+                            width: 100%;
+                            height: 300px;
+                            background: linear-gradient(135deg, #14171f, #1a1e30);
+                            border-radius: 10px;
+                            border: 1px solid rgba(255, 255, 255, 0.1);
+                            overflow: hidden;
+                            box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.3);
+                        }
+                        
+                        .betting-phase-info {
+                            position: absolute;
+                            top: 50%;
+                            left: 50%;
+                            transform: translate(-50%, -50%);
+                            background: rgba(0, 0, 0, 0.7);
+                            border-radius: 10px;
+                            padding: 15px 20px;
+                            text-align: center;
+                            color: #fff;
+                            backdrop-filter: blur(5px);
+                            max-width: 300px;
+                            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+                        }
+                        
+                        .betting-phase-message {
+                            margin: 0;
+                            font-weight: bold;
+                        }
+                        
+                        .result {
+                            position: absolute;
+                            top: 50%;
+                            left: 50%;
+                            transform: translate(-50%, -50%);
+                            background: rgba(0, 0, 0, 0.8);
+                            border-radius: 15px;
+                            padding: 20px;
+                            text-align: center;
+                            color: #fff;
+                            backdrop-filter: blur(5px);
+                            max-width: 300px;
+                            box-shadow: 0 5px 25px rgba(0, 0, 0, 0.4);
+                            animation: pop-in 0.5s forwards;
+                            z-index: 2;
+                        }
+                        
+                        @keyframes pop-in {
+                            0% { transform: translate(-50%, -50%) scale(0.8); opacity: 0; }
+                            50% { transform: translate(-50%, -50%) scale(1.05); opacity: 1; }
+                            100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+                        }
+                        
+                        .result.win .cashout-icon {
+                            font-size: 36px;
+                            margin-bottom: 10px;
+                            animation: bounce 1s infinite alternate;
+                        }
+                        
+                        @keyframes bounce {
+                            0% { transform: translateY(0); }
+                            100% { transform: translateY(-10px); }
+                        }
+                        
+                        .result.win .cashout-text {
+                            font-size: 18px;
+                            margin-bottom: 10px;
+                            color: #00c853;
+                        }
+                        
+                        .result.win .win-amount {
+                            font-size: 24px;
+                            font-weight: bold;
+                            color: #f2c94c;
+                            margin-top: 10px;
+                        }
+                        
+                        .result.lose .crash-icon {
+                            font-size: 36px;
+                            margin-bottom: 10px;
+                            animation: shake 0.5s;
+                        }
+                        
+                        @keyframes shake {
+                            0%, 100% { transform: translateX(0); }
+                            20%, 60% { transform: translateX(-5px); }
+                            40%, 80% { transform: translateX(5px); }
+                        }
+                        
+                        .result.lose .crash-text {
+                            font-size: 18px;
+                            margin-bottom: 10px;
+                            color: #ff1744;
+                        }
+                        
+                        .result.lose .lose-message {
+                            font-size: 16px;
+                            color: rgba(255, 255, 255, 0.7);
+                        }
+                        
+                        /* Панель управления */
+                        .crush-controls {
+                            display: flex;
+                            flex-direction: column;
+                            gap: 15px;
+                            background: rgba(0, 0, 0, 0.2);
+                            border-radius: 10px;
+                            padding: 15px;
+                        }
+                        
+                        .bet-panel {
+                            display: flex;
+                            justify-content: space-between;
+                            align-items: center;
+                            gap: 15px;
+                        }
+                        
+                        .bet-input-container {
                             flex: 1;
                         }
                         
-                        .bet-input-group {
+                        .bet-input-container label {
+                            display: block;
+                            font-size: 12px;
+                            color: rgba(255, 255, 255, 0.7);
+                            margin-bottom: 5px;
+                        }
+                        
+                        .bet-input-wrapper {
                             display: flex;
-                            flex-direction: column;
-                            gap: 10px;
+                            gap: 5px;
                         }
                         
                         #crush-bet {
-                            padding: 10px;
-                            border-radius: 8px;
-                            border: 1px solid var(--primary-green);
+                            flex: 1;
+                            padding: 8px 10px;
+                            font-size: 14px;
                             background: rgba(0, 0, 0, 0.3);
-                            color: white;
-                            font-size: 16px;
+                            border: 1px solid rgba(255, 255, 255, 0.1);
+                            border-radius: 5px;
+                            color: #fff;
+                            outline: none;
+                            transition: all 0.2s;
+                        }
+                        
+                        #crush-bet:focus {
+                            border-color: #00c853;
+                            box-shadow: 0 0 0 2px rgba(0, 200, 83, 0.2);
                         }
                         
                         .quick-bet-buttons {
                             display: flex;
-                            gap: 10px;
+                            gap: 5px;
                         }
                         
                         .quick-bet {
-                            flex: 1;
-                            padding: 8px;
-                            border-radius: 6px;
-                            border: 1px solid var(--gold);
-                            background: rgba(0, 0, 0, 0.5);
-                            color: var(--gold);
+                            padding: 8px 10px;
+                            background: rgba(0, 0, 0, 0.3);
+                            border: 1px solid rgba(255, 255, 255, 0.1);
+                            border-radius: 5px;
+                            color: #fff;
                             cursor: pointer;
-                            transition: all 0.2s ease;
+                            transition: all 0.2s;
                         }
                         
                         .quick-bet:hover {
-                            background: var(--gold);
-                            color: black;
+                            background: rgba(255, 255, 255, 0.1);
                         }
                         
                         .auto-settings {
-                            padding: 10px;
-                            border: 1px solid #333;
-                            border-radius: 8px;
-                            background: rgba(0, 0, 0, 0.2);
+                            display: flex;
+                            align-items: center;
+                            gap: 10px;
+                        }
+                        
+                        .auto-option {
+                            display: flex;
+                            align-items: center;
+                            gap: 5px;
+                            font-size: 12px;
+                            color: rgba(255, 255, 255, 0.8);
+                        }
+                        
+                        #auto-cashout-at {
+                            width: 60px;
+                            padding: 4px 8px;
+                            font-size: 12px;
+                            background: rgba(0, 0, 0, 0.3);
+                            border: 1px solid rgba(255, 255, 255, 0.1);
+                            border-radius: 4px;
+                            color: #fff;
                         }
                         
                         .auto-settings.disabled {
@@ -1468,311 +1824,191 @@
                             pointer-events: none;
                         }
                         
-                        .multiplier-container {
-                            text-align: center;
-                            margin: 20px 0;
-                            padding: 20px;
-                            background: rgba(0, 0, 0, 0.4);
-                            border-radius: 12px;
+                        .action-buttons {
                             display: flex;
-                            justify-content: center;
-                            align-items: center;
                             gap: 10px;
-                        }
-                        
-                        .multiplier-label {
-                            font-size: 24px;
-                            color: var(--light-gray);
-                        }
-                        
-                        .multiplier-value {
-                            font-size: 48px;
-                            font-weight: bold;
-                            transition: all 0.1s ease;
-                            text-shadow: 0 0 10px currentColor;
-                        }
-                        
-                        .multiplier-suffix {
-                            font-size: 32px;
-                            color: var(--light-gray);
-                        }
-                        
-                        .multiplier-value.low {
-                            color: var(--primary-green);
-                        }
-                        
-                        .multiplier-value.medium {
-                            color: var(--gold);
-                        }
-                        
-                        .multiplier-value.high {
-                            color: #FF9800;
-                        }
-                        
-                        .multiplier-value.extreme {
-                            color: var(--red);
-                            animation: pulse 0.5s infinite;
-                        }
-                        
-                        .multiplier-value.crashed {
-                            color: var(--red);
-                            animation: crash-flash 0.3s 3;
-                        }
-                        
-                        .multiplier-value.cashed-out {
-                            color: #2196F3;
-                        }
-                        
-                        @keyframes pulse {
-                            0% { transform: scale(1); }
-                            50% { transform: scale(1.05); }
-                            100% { transform: scale(1); }
-                        }
-                        
-                        @keyframes crash-flash {
-                            0% { opacity: 1; }
-                            50% { opacity: 0.3; }
-                            100% { opacity: 1; }
-                        }
-                        
-                        .crush-buttons {
-                            display: flex;
-                            gap: 15px;
-                            margin-top: 20px;
                         }
                         
                         .action-btn {
                             flex: 1;
-                            padding: 15px;
-                            font-size: 18px;
+                            padding: 12px 0;
+                            font-size: 14px;
                             font-weight: bold;
-                            border-radius: 10px;
                             border: none;
+                            border-radius: 6px;
                             cursor: pointer;
-                            transition: all 0.2s ease;
+                            transition: all 0.2s;
+                            text-transform: uppercase;
+                            letter-spacing: 1px;
                         }
                         
-                        #start-crush-btn {
-                            background: var(--primary-green);
-                            color: white;
+                        .primary-btn {
+                            background: #00c853;
+                            color: #fff;
+                            box-shadow: 0 3px 8px rgba(0, 200, 83, 0.3);
                         }
                         
-                        #start-crush-btn:hover:not(:disabled) {
-                            background: #00c77e;
+                        .primary-btn:hover:not(:disabled) {
+                            background: #00e676;
                             transform: translateY(-2px);
+                            box-shadow: 0 5px 15px rgba(0, 200, 83, 0.4);
                         }
                         
-                        #start-crush-btn.bet-placed {
-                            background: #666;
+                        .secondary-btn {
+                            background: #2196f3;
+                            color: #fff;
+                            box-shadow: 0 3px 8px rgba(33, 150, 243, 0.3);
                         }
                         
-                        #cash-crush-btn {
-                            background: linear-gradient(45deg, #2196F3, #1976D2);
-                            color: white;
-                        }
-                        
-                        #cash-crush-btn:hover:not(:disabled) {
-                            background: linear-gradient(45deg, #42A5F5, #1E88E5);
+                        .secondary-btn:hover:not(:disabled) {
+                            background: #42a5f5;
                             transform: translateY(-2px);
-                        }
-                        
-                        #cash-crush-btn.win-collected {
-                            background: #666;
+                            box-shadow: 0 5px 15px rgba(33, 150, 243, 0.4);
                         }
                         
                         .action-btn:disabled {
-                            opacity: 0.5;
+                            background: #444;
+                            color: #aaa;
+                            box-shadow: none;
                             cursor: not-allowed;
-                            transform: none;
                         }
                         
-                        .crush-graph {
-                            width: 100%;
-                            height: 300px;
-                            border: 1px solid #333;
+                        .action-btn.bet-placed {
+                            background: #795548;
+                        }
+                        
+                        .action-btn.win-collected {
+                            background: #795548;
+                        }
+                        
+                        /* Боковая колонка */
+                        .crush-side-column {
+                            display: flex;
+                            flex-direction: column;
+                            gap: 15px;
+                        }
+                        
+                        .crush-history-panel, .winners-panel {
+                            background: rgba(0, 0, 0, 0.2);
                             border-radius: 10px;
-                            margin: 20px 0;
-                            position: relative;
-                            background: linear-gradient(135deg, #0a0a0a, #1a1a1a);
                             overflow: hidden;
                         }
                         
-                        .crush-side-panel {
-                            display: grid;
-                            grid-template-columns: 1fr 1fr;
-                            gap: 20px;
-                            margin-top: 20px;
+                        .panel-header {
+                            background: rgba(0, 0, 0, 0.3);
+                            padding: 10px 15px;
                         }
                         
-                        .crush-history, .last-winners {
-                            background: rgba(0, 0, 0, 0.2);
-                            border-radius: 10px;
-                            padding: 15px;
-                        }
-                        
-                        .crush-history h3, .last-winners h3 {
-                            margin-bottom: 15px;
-                            color: var(--gold);
-                            font-size: 18px;
+                        .panel-header h3 {
+                            margin: 0;
+                            font-size: 14px;
+                            font-weight: 500;
+                            color: rgba(255, 255, 255, 0.8);
                         }
                         
                         .history-items {
-                            display: flex;
-                            flex-wrap: wrap;
-                            gap: 8px;
+                            display: grid;
+                            grid-template-columns: repeat(5, 1fr);
+                            gap: 5px;
+                            padding: 10px;
                         }
                         
                         .history-item {
-                            width: 60px;
-                            height: 30px;
-                            border-radius: 6px;
                             display: flex;
-                            align-items: center;
                             justify-content: center;
+                            align-items: center;
+                            padding: 5px;
+                            border-radius: 5px;
                             font-size: 12px;
                             font-weight: bold;
-                            color: white;
-                            transition: transform 0.2s ease;
+                            color: #fff;
+                            transition: all 0.2s;
                         }
                         
                         .history-item:hover {
-                            transform: scale(1.1);
+                            transform: scale(1.05);
                         }
                         
-                        .history-item.crashed {
-                            background: #ef5350;
-                        }
-                        
-                        .history-item.cashed-out {
-                            background: #66bb6a;
-                        }
-                        
-                        .history-item.low {
-                            opacity: 0.8;
-                        }
-                        
-                        .history-item.medium {
-                            opacity: 0.9;
-                        }
-                        
-                        .history-item.high {
-                            opacity: 1;
-                        }
-                        
-                        .history-item.extreme {
-                            box-shadow: 0 0 5px currentColor;
-                        }
+                        /* Цвета для истории множителей */
+                        .history-item.level-1 { background: #00c853; }
+                        .history-item.level-2 { background: #64dd17; }
+                        .history-item.level-3 { background: #ffd600; }
+                        .history-item.level-4 { background: #ff9100; }
+                        .history-item.level-5 { background: #ff3d00; }
+                        .history-item.level-6 { background: #ff1744; }
                         
                         .winners-list {
+                            padding: 10px;
                             display: flex;
                             flex-direction: column;
-                            gap: 10px;
+                            gap: 5px;
                         }
                         
                         .winner-item {
                             display: flex;
                             justify-content: space-between;
                             align-items: center;
-                            padding: 8px 12px;
+                            padding: 5px 10px;
+                            font-size: 12px;
+                            border-radius: 5px;
                             background: rgba(255, 255, 255, 0.05);
-                            border-radius: 6px;
+                            transition: all 0.2s;
+                        }
+                        
+                        .winner-item:hover {
+                            background: rgba(255, 255, 255, 0.1);
                         }
                         
                         .winner-name {
-                            color: var(--light-gray);
+                            flex: 1;
+                            overflow: hidden;
+                            text-overflow: ellipsis;
+                            white-space: nowrap;
                         }
                         
                         .winner-amount {
-                            color: var(--primary-green);
+                            color: #00c853;
                             font-weight: bold;
+                            margin-left: 5px;
+                            margin-right: 5px;
                         }
                         
                         .winner-multiplier {
-                            color: var(--gold);
+                            color: #f2c94c;
                             font-weight: bold;
                         }
                         
-                        .result {
-                            margin-top: 20px;
-                            padding: 20px;
-                            border-radius: 10px;
-                            text-align: center;
-                            animation: result-appear 0.5s ease;
-                        }
-                        
-                        @keyframes result-appear {
-                            from {
-                                opacity: 0;
-                                transform: translateY(20px);
-                            }
-                            to {
-                                opacity: 1;
-                                transform: translateY(0);
-                            }
-                        }
-                        
-                        .result.win {
-                            background: rgba(76, 175, 80, 0.2);
-                            border: 1px solid var(--primary-green);
-                        }
-                        
-                        .result.lose {
-                            background: rgba(244, 67, 54, 0.2);
-                            border: 1px solid var(--red);
-                        }
-                        
-                        .crash-animation, .cashout-animation {
-                            animation: result-pop 0.5s ease;
-                        }
-                        
-                        @keyframes result-pop {
-                            0% { transform: scale(0.5); opacity: 0; }
-                            80% { transform: scale(1.1); opacity: 0.8; }
-                            100% { transform: scale(1); opacity: 1; }
-                        }
-                        
-                        .crash-icon, .cashout-icon {
-                            font-size: 48px;
-                            margin-bottom: 10px;
-                        }
-                        
-                        .crash-text, .cashout-text {
-                            font-size: 24px;
-                            font-weight: bold;
-                            margin-bottom: 10px;
-                        }
-                        
-                        .win-amount {
-                            font-size: 32px;
-                            font-weight: bold;
-                            color: var(--primary-green);
-                        }
-                        
-                        .lose-message {
-                            font-size: 20px;
-                            color: var(--red);
-                        }
-                        
+                        /* Респонсивный дизайн */
                         @media (max-width: 768px) {
-                            .crush-side-panel {
+                            .crush-layout {
                                 grid-template-columns: 1fr;
                             }
                             
-                            .game-info-bar {
+                            .crush-top-bar {
                                 flex-direction: column;
+                                align-items: flex-start;
                                 gap: 10px;
                             }
                             
-                            .multiplier-container {
+                            .bet-panel {
                                 flex-direction: column;
+                                align-items: flex-start;
                             }
                             
-                            .crush-buttons {
-                                flex-direction: column;
+                            .bet-input-container {
+                                width: 100%;
                             }
                             
-                            .bet-section {
-                                flex-direction: column;
+                            .bet-input-wrapper {
+                                width: 100%;
+                            }
+                            
+                            .crush-graph {
+                                height: 250px;
+                            }
+                            
+                            .history-items {
+                                grid-template-columns: repeat(3, 1fr);
                             }
                         }
                     `;

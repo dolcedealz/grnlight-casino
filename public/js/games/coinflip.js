@@ -904,49 +904,62 @@
                 }
             }
         };
-        
         /**
-         * Анимация броска монеты
-         */
-        const flipCoinWithAnimation = function() {
-            return new Promise((resolve) => {
-                try {
-                    const coin = elements.coinElement;
-                    if (!coin) {
-                        app.log('CoinFlip', 'Элемент монеты не найден для анимации', true);
-                        // Возвращаем случайный результат в любом случае
-                        setTimeout(() => {
-                            resolve(Math.random() < 0.5 ? 'heads' : 'tails');
-                        }, 1000);
-                        return;
-                    }
-                    
-                    // Генерируем случайный результат
-                    const result = Math.random() < 0.5 ? 'heads' : 'tails';
-                    
-                    // Удаляем предыдущие классы
-                    coin.className = 'coin-element';
-                    
-                    // Форсируем перерисовку
-                    void coin.offsetWidth;
-                    
-                    // Добавляем класс для анимации
-                    coin.classList.add('flipping');
-                    
-                    // По окончании анимации, устанавливаем финальное состояние
-                    setTimeout(() => {
-                        coin.className = 'coin-element';
-                        coin.classList.add(result);
-                        resolve(result);
-                    }, 2000);
-                    
-                } catch (error) {
-                    app.log('CoinFlip', `Ошибка анимации броска: ${error.message}`, true);
-                    // Возвращаем результат даже при ошибке анимации
-                    resolve(Math.random() < 0.5 ? 'heads' : 'tails');
-                }
-            });
-        };
+ * Определение результата с учетом преимущества казино
+ * Даем пользователю 47.5% шанс на выигрыш вместо честных 50%
+ */
+const determineResultWithHouseEdge = function(playerChoice) {
+    // Шанс игрока на выигрыш: 47.5%
+    const playerWinsChance = 0.475;
+    
+    // Если случайное число меньше playerWinsChance, игрок выигрывает
+    const playerWins = Math.random() < playerWinsChance;
+    
+    // Если игрок выигрывает, возвращаем его выбор, иначе противоположный
+    return playerWins ? playerChoice : (playerChoice === 'heads' ? 'tails' : 'heads');
+};
+
+const flipCoinWithAnimation = function() {
+    return new Promise((resolve) => {
+        try {
+            const coin = elements.coinElement;
+            if (!coin) {
+                app.log('CoinFlip', 'Элемент монеты не найден для анимации', true);
+                // Возвращаем результат со смещенным шансом
+                setTimeout(() => {
+                    const adjustedResult = determineResultWithHouseEdge(state.chosenSide);
+                    resolve(adjustedResult);
+                }, 1000);
+                return;
+            }
+            
+            // Используем смещенную вероятность вместо честной 50/50
+            const result = determineResultWithHouseEdge(state.chosenSide);
+            
+            // Удаляем предыдущие классы
+            coin.className = 'coin-element';
+            
+            // Форсируем перерисовку
+            void coin.offsetWidth;
+            
+            // Добавляем класс для анимации
+            coin.classList.add('flipping');
+            
+            // По окончании анимации, устанавливаем финальное состояние
+            setTimeout(() => {
+                coin.className = 'coin-element';
+                coin.classList.add(result);
+                resolve(result);
+            }, 2000);
+            
+        } catch (error) {
+            app.log('CoinFlip', `Ошибка анимации броска: ${error.message}`, true);
+            // Возвращаем результат со смещенным шансом даже при ошибке анимации
+            const adjustedResult = determineResultWithHouseEdge(state.chosenSide);
+            resolve(adjustedResult);
+        }
+    });
+};
         
         /**
          * Отображение результата игры

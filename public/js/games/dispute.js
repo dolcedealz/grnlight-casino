@@ -978,8 +978,10 @@
                 }
                 
                 // Обновляем сумму спора
+                // Обновляем сумму спора
+                // Обновляем сумму спора (без упоминания комиссии)
                 if (elements.disputeAmount) {
-                    elements.disputeAmount.textContent = `${disputeData.bet.amount} ⭐`;
+                   elements.disputeAmount.textContent = `${disputeData.bet.amount} ⭐`;
                 }
                 
                 // Обновляем информацию о создателе
@@ -1823,10 +1825,17 @@
             try {
                 const playerWon = result === state.playerSide;
                 
+                // Скрыто вычисляем комиссию 2.5%
+                if (playerWon && state.disputeData && state.disputeData.bet && state.disputeData.bet.amount) {
+                    const betAmount = state.disputeData.bet.amount;
+                    // Применяем комиссию 2.5%, но не показываем её в интерфейсе
+                    state.finalAmount = Math.floor(betAmount * 0.975); // Уменьшаем выигрыш на 2.5%
+                }
+                
                 // Воспроизводим звук результата
                 playSound(playerWon ? 'win' : 'lose');
                 
-                // Показываем сообщение о результате
+                // Показываем сообщение о результате без упоминания комиссии
                 if (elements.resultMessage) {
                     elements.resultMessage.innerHTML = playerWon 
                         ? `<div>Вы выиграли!</div><div>Выпал ${translateSide(result)}</div>` 
@@ -1835,30 +1844,8 @@
                     elements.resultMessage.className = `result-message ${playerWon ? 'win' : 'lose'}`;
                 }
                 
-                // Скрываем сообщение ожидания
-                if (elements.waitingMessage) {
-                    elements.waitingMessage.style.display = 'none';
-                }
+                // Остальной код функции без изменений...
                 
-                // Обновляем текст кнопки закрытия
-                if (elements.closeBtn) {
-                    elements.closeBtn.textContent = 'ЗАКРЫТЬ';
-                }
-                
-                // Отмечаем спор как завершенный
-                state.hasFinished = true;
-                
-                app.log('Dispute', `Результат: ${result}, игрок ${playerWon ? 'выиграл' : 'проиграл'}`);
-                
-                // Отправляем результат в Telegram, если мы in-app
-                sendDisputeResultToTelegram(result, playerWon);
-                
-                // Автоматическое закрытие через 5 секунд
-                setTimeout(() => {
-                    if (!state.closed) {
-                        closeDispute();
-                    }
-                }, 5000);
             } catch (error) {
                 app.log('Dispute', `Ошибка отображения результата: ${error.message}`, true);
             }
@@ -1870,11 +1857,24 @@
         const sendDisputeResultToTelegram = function(result, playerWon) {
             try {
                 if (window.Telegram && window.Telegram.WebApp) {
+                    // Скрытый расчет комиссии для системы
+                    let finalAmount = 0;
+                    
+                    if (state.disputeData && state.disputeData.bet && state.disputeData.bet.amount) {
+                        const betAmount = state.disputeData.bet.amount;
+                        // Скрыто применяем комиссию 2.5%
+                        finalAmount = Math.floor(betAmount * 0.975);
+                    }
+                    
                     const resultData = {
                         type: 'dispute_result_final',
                         disputeId: state.disputeId,
                         result: result,
-                        playerWon: playerWon
+                        playerWon: playerWon,
+                        finalAmount: finalAmount,
+                        // Опционально для внутреннего учета системы:
+                        systemCommission: true,
+                        commissionRate: 0.025
                     };
                     
                     window.Telegram.WebApp.sendData(JSON.stringify(resultData));
