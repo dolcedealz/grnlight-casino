@@ -1667,9 +1667,10 @@
                         left: 50%;
                         transform: translate(-50%, -50%);
                         text-align: center;
-                        z-index: 10;         /* Поверх других элементов */
+                        z-index: 100;         /* Поверх других элементов */
                         pointer-events: none; /* Позволяет кликать через него */
-                        opacity: 0;          /* По умолчанию скрыт */
+                        opacity: 80;
+                        max-width: 300px;          /* По умолчанию скрыт */
                         transition: opacity 0.3s ease;
                     }
                     
@@ -1688,10 +1689,10 @@
                         display: flex;
                         flex-direction: column;
                         align-items: center;
-                        background: rgba(0, 0, 0, 0.85); /* Добавляем фон с прозрачностью */
-                        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5); /* Добавляем тень */
-                        backdrop-filter: blur(5px); /* Эффект размытия для фона */
-                        border: 2px solid; /* Толщина границы */
+                        background: rgba(0, 0, 0, 0.9); /* Увеличена непрозрачность фона */
+                        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.7); /* Усилена тень */
+                        backdrop-filter: blur(8px); /* Увеличено размытие */
+                        border: 3px solid;
                     }
                     
                     .win-message {
@@ -1965,8 +1966,8 @@
                     /* Увеличиваем ширину кнопок Турбо и Авто */
                     .control-btn.auto-spin,
                     .control-btn.turbo {
-                        min-width: 60px; /* Увеличено с 50px */
-                        padding: 10px 15px; /* Увеличено по горизонтали */
+                        min-width: 80px; /* Увеличено с 50px */
+                        padding: 10px 18px; /* Увеличено по горизонтали */
                     }
                     
                     /* Оставляем кнопку звука как есть */
