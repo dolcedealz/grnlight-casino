@@ -1,6 +1,6 @@
 /**
  * slots.js - Enhanced Slots Game with Premium Features
- * Version 3.0.0
+ * Version 3.1.0
  * 
  * Features:
  * - Improved animations and visual effects
@@ -9,7 +9,8 @@
  * - Turbo mode for faster gameplay
  * - Enhanced winning animations and jackpot celebrations
  * - Improved winning chances for new players
- * - Manual bet input with increment/decrement controls
+ * - Optimized UI for mobile devices
+ * - Quick bet buttons for faster gameplay
  */
 
 // Create an isolated module to prevent conflicts
@@ -26,7 +27,7 @@
     }
     
     const app = window.GreenLightApp;
-    app.log('Slots', 'Initializing Enhanced Slots Game v3.0.0');
+    app.log('Slots', 'Initializing Enhanced Slots Game v3.1.0');
     
     // Game logic in closure for isolation
     const slotsGame = (function() {
@@ -125,7 +126,8 @@
             betIncreaseBtn: null,
             resultDisplay: null,
             autoSpinMenu: null,
-            autoSpinOptions: null
+            autoSpinOptions: null,
+            keyboardHideBtn: null
         };
         
         // Audio elements
@@ -270,12 +272,21 @@
                         
                         <div class="slots-controls">
                             <div class="bet-controls">
-                                <button class="bet-btn decrease" id="bet-decrease">-</button>
-                                <div class="bet-input-container">
-                                    <span class="bet-label">BET</span>
-                                    <input type="number" class="bet-input" id="bet-input" min="${CONFIG.MIN_BET}" max="${CONFIG.MAX_BET}" value="${CONFIG.DEFAULT_BET}">
+                                <div class="compact-bet-input-wrapper">
+                                    <button class="bet-btn decrease" id="bet-decrease">-</button>
+                                    <div class="bet-input-container">
+                                        <span class="bet-label">BET</span>
+                                        <input type="number" class="bet-input" id="bet-input" min="${CONFIG.MIN_BET}" max="${CONFIG.MAX_BET}" value="${CONFIG.DEFAULT_BET}" pattern="[0-9]*" inputmode="numeric">
+                                    </div>
+                                    <button class="bet-btn increase" id="bet-increase">+</button>
+                                    <button class="keyboard-hide-btn" id="keyboard-hide-btn">✓</button>
                                 </div>
-                                <button class="bet-btn increase" id="bet-increase">+</button>
+                                <div class="quick-bet-btns">
+                                    <button class="quick-bet-btn" data-amount="10">10</button>
+                                    <button class="quick-bet-btn" data-amount="20">20</button>
+                                    <button class="quick-bet-btn" data-amount="50">50</button>
+                                    <button class="quick-bet-btn" data-amount="100">100</button>
+                                </div>
                             </div>
                             
                             <div class="action-controls">
@@ -326,6 +337,10 @@
                 elements.autoSpinMenu = document.getElementById('auto-spin-menu');
                 elements.autoSpinOptions = document.getElementById('auto-spin-options');
                 elements.closeAutoMenu = document.getElementById('close-auto-menu');
+                elements.keyboardHideBtn = document.getElementById('keyboard-hide-btn');
+                
+                // Initialize potential win
+                updatePotentialWin();
                 
                 app.log('Slots', 'Interface created successfully');
                 return true;
@@ -465,6 +480,29 @@
                 // Bet input field
                 if (elements.betInput) {
                     elements.betInput.addEventListener('change', validateBetInput);
+                    
+                    // Fокус на поле ввода (для мобильных устройств)
+                    elements.betInput.addEventListener('focus', function() {
+                        // Добавляем класс для отображения кнопки скрытия клавиатуры
+                        document.querySelector('.keyboard-hide-btn').classList.add('visible');
+                    });
+                    
+                    // Блюр при нажатии Enter
+                    elements.betInput.addEventListener('keydown', function(e) {
+                        if (e.key === 'Enter') {
+                            this.blur();
+                        }
+                    });
+                }
+                
+                // Кнопка скрытия клавиатуры
+                if (elements.keyboardHideBtn) {
+                    elements.keyboardHideBtn.addEventListener('click', function() {
+                        if (elements.betInput) {
+                            elements.betInput.blur();
+                        }
+                        this.classList.remove('visible');
+                    });
                 }
                 
                 // Auto spin button
@@ -508,6 +546,33 @@
                         toggleSound();
                     });
                 }
+                
+                // Быстрые ставки
+                const quickBetBtns = document.querySelectorAll('.quick-bet-btn');
+                quickBetBtns.forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        if (elements.betInput) {
+                            const amount = parseInt(this.dataset.amount);
+                            elements.betInput.value = amount;
+                            validateBetInput();
+                            playSound(CONFIG.SOUNDS.BUTTON_CLICK);
+                        }
+                    });
+                });
+                
+                // Добавляем обработчик для клика по документу (скрытие клавиатуры)
+                document.addEventListener('click', function(e) {
+                    // Если клик не на элементе ввода и не на кнопках ставки
+                    if (elements.betInput && 
+                        e.target !== elements.betInput && 
+                        !e.target.closest('.bet-controls')) {
+                        elements.betInput.blur();
+                        const keyboardHideBtn = document.querySelector('.keyboard-hide-btn');
+                        if (keyboardHideBtn) {
+                            keyboardHideBtn.classList.remove('visible');
+                        }
+                    }
+                });
                 
                 app.log('Slots', 'Event listeners setup complete');
                 return true;
@@ -1455,6 +1520,12 @@
             }
         };
         
+        // Calculate potential win based on current bet
+        const updatePotentialWin = function() {
+            // In a real implementation, this would calculate potential winnings
+            // based on paytable and current bet
+        };
+        
         // Add CSS styles
         const addStyles = function() {
             // Create style element if not exists
@@ -1693,27 +1764,42 @@
                         gap: 15px;
                     }
                     
-                    /* Bet controls */
+                    /* Bet controls - Новая компактная версия */
                     .bet-controls {
                         display: flex;
-                        align-items: center;
+                        flex-direction: column;
                         gap: 10px;
                     }
                     
+                    .compact-bet-input-wrapper {
+                        display: flex;
+                        align-items: center;
+                        background: rgba(20, 20, 20, 0.5);
+                        border-radius: 8px;
+                        padding: 8px 12px;
+                        position: relative;
+                    }
+                    
                     .bet-btn {
-                        width: 40px;
-                        height: 40px;
-                        background: linear-gradient(145deg, #262626, #1a1a1a);
+                        width: 36px;
+                        height: 36px;
+                        background: linear-gradient(145deg, #333, #222);
                         border: none;
                         border-radius: 50%;
                         color: #FFD700;
-                        font-size: 20px;
+                        font-size: 18px;
+                        font-weight: bold;
                         cursor: pointer;
                         box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        transition: all 0.2s ease;
                     }
                     
                     .bet-btn:hover {
-                        background: linear-gradient(145deg, #2a2a2a, #222);
+                        background: linear-gradient(145deg, #3a3a3a, #2a2a2a);
+                        transform: scale(1.05);
                     }
                     
                     .bet-btn:active {
@@ -1722,43 +1808,86 @@
                     }
                     
                     .bet-btn:disabled {
-                        opacity: 0.5;
+                        opacity: 0.7;
                         cursor: not-allowed;
                     }
                     
                     .bet-input-container {
                         position: relative;
-                        text-align: center;
-                    }
-                    
-                    .bet-label {
-                        display: block;
-                        font-size: 12px;
-                        text-transform: uppercase;
-                        opacity: 0.7;
-                        margin-bottom: 5px;
+                        margin: 0 10px;
                     }
                     
                     .bet-input {
-                        width: 100px;
-                        padding: 10px;
-                        border: 2px solid #333;
-                        border-radius: 5px;
-                        background: #111;
-                        color: #FFD700;
-                        font-size: 18px;
-                        font-weight: bold;
+                        width: 80px;
                         text-align: center;
+                        font-size: 20px;
+                        font-weight: bold;
+                        background: transparent;
+                        border: none;
+                        color: #FFD700;
+                        padding: 5px 0;
                     }
                     
                     .bet-input:focus {
                         outline: none;
-                        border-color: #FFD700;
                     }
                     
-                    .bet-input:disabled {
-                        opacity: 0.7;
-                        cursor: not-allowed;
+                    .bet-label {
+                        position: absolute;
+                        top: -15px;
+                        left: 50%;
+                        transform: translateX(-50%);
+                        font-size: 11px;
+                        color: rgba(255, 255, 255, 0.7);
+                        text-transform: uppercase;
+                    }
+                    
+                    .keyboard-hide-btn {
+                        position: absolute;
+                        right: 10px;
+                        top: 50%;
+                        transform: translateY(-50%);
+                        width: 28px;
+                        height: 28px;
+                        background: rgba(0, 0, 0, 0.3);
+                        border: 1px solid rgba(255, 255, 255, 0.2);
+                        border-radius: 50%;
+                        color: #fff;
+                        font-size: 14px;
+                        cursor: pointer;
+                        display: none;
+                        justify-content: center;
+                        align-items: center;
+                        opacity: 0;
+                        transition: opacity 0.2s ease;
+                    }
+                    
+                    .keyboard-hide-btn.visible {
+                        display: flex;
+                        opacity: 1;
+                    }
+                    
+                    .quick-bet-btns {
+                        display: flex;
+                        justify-content: center;
+                        gap: 8px;
+                        margin-top: 5px;
+                    }
+                    
+                    .quick-bet-btn {
+                        padding: 6px 12px;
+                        background: rgba(20, 20, 20, 0.5);
+                        border: 1px solid rgba(255, 215, 0, 0.3);
+                        border-radius: 5px;
+                        color: #FFD700;
+                        font-size: 14px;
+                        cursor: pointer;
+                        transition: all 0.2s ease;
+                    }
+                    
+                    .quick-bet-btn:hover {
+                        background: rgba(40, 40, 40, 0.5);
+                        border-color: #FFD700;
                     }
                     
                     /* Action controls */
@@ -1953,13 +2082,33 @@
                             font-size: 18px;
                         }
                         
-                        .symbol {
-                            font-size: 28px;
+                        .reel {
+                            aspect-ratio: 0.9;
                         }
                         
-                        .bet-controls {
+                        .symbol {
+                            font-size: 32px;
+                        }
+                        
+                        .bet-input {
+                            width: 60px;
+                            font-size: 18px;
+                        }
+                        
+                        .bet-btn {
+                            width: 32px;
+                            height: 32px;
+                            font-size: 16px;
+                        }
+                        
+                        .quick-bet-btns {
                             flex-wrap: wrap;
-                            justify-content: center;
+                        }
+                        
+                        .quick-bet-btn {
+                            flex: 1;
+                            min-width: calc(25% - 8px);
+                            text-align: center;
                         }
                         
                         .action-controls {
