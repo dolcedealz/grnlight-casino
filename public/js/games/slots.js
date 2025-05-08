@@ -268,8 +268,6 @@
                             <!-- Reels will be created dynamically -->
                         </div>
                         
-                        <div class="result-display" id="result-display"></div>
-                        
                         <div class="slots-controls">
                             <div class="bet-controls">
                                 <div class="compact-bet-input-wrapper">
@@ -309,6 +307,8 @@
                                 </div>
                             </div>
                         </div>
+                        
+                        <div class="result-display" id="result-display"></div>
                         
                         <div class="auto-spin-menu hidden" id="auto-spin-menu">
                             <div class="menu-header">
@@ -1237,15 +1237,8 @@
             
             // Show result display
             if (elements.resultDisplay) {
-                elements.resultDisplay.innerHTML = `
-                    <div class="no-win-message">
-                        <div class="no-win-text">Try again!</div>
-                    </div>
-                `;
-                elements.resultDisplay.className = 'result-display no-win-result';
-                
-                // Clear animation
-                elements.resultDisplay.style.animation = 'none';
+                elements.resultDisplay.innerHTML = ''; // Пустое содержимое для уменьшения пробела
+                elements.resultDisplay.className = 'result-display';
             }
         };
         
@@ -1466,6 +1459,12 @@
                     if (elements.betIncreaseBtn) {
                         elements.betIncreaseBtn.disabled = true;
                     }
+                    
+                    // Очищаем результат при начале вращения
+                    if (elements.resultDisplay) {
+                        elements.resultDisplay.innerHTML = '';
+                        elements.resultDisplay.className = 'result-display';
+                    }
                     break;
                     
                 case 'idle':
@@ -1600,7 +1599,7 @@
                         background: #000;
                         padding: 15px;
                         border-radius: 10px;
-                        margin-bottom: 20px;
+                        margin-bottom: 10px; /* Уменьшено с 20px до 10px */
                         border: 2px solid #FFD700;
                         box-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
                     }
@@ -1663,13 +1662,24 @@
                     
                     /* Result display */
                     .result-display {
-                        position: relative;
-                        min-height: 60px;
+                        position: absolute;  /* Изменить с relative на absolute */
+                        top: 50%;           /* Позиционирование по центру экрана */
+                        left: 50%;
+                        transform: translate(-50%, -50%);
                         text-align: center;
-                        margin-bottom: 20px;
-                        display: flex;
-                        justify-content: center;
-                        align-items: center;
+                        z-index: 10;         /* Поверх других элементов */
+                        pointer-events: none; /* Позволяет кликать через него */
+                        opacity: 0;          /* По умолчанию скрыт */
+                        transition: opacity 0.3s ease;
+                    }
+                    
+                    /* Активный стиль для result-display */
+                    .result-display.win-result,
+                    .result-display.big-win-result, 
+                    .result-display.jackpot-win-result,
+                    .result-display.no-win-result {
+                        opacity: 1;
+                        pointer-events: auto;
                     }
                     
                     .win-message, .big-win-message, .jackpot-win-message, .no-win-message {
@@ -1678,25 +1688,28 @@
                         display: flex;
                         flex-direction: column;
                         align-items: center;
+                        background: rgba(0, 0, 0, 0.85); /* Добавляем фон с прозрачностью */
+                        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5); /* Добавляем тень */
+                        backdrop-filter: blur(5px); /* Эффект размытия для фона */
+                        border: 2px solid; /* Толщина границы */
                     }
                     
                     .win-message {
-                        background: rgba(0, 168, 107, 0.2);
-                        border: 1px solid #00A86B;
+                        border-color: #00A86B;
                     }
                     
                     .big-win-message {
-                        background: rgba(255, 215, 0, 0.2);
-                        border: 1px solid #FFD700;
+                        border-color: #FFD700;
                     }
                     
                     .jackpot-win-message {
-                        background: rgba(255, 69, 0, 0.2);
-                        border: 1px solid #FF4500;
+                        border-color: #FF4500;
                     }
                     
                     .no-win-message {
                         color: #aaa;
+                        border-color: #555;
+                        padding: 10px 20px;
                     }
                     
                     .win-icon {
@@ -1761,10 +1774,10 @@
                     .slots-controls {
                         display: flex;
                         flex-direction: column;
-                        gap: 15px;
+                        gap: 10px; /* Уменьшено с 15px до 10px */
                     }
                     
-                    /* Bet controls - Новая компактная версия */
+                    /* Bet controls - Компактная версия */
                     .bet-controls {
                         display: flex;
                         flex-direction: column;
@@ -1947,6 +1960,19 @@
                         justify-content: center;
                         cursor: pointer;
                         transition: all 0.2s ease;
+                    }
+                    
+                    /* Увеличиваем ширину кнопок Турбо и Авто */
+                    .control-btn.auto-spin,
+                    .control-btn.turbo {
+                        min-width: 60px; /* Увеличено с 50px */
+                        padding: 10px 15px; /* Увеличено по горизонтали */
+                    }
+                    
+                    /* Оставляем кнопку звука как есть */
+                    .control-btn.sound {
+                        padding: 10px;
+                        min-width: auto;
                     }
                     
                     .control-btn:hover {
