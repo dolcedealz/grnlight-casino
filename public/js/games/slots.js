@@ -1,19 +1,8 @@
 /**
  * slots.js - Enhanced Slots Game with Premium Features
  * Version 3.1.0
- * 
- * Features:
- * - Improved animations and visual effects
- * - Sound effects and background music
- * - Auto-spin with configurable count
- * - Turbo mode for faster gameplay
- * - Enhanced winning animations and jackpot celebrations
- * - Improved winning chances for new players
- * - Optimized UI for mobile devices
- * - Quick bet buttons for faster gameplay
  */
 
-// Create an isolated module to prevent conflicts
 (function() {
     // Check for main app object
     if (!window.GreenLightApp) {
@@ -308,8 +297,6 @@
                             </div>
                         </div>
                         
-                        <div class="result-display" id="result-display"></div>
-                        
                         <div class="auto-spin-menu hidden" id="auto-spin-menu">
                             <div class="menu-header">
                                 <h3>Auto Spins</h3>
@@ -323,6 +310,12 @@
                         </div>
                     </div>
                 `;
+                
+                // Create separate result display element outside the main container
+                const resultDisplay = document.createElement('div');
+                resultDisplay.id = 'result-display';
+                resultDisplay.className = 'result-display';
+                document.body.appendChild(resultDisplay);
                 
                 // Get references to created elements
                 elements.reelsContainer = document.getElementById('reels-container');
@@ -481,7 +474,7 @@
                 if (elements.betInput) {
                     elements.betInput.addEventListener('change', validateBetInput);
                     
-                    // Fокус на поле ввода (для мобильных устройств)
+                    // Фокус на поле ввода (для мобильных устройств)
                     elements.betInput.addEventListener('focus', function() {
                         // Добавляем класс для отображения кнопки скрытия клавиатуры
                         document.querySelector('.keyboard-hide-btn').classList.add('visible');
@@ -924,30 +917,50 @@
             return new Promise(resolve => {
                 setTimeout(() => {
                     try {
+                        // Save parent reel reference and dimensions
+                        const parentReel = reelElement.parentElement;
+                        const reelHeight = parentReel.offsetHeight;
+                        
+                        // Set fixed height to prevent layout shifts
+                        parentReel.style.height = `${reelHeight}px`;
+                        
                         // Clear existing content
                         reelElement.innerHTML = '';
                         
-                        // Create random symbols for animation
-                        const symbolCount = 20; // Number of symbols to scroll through
+                        // Create random symbols for animation (reduced count)
+                        const symbolCount = 15;
+                        
+                        // Use document fragment for better performance
+                        const fragment = document.createDocumentFragment();
                         
                         // Add symbols for animation
                         for (let i = 0; i < symbolCount; i++) {
                             const symbolEl = document.createElement('div');
                             symbolEl.className = 'symbol';
                             symbolEl.textContent = getRandomSymbol();
-                            reelElement.appendChild(symbolEl);
+                            fragment.appendChild(symbolEl);
                         }
                         
                         // Add final symbol at the end
                         const finalSymbolEl = document.createElement('div');
                         finalSymbolEl.className = 'symbol final';
                         finalSymbolEl.textContent = finalSymbol;
-                        reelElement.appendChild(finalSymbolEl);
+                        fragment.appendChild(finalSymbolEl);
+                        
+                        // Append all at once
+                        reelElement.appendChild(fragment);
                         
                         // Set symbol height
-                        const symbolHeight = 80; // Height of each symbol including margin
+                        const symbolHeight = 80;
                         
-                        // Start the animation
+                        // Reset transform before animation
+                        reelElement.style.transition = 'none';
+                        reelElement.style.transform = 'translateY(0)';
+                        
+                        // Force reflow
+                        void reelElement.offsetWidth;
+                        
+                        // Start animation
                         reelElement.style.transition = `transform ${duration}ms cubic-bezier(0.1, 0.7, 0.1, 1)`;
                         reelElement.style.transform = `translateY(-${symbolCount * symbolHeight}px)`;
                         
@@ -965,7 +978,12 @@
                             reelElement.appendChild(symbolEl);
                             
                             // Add data attribute for symbol type
-                            reelElement.parentElement.dataset.symbol = finalSymbol;
+                            parentReel.dataset.symbol = finalSymbol;
+                            
+                            // Remove fixed height after animation
+                            setTimeout(() => {
+                                parentReel.style.height = '';
+                            }, 50);
                             
                             // Resolve promise
                             resolve();
@@ -1237,7 +1255,7 @@
             
             // Show result display
             if (elements.resultDisplay) {
-                elements.resultDisplay.innerHTML = ''; // Пустое содержимое для уменьшения пробела
+                elements.resultDisplay.innerHTML = '';
                 elements.resultDisplay.className = 'result-display';
             }
         };
@@ -1460,7 +1478,7 @@
                         elements.betIncreaseBtn.disabled = true;
                     }
                     
-                    // Очищаем результат при начале вращения
+                    // Clear result display
                     if (elements.resultDisplay) {
                         elements.resultDisplay.innerHTML = '';
                         elements.resultDisplay.className = 'result-display';
@@ -1545,7 +1563,7 @@
                         margin: 0 auto;
                         position: relative;
                         overflow: hidden;
-                        box-sizing: border-box; /* Важно - включаем border-box */
+                        box-sizing: border-box;
                     }
                     
                     /* Header with jackpot and win display */
@@ -1603,8 +1621,8 @@
                         margin-bottom: 10px;
                         border: 2px solid #FFD700;
                         box-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
-                        overflow: hidden; /* Обязательно скрываем переполнение */
-                        height: auto; /* Авто-высота, но не будет расширяться за пределы содержимого */
+                        overflow: hidden;
+                        height: auto;
                     }
                     
                     .reel-row {
@@ -1613,7 +1631,7 @@
                         gap: 10px;
                         margin-bottom: 10px;
                         height: auto;
-                        max-height: 100px; /* Максимальная высота ряда */
+                        max-height: 100px;
                     }
                     
                     .reel-row:last-child {
@@ -1628,15 +1646,16 @@
                         overflow: hidden;
                         position: relative;
                         border: 1px solid #333;
-                        min-height: 80px; /* Минимальная высота */
-                        height: 80px; /* Фиксированная высота */
+                        min-height: 80px;
+                        height: 80px;
                     }
                     
                     .reel-strip {
                         position: relative;
                         width: 100%;
                         height: 100%;
-                        transform-origin: center center; /* Центрируем анимацию */
+                        transform-origin: center center;
+                        will-change: transform;
                     }
                     
                     .symbol {
@@ -1649,15 +1668,15 @@
                         font-size: 36px;
                         top: 0;
                         left: 0;
-                        transition: transform 0.3s ease; /* Плавная трансформация */
+                        transition: transform 0.3s ease;
                     }
                     
                     /* Symbol highlight animation */
                     .symbol.highlight {
                         animation: symbolHighlight 1s ease-in-out infinite alternate;
                         z-index: 10;
-                        transform: scale(1.1); /* Используем transform вместо изменения размеров */
-                        will-change: transform; /* Оптимизация для анимации */
+                        transform: scale(1.1);
+                        will-change: transform;
                     }
                     
                     @keyframes symbolHighlight {
@@ -1673,23 +1692,22 @@
                     
                     /* Result display */
                     .result-display {
-                        position: absolute;  /* Изменить с relative на absolute */
-                        top: 50%;           /* Позиционирование по центру экрана */
+                        position: fixed;
+                        top: 50%;
                         left: 50%;
                         transform: translate(-50%, -50%);
                         text-align: center;
-                        z-index: 100;         /* Поверх других элементов */
-                        pointer-events: none; /* Позволяет кликать через него */
-                        opacity: 80;
-                        max-width: 300px;          /* По умолчанию скрыт */
+                        z-index: 9999;
+                        pointer-events: none;
+                        opacity: 0;
                         transition: opacity 0.3s ease;
+                        max-width: 300px;
                     }
                     
                     /* Активный стиль для result-display */
                     .result-display.win-result,
                     .result-display.big-win-result, 
-                    .result-display.jackpot-win-result,
-                    .result-display.no-win-result {
+                    .result-display.jackpot-win-result {
                         opacity: 1;
                         pointer-events: auto;
                     }
@@ -1700,9 +1718,9 @@
                         display: flex;
                         flex-direction: column;
                         align-items: center;
-                        background: rgba(0, 0, 0, 0.9); /* Увеличена непрозрачность фона */
-                        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.7); /* Усилена тень */
-                        backdrop-filter: blur(8px); /* Увеличено размытие */
+                        background: rgba(0, 0, 0, 0.9);
+                        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.7);
+                        backdrop-filter: blur(8px);
                         border: 3px solid;
                     }
                     
@@ -1786,10 +1804,10 @@
                     .slots-controls {
                         display: flex;
                         flex-direction: column;
-                        gap: 10px; /* Уменьшено с 15px до 10px */
+                        gap: 10px;
                     }
                     
-                    /* Bet controls - Компактная версия */
+                    /* Bet controls */
                     .bet-controls {
                         display: flex;
                         flex-direction: column;
@@ -1977,8 +1995,8 @@
                     /* Увеличиваем ширину кнопок Турбо и Авто */
                     .control-btn.auto-spin,
                     .control-btn.turbo {
-                        min-width: 80px; /* Увеличено с 50px */
-                        padding: 10px 18px; /* Увеличено по горизонтали */
+                        min-width: 80px;
+                        padding: 10px 18px;
                     }
                     
                     /* Оставляем кнопку звука как есть */
