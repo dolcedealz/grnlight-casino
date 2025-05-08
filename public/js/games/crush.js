@@ -330,10 +330,10 @@
                                 </div>
                                 
                                 <div id="betting-phase-info" class="betting-phase-info">
-                                    <p>Период размещения ставок. Сделайте вашу ставку до начала следующего раунда.</p>
+                                    <p class="betting-phase-message">Период размещения ставок. Сделайте вашу ставку до начала следующего раунда.</p>
                                 </div>
                                 
-                                <div id="crush-result" class="result"></div>
+                                <div id="crush-result" class="result hidden"></div>
                             </div>
                             
                             <div class="crush-controls">
@@ -427,12 +427,8 @@
                     return;
                 }
                 
-                let existingCanvas = elements.crushGraph.querySelector('canvas');
-                if (existingCanvas) {
-                    graphCanvas = existingCanvas;
-                    graphCtx = graphCanvas.getContext('2d');
-                    return;
-                }
+                // Очищаем существующее содержимое
+                elements.crushGraph.innerHTML = '';
                 
                 // Создаем новый canvas с учетом pixel ratio
                 const dpr = window.devicePixelRatio || 1;
@@ -448,11 +444,19 @@
                 elements.crushGraph.appendChild(graphCanvas);
                 
                 graphCtx = graphCanvas.getContext('2d');
+                if (!graphCtx) {
+                    app.log('Crush', 'Не удалось получить контекст для canvas', true);
+                    return;
+                }
+                
                 graphCtx.scale(dpr, dpr);
                 
                 // Улучшение качества отрисовки
                 graphCtx.imageSmoothingEnabled = true;
                 graphCtx.imageSmoothingQuality = 'high';
+                
+                // Сразу рисуем начальную сетку
+                drawGrid();
                 
                 app.log('Crush', 'Canvas для графика успешно создан');
             } catch (error) {
@@ -545,7 +549,8 @@
             try {
                 if (!graphCtx) return;
                 
-                graphCtx.clearRect(0, 0, graphCanvas.width, graphCanvas.height);
+                graphCtx.clearRect(0, 0, graphCanvas.width / (window.devicePixelRatio || 1), 
+                                   graphCanvas.height / (window.devicePixelRatio || 1));
                 drawGrid();
                 globalState.graphPoints = [];
                 
@@ -798,9 +803,6 @@
                     if (globalState.isWaitingForNextRound) {
                         // Только во время паузы показываем сообщение
                         elements.bettingPhaseInfo.style.display = 'block';
-                        elements.bettingPhaseInfo.innerHTML = `
-                            <p class="betting-phase-message">Период размещения ставок. Сделайте вашу ставку до начала следующего раунда.</p>
-                        `;
                     } else {
                         // Во время активного раунда скрываем сообщение полностью
                         elements.bettingPhaseInfo.style.display = 'none';
@@ -887,6 +889,17 @@
                 globalState.roundId++;
                 globalState.currentRoundBets = 0;
                 
+                // Сбрасываем результат предыдущего раунда
+                if (elements.crushResult) {
+                    elements.crushResult.style.display = 'none';
+                    elements.crushResult.innerHTML = '';
+                }
+                
+                // Явно показываем сообщение о ставке
+                if (elements.bettingPhaseInfo) {
+                    elements.bettingPhaseInfo.style.display = 'block';
+                }
+                
                 updateGamePhaseDisplay();
                 
                 if (globalState.roundTimerInterval) {
@@ -939,6 +952,11 @@
                 
                 // Генерируем новую точку краша (НЕ выводим в консоль!)
                 globalState.crashPoint = generateCrashPoint();
+                
+                // Явно скрываем сообщение о ставке
+                if (elements.bettingPhaseInfo) {
+                    elements.bettingPhaseInfo.style.display = 'none';
+                }
                 
                 resetGraph();
                 updateGamePhaseDisplay();
@@ -1337,6 +1355,7 @@
                 updateGamePhaseDisplay();
                 
                 if (elements.crushResult) {
+                    elements.crushResult.style.display = 'block';
                     elements.crushResult.innerHTML = `
                         <div class="cashout-animation">
                             <div class="cashout-icon">💰</div>
@@ -1345,7 +1364,6 @@
                         </div>
                     `;
                     elements.crushResult.className = 'result win';
-                    elements.crushResult.style.display = 'block';
                 }
                 
                 if (elements.multiplierDisplay) {
@@ -1388,6 +1406,7 @@
                 
                 if (userState.hasBetInCurrentRound && !userState.hasCollectedWin) {
                     if (elements.crushResult) {
+                        elements.crushResult.style.display = 'block';
                         elements.crushResult.innerHTML = `
                             <div class="crash-animation">
                                 <div class="crash-icon">💥</div>
@@ -1396,7 +1415,6 @@
                             </div>
                         `;
                         elements.crushResult.className = 'result lose';
-                        elements.crushResult.style.display = 'block';
                     }
                     
                     playSound('crash');
@@ -1987,6 +2005,7 @@
                             border: 1px solid rgba(255, 255, 255, 0.1);
                             overflow: hidden;
                             box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.3);
+                            position: relative;
                         }
                         
                         .betting-phase-info {
@@ -1997,392 +2016,7 @@
                             background: rgba(0, 0, 0, 0.8);
                             border-radius: 12px;
                             padding: 20px 25px;
-                            text-align: center;
-                            color: #fff;
-                            backdrop-filter: blur(5px);
-                            max-width: 400px; /* Увеличенный размер */
-                            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.4);
-                            z-index: 10;
-                            border: 1px solid rgba(242, 201, 76, 0.3);
-                        }
-                        
-                        .betting-phase-message {
-                            margin: 0;
-                            font-size: 16px; /* Увеличенный размер */
-                            line-height: 1.5;
-                            font-weight: 500;
-                            color: #FFD54F;
-                        }
-                        
-                        .result {
-                            position: absolute;
-                            top: 50%;
-                            left: 50%;
-                            transform: translate(-50%, -50%);
-                            background: rgba(0, 0, 0, 0.8);
-                            border-radius: 15px;
-                            padding: 20px;
-                            text-align: center;
-                            color: #fff;
-                            backdrop-filter: blur(5px);
-                            max-width: 300px;
-                            box-shadow: 0 5px 25px rgba(0, 0, 0, 0.4);
-                            animation: pop-in 0.5s forwards;
-                            z-index: 2;
-                        }
-                        
-                        @keyframes pop-in {
-                            0% { transform: translate(-50%, -50%) scale(0.8); opacity: 0; }
-                            50% { transform: translate(-50%, -50%) scale(1.05); opacity: 1; }
-                            100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
-                        }
-                        
-                        .result.win .cashout-icon {
-                            font-size: 36px;
-                            margin-bottom: 10px;
-                            animation: bounce 1s infinite alternate;
-                        }
-                        
-                        @keyframes bounce {
-                            0% { transform: translateY(0); }
-                            100% { transform: translateY(-10px); }
-                        }
-                        
-                        .result.win .cashout-text {
-                            font-size: 18px;
-                            margin-bottom: 10px;
-                            color: #00c853;
-                        }
-                        
-                        .result.win .win-amount {
-                            font-size: 24px;
-                            font-weight: bold;
-                            color: #f2c94c;
-                            margin-top: 10px;
-                        }
-                        
-                        .result.lose .crash-icon {
-                            font-size: 36px;
-                            margin-bottom: 10px;
-                            animation: shake 0.5s;
-                        }
-                        
-                        @keyframes shake {
-                            0%, 100% { transform: translateX(0); }
-                            20%, 60% { transform: translateX(-5px); }
-                            40%, 80% { transform: translateX(5px); }
-                        }
-                        
-                        .result.lose .crash-text {
-                            font-size: 18px;
-                            margin-bottom: 10px;
-                            color: #ff1744;
-                        }
-                        
-                        .result.lose .lose-message {
-                            font-size: 16px;
-                            color: rgba(255, 255, 255, 0.7);
-                        }
-                        
-                        /* Панель управления */
-                        .crush-controls {
-                            display: flex;
-                            flex-direction: column;
-                            gap: 15px;
-                            background: rgba(0, 0, 0, 0.2);
-                            border-radius: 10px;
-                            padding: 15px;
-                        }
-                        
-                        .bet-panel {
-                            display: flex;
-                            justify-content: space-between;
-                            align-items: center;
-                            gap: 15px;
-                        }
-                        
-                        .bet-input-container {
-                            flex: 1;
-                        }
-                        
-                        .bet-input-container label {
-                            display: block;
-                            font-size: 12px;
-                            color: rgba(255, 255, 255, 0.7);
-                            margin-bottom: 5px;
-                        }
-                        
-                        .bet-input-wrapper {
-                            display: flex;
-                            gap: 5px;
-                        }
-                        
-                        #crush-bet {
-                            flex: 1;
-                            padding: 8px 10px;
-                            font-size: 14px;
-                            background: rgba(0, 0, 0, 0.3);
-                            border: 1px solid rgba(255, 255, 255, 0.1);
-                            border-radius: 5px;
-                            color: #fff;
-                            outline: none;
-                            transition: all 0.2s;
-                        }
-                        
-                        #crush-bet:focus {
-                            border-color: #00c853;
-                            box-shadow: 0 0 0 2px rgba(0, 200, 83, 0.2);
-                        }
-                        
-                        .quick-bet-buttons {
-                            display: flex;
-                            gap: 5px;
-                        }
-                        
-                        .quick-bet {
-                            padding: 8px 10px;
-                            background: rgba(0, 0, 0, 0.3);
-                            border: 1px solid rgba(255, 255, 255, 0.1);
-                            border-radius: 5px;
-                            color: #fff;
-                            cursor: pointer;
-                            transition: all 0.2s;
-                        }
-                        
-                        .quick-bet:hover {
-                            background: rgba(255, 255, 255, 0.1);
-                        }
-                        
-                        .auto-settings {
-                            display: flex;
-                            align-items: center;
-                            gap: 10px;
-                        }
-                        
-                        .auto-option {
-                            display: flex;
-                            align-items: center;
-                            gap: 5px;
-                            font-size: 12px;
-                            color: rgba(255, 255, 255, 0.8);
-                        }
-                        
-                        #auto-cashout-at {
-                            width: 60px;
-                            padding: 4px 8px;
-                            font-size: 12px;
-                            background: rgba(0, 0, 0, 0.3);
-                            border: 1px solid rgba(255, 255, 255, 0.1);
-                            border-radius: 4px;
-                            color: #fff;
-                        }
-                        
-                        .auto-settings.disabled {
-                            opacity: 0.5;
-                            pointer-events: none;
-                        }
-                        
-                        .action-buttons {
-                            display: flex;
-                            gap: 10px;
-                        }
-                        
-                        .action-btn {
-                            flex: 1;
-                            padding: 12px 0;
-                            font-size: 14px;
-                            font-weight: bold;
-                            border: none;
-                            border-radius: 6px;
-                            cursor: pointer;
-                            transition: all 0.2s;
-                            text-transform: uppercase;
-                            letter-spacing: 1px;
-                        }
-                        
-                        .primary-btn {
-                            background: #00c853;
-                            color: #fff;
-                            box-shadow: 0 3px 8px rgba(0, 200, 83, 0.3);
-                        }
-                        
-                        .primary-btn:hover:not(:disabled) {
-                            background: #00e676;
-                            transform: translateY(-2px);
-                            box-shadow: 0 5px 15px rgba(0, 200, 83, 0.4);
-                        }
-                        
-                        .secondary-btn {
-                            background: #2196f3;
-                            color: #fff;
-                            box-shadow: 0 3px 8px rgba(33, 150, 243, 0.3);
-                        }
-                        
-                        .secondary-btn:hover:not(:disabled) {
-                            background: #42a5f5;
-                            transform: translateY(-2px);
-                            box-shadow: 0 5px 15px rgba(33, 150, 243, 0.4);
-                        }
-                        
-                        .action-btn:disabled {
-                            background: #444;
-                            color: #aaa;
-                            box-shadow: none;
-                            cursor: not-allowed;
-                        }
-                        
-                        .action-btn.bet-placed {
-                            background: #795548;
-                        }
-                        
-                        .action-btn.win-collected {
-                            background: #795548;
-                        }
-                        
-                        /* Боковая колонка */
-                        .crush-side-column {
-                            display: flex;
-                            flex-direction: column;
-                            gap: 15px;
-                        }
-                        
-                        .crush-history-panel, .winners-panel {
-                            background: rgba(0, 0, 0, 0.2);
-                            border-radius: 10px;
-                            overflow: hidden;
-                        }
-                        
-                        .panel-header {
-                            background: rgba(0, 0, 0, 0.3);
-                            padding: 10px 15px;
-                        }
-                        
-                        .panel-header h3 {
-                            margin: 0;
-                            font-size: 14px;
-                            font-weight: 500;
-                            color: rgba(255, 255, 255, 0.8);
-                        }
-                        
-                        .history-items {
-                            display: grid;
-                            grid-template-columns: repeat(5, 1fr);
-                            gap: 5px;
-                            padding: 10px;
-                        }
-                        
-                        .history-item {
-                            display: flex;
-                            justify-content: center;
-                            align-items: center;
-                            padding: 6px;
-                            border-radius: 5px;
-                            font-size: 12px;
-                            font-weight: bold;
-                            color: #fff;
-                            transition: all 0.2s;
-                        }
-                        
-                        .history-item:hover {
-                            transform: scale(1.05);
-                        }
-                        
-                        /* Цвета для истории множителей */
-                        .history-item.level-1 { background: #00c853; }
-                        .history-item.level-2 { background: #64dd17; }
-                        .history-item.level-3 { background: #ffd600; }
-                        .history-item.level-4 { background: #ff9100; }
-                        .history-item.level-5 { background: #ff3d00; }
-                        .history-item.level-6 { background: #ff1744; }
-                        
-                        .winners-list {
-                            padding: 10px;
-                            display: flex;
-                            flex-direction: column;
-                            gap: 5px;
-                        }
-                        
-                        .winner-item {
-                            display: flex;
-                            justify-content: space-between;
-                            align-items: center;
-                            padding: 5px 10px;
-                            font-size: 12px;
-                            border-radius: 5px;
-                            background: rgba(255, 255, 255, 0.05);
-                            transition: all 0.2s;
-                        }
-                        
-                        .winner-item:hover {
-                            background: rgba(255, 255, 255, 0.1);
-                        }
-                        
-                        .winner-name {
-                            flex: 1;
-                            overflow: hidden;
-                            text-overflow: ellipsis;
-                            white-space: nowrap;
-                        }
-                        
-                        .winner-amount {
-                            color: #00c853;
-                            font-weight: bold;
-                            margin-left: 5px;
-                            margin-right: 5px;
-                        }
-                        
-                        .winner-multiplier {
-                            color: #f2c94c;
-                            font-weight: bold;
-                        }
-                        
-                        /* Респонсивный дизайн */
-                        @media (max-width: 768px) {
-                            .crush-layout {
-                                grid-template-columns: 1fr;
-                            }
-                            
-                            .crush-top-bar {
-                                flex-direction: column;
-                                align-items: flex-start;
-                                gap: 10px;
-                            }
-                            
-                            .bet-panel {
-                                flex-direction: column;
-                                align-items: flex-start;
-                            }
-                            
-                            .bet-input-container {
-                                width: 100%;
-                            }
-                            
-                            .bet-input-wrapper {
-                                width: 100%;
-                            }
-                            
-                            .crush-graph {
-                                height: 300px;
-                            }
-                            
-                            .history-items {
-                                grid-template-columns: repeat(3, 1fr);
-                            }
-                        }
-                        
-                        /* Улучшенная заметность сообщения об ожидании */
-                        @keyframes pulse-message {
-                            0% { background-color: rgba(0, 0, 0, 0.7); }
-                            50% { background-color: rgba(10, 15, 30, 0.75); }
-                            100% { background-color: rgba(0, 0, 0, 0.7); }
-                        }
-                        
-                        .betting-phase-message {
-                            animation: pulse-message 2s infinite;
-                            color: #ffeb3b;
-                            text-shadow: 0 0 5px rgba(255, 235, 59, 0.5);
-                        }
-                    `;
+                            text`;
                     document.head.appendChild(styleElement);
                     
                     app.log('Crush', 'Стили для игры добавлены');
