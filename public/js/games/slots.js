@@ -1534,7 +1534,7 @@
                 
                 // Add CSS rules
                 styleEl.textContent = `
-                    /* Enhanced Slots Game Styles */
+                    /* Основной контейнер */
                     .slots-premium {
                         background: linear-gradient(to bottom, #1a2a3a, #0a1520);
                         padding: 20px;
@@ -1545,6 +1545,7 @@
                         margin: 0 auto;
                         position: relative;
                         overflow: hidden;
+                        box-sizing: border-box; /* Важно - включаем border-box */
                     }
                     
                     /* Header with jackpot and win display */
@@ -1599,9 +1600,11 @@
                         background: #000;
                         padding: 15px;
                         border-radius: 10px;
-                        margin-bottom: 10px; /* Уменьшено с 20px до 10px */
+                        margin-bottom: 10px;
                         border: 2px solid #FFD700;
                         box-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
+                        overflow: hidden; /* Обязательно скрываем переполнение */
+                        height: auto; /* Авто-высота, но не будет расширяться за пределы содержимого */
                     }
                     
                     .reel-row {
@@ -1609,6 +1612,8 @@
                         justify-content: space-between;
                         gap: 10px;
                         margin-bottom: 10px;
+                        height: auto;
+                        max-height: 100px; /* Максимальная высота ряда */
                     }
                     
                     .reel-row:last-child {
@@ -1623,12 +1628,15 @@
                         overflow: hidden;
                         position: relative;
                         border: 1px solid #333;
+                        min-height: 80px; /* Минимальная высота */
+                        height: 80px; /* Фиксированная высота */
                     }
                     
                     .reel-strip {
                         position: relative;
                         width: 100%;
                         height: 100%;
+                        transform-origin: center center; /* Центрируем анимацию */
                     }
                     
                     .symbol {
@@ -1641,12 +1649,15 @@
                         font-size: 36px;
                         top: 0;
                         left: 0;
+                        transition: transform 0.3s ease; /* Плавная трансформация */
                     }
                     
                     /* Symbol highlight animation */
                     .symbol.highlight {
                         animation: symbolHighlight 1s ease-in-out infinite alternate;
                         z-index: 10;
+                        transform: scale(1.1); /* Используем transform вместо изменения размеров */
+                        will-change: transform; /* Оптимизация для анимации */
                     }
                     
                     @keyframes symbolHighlight {
@@ -2102,7 +2113,7 @@
                     /* Media Queries */
                     @media (max-width: 576px) {
                         .slots-premium {
-                            padding: 10px;
+                            box-sizing: border-box;
                         }
                         
                         .jackpot-amount, .win-amount {
