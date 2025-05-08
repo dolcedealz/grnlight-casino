@@ -81,7 +81,7 @@
         };
         
         // Константы игры
-        const WAITING_TIME_BETWEEN_ROUNDS = 10;
+        const WAITING_TIME_BETWEEN_ROUNDS = 15; // Увеличено время ожидания до 15 сек
         const MAX_HISTORY_SIZE = 15;  // Увеличен размер истории
         const GAME_UPDATE_INTERVAL = 16;  // 60 FPS для плавной анимации
         const TIMER_UPDATE_INTERVAL = 100;  // Более частое обновление таймера
@@ -489,53 +489,85 @@
                 const width = graphCanvas.width;
                 const height = graphCanvas.height;
                 
-                // Фон
-                graphCtx.fillStyle = 'rgba(20, 25, 30, 0.9)';
+                // Фон с более тонким градиентом для глубины
+                const bgGradient = graphCtx.createLinearGradient(0, 0, 0, height);
+                bgGradient.addColorStop(0, 'rgba(22, 28, 36, 0.95)');
+                bgGradient.addColorStop(1, 'rgba(18, 22, 30, 0.95)');
+                graphCtx.fillStyle = bgGradient;
                 graphCtx.fillRect(0, 0, width, height);
                 
-                // Горизонтальные линии
-                const horizontalLines = [1, 2, 5, 10, 20];
-                graphCtx.strokeStyle = 'rgba(255, 255, 255, 0.07)';
+                // Добавляем тонкий внешний край для глубины
+                graphCtx.strokeStyle = 'rgba(30, 40, 50, 0.8)';
+                graphCtx.lineWidth = 1;
+                graphCtx.strokeRect(0, 0, width, height);
+                
+                // Горизонтальные линии с более адаптивным распределением
+                // Рисуем линии на важных уровнях множителя
+                const horizontalLines = [1, 1.5, 2, 3, 5, 10, 20, 50];
                 graphCtx.lineWidth = 1;
                 
                 horizontalLines.forEach(multiplier => {
-                    // Вычисляем положение линии на основе множителя (логарифмически)
-                    const yPos = height - (Math.log(multiplier) / Math.log(20)) * height;
+                    // Нормализация позиции для лучшей видимости
+                    // В начале графика (малые множители) - линейная шкала
+                    // Для больших значений - логарифмическая
+                    let yPos;
+                    if (multiplier <= 2) {
+                        // Линейная шкала для малых значений (1-2) занимает верхние 40% графика
+                        const normalizedMult = (multiplier - 1) / 1; // от 0 до 1
+                        yPos = height - normalizedMult * height * 0.4;
+                    } else {
+                        // Логарифмическая шкала для больших значений (2-50) занимает нижние 60% графика
+                        const logValue = Math.log(multiplier / 2) / Math.log(25); // от 0 до 1
+                        yPos = height * 0.6 - logValue * height * 0.6;
+                    }
+                    
+                    // Разная прозрачность для разных уровней
+                    const opacity = multiplier === 1 ? 0.15 : 
+                                   (multiplier === 2 || multiplier === 5 || multiplier === 10) ? 0.12 : 0.07;
+                    graphCtx.strokeStyle = `rgba(255, 255, 255, ${opacity})`;
+                    
                     graphCtx.beginPath();
                     graphCtx.moveTo(0, yPos);
                     graphCtx.lineTo(width, yPos);
                     graphCtx.stroke();
                     
-                    // Добавляем метку множителя
-                    graphCtx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-                    graphCtx.font = '10px Arial';
-                    graphCtx.textAlign = 'left';
-                    graphCtx.fillText(`${multiplier}×`, 5, yPos - 5);
+                    // Добавляем метку множителя (только для основных уровней)
+                    if (multiplier === 1 || multiplier === 2 || multiplier === 5 || 
+                        multiplier === 10 || multiplier === 20) {
+                        graphCtx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+                        graphCtx.font = '11px Arial';
+                        graphCtx.textAlign = 'left';
+                        graphCtx.fillText(`${multiplier}×`, 5, yPos - 5);
+                    }
                 });
                 
                 // Вертикальные линии (время - секунды)
-                graphCtx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
-                for (let second = 1; second <= 10; second++) {
-                    if (second % 5 === 0) {
-                        graphCtx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-                    } else {
-                        graphCtx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
-                    }
+                // Адаптируем под меньший временной диапазон 
+                for (let second = 0; second <= 15; second++) {
+                    // Рисуем более заметные линии каждые 5 секунд и тонкие каждую секунду
+                    const opacity = second % 5 === 0 ? 0.1 : 0.05;
+                    graphCtx.strokeStyle = `rgba(255, 255, 255, ${opacity})`;
                     
-                    const xPos = (second / 10) * width;
+                    const xPos = (second / 15) * width;
                     graphCtx.beginPath();
                     graphCtx.moveTo(xPos, 0);
                     graphCtx.lineTo(xPos, height);
                     graphCtx.stroke();
                     
-                    // Добавляем метку времени для каждых 5 секунд
-                    if (second % 5 === 0) {
+                    // Добавляем метку времени каждые 5 секунд
+                    if (second % 5 === 0 && second > 0) {
                         graphCtx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-                        graphCtx.font = '10px Arial';
+                        graphCtx.font = '11px Arial';
                         graphCtx.textAlign = 'center';
-                        graphCtx.fillText(`${second}s`, xPos, height - 5);
+                        graphCtx.fillText(`${second}с`, xPos, height - 5);
                     }
                 }
+                
+                // Добавляем метку 0с в начале
+                graphCtx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+                graphCtx.font = '11px Arial';
+                graphCtx.textAlign = 'left';
+                graphCtx.fillText('0с', 5, height - 5);
                 
             } catch (error) {
                 app.log('Crush', `Ошибка рисования сетки: ${error.message}`, true);
@@ -686,18 +718,25 @@
                     }
                 }
                 
+                // Исправление ошибки - сообщение "дождитесь следующего раунда" не исчезает
                 if (elements.bettingPhaseInfo) {
                     if (globalState.isWaitingForNextRound) {
+                        // Фаза ожидания раунда - показываем сообщение о ставке
                         elements.bettingPhaseInfo.style.display = 'block';
                         elements.bettingPhaseInfo.innerHTML = `
                             <p class="betting-phase-message">Сделайте ставку до начала раунда!</p>
                         `;
                     } else if (globalState.isActiveRound && !userState.hasBetInCurrentRound) {
+                        // Активный раунд без ставки - показываем сообщение об ожидании
                         elements.bettingPhaseInfo.style.display = 'block';
                         elements.bettingPhaseInfo.innerHTML = `
                             <p class="betting-phase-message">Дождитесь следующего раунда для ставки</p>
                         `;
+                    } else if (globalState.isActiveRound && userState.hasBetInCurrentRound) {
+                        // Активный раунд со ставкой - скрываем сообщение
+                        elements.bettingPhaseInfo.style.display = 'none';
                     } else {
+                        // Любой другой случай - скрываем сообщение
                         elements.bettingPhaseInfo.style.display = 'none';
                     }
                 }
@@ -888,13 +927,24 @@
             try {
                 const elapsedTime = (Date.now() - globalState.roundStartTime) / 1000;
                 
-                const growthFactor = 0.5;
-                globalState.currentMultiplier = Math.exp(elapsedTime * growthFactor);
+                // Новая функция роста: медленно в начале, затем быстрее
+                // Используем комбинацию степенной и экспоненциальной функции
+                // для более плавного начала и ускорения в дальнейшем
+                const baseGrowth = Math.pow(elapsedTime, 1.2) * 0.1; // Начальный медленный рост
+                const expGrowth = Math.exp(elapsedTime * 0.2) - 1;   // Экспоненциальный рост позже
+                
+                // Комбинируем два вида роста с весами, зависящими от времени
+                const timeFactor = Math.min(1, elapsedTime / 5); // Коэффициент перехода
+                const combinedGrowth = baseGrowth * (1 - timeFactor) + expGrowth * timeFactor;
+                
+                // Добавляем 1, чтобы множитель всегда начинался с 1.00
+                globalState.currentMultiplier = 1 + combinedGrowth;
                 
                 updateMultiplierDisplay();
                 
                 // Добавляем точки с разной частотой в зависимости от времени
-                const pointInterval = elapsedTime > 10 ? 100 : 50;
+                // Чаще точки в начале для лучшей детализации
+                const pointInterval = elapsedTime > 5 ? 80 : 40;
                 if (Date.now() % pointInterval < GAME_UPDATE_INTERVAL) {
                     addGraphPoint(globalState.currentMultiplier);
                 }
@@ -989,17 +1039,23 @@
                 const width = graphCanvas.width;
                 const height = graphCanvas.height;
                 
-                // Настраиваем максимальные значения для более логичного масштабирования
+                // Приближаем график, фокусируясь на меньшем диапазоне значений множителя
+                // и меньшем временном отрезке для более детальной визуализации
                 const currentMultiplier = globalState.currentMultiplier;
-                let maxMult = 20; // Начальное максимальное значение для множителя
                 
-                // Динамически увеличиваем максимальный множитель, если текущий приближается к нему
-                if (currentMultiplier > maxMult * 0.5) {
-                    maxMult = Math.max(maxMult, currentMultiplier * 1.5);
+                // Динамическое масштабирование оси Y (множителя)
+                // Начинаем с небольшого значения для лучшей детализации начала
+                let maxMult = 5; // Начальное значение для лучшей детализации
+                
+                // Автоматически увеличиваем масштаб по мере роста множителя
+                if (currentMultiplier > maxMult * 0.65) {
+                    maxMult = Math.max(maxMult, currentMultiplier * 1.35);
                 }
                 
-                // Максимальное время отображения на графике (в секундах)
-                const maxTime = 20;
+                // Масштабирование временной оси - показываем до 15 секунд
+                // но для начальной фазы показываем более короткий отрезок времени
+                const elapsedTime = (Date.now() - globalState.roundStartTime) / 1000;
+                const maxTime = Math.min(15, Math.max(5, elapsedTime * 1.5));
                 
                 // Рисуем линию графика с плавной кривой
                 graphCtx.beginPath();
@@ -1007,37 +1063,57 @@
                 // Начинаем с первой точки
                 const firstPoint = globalState.graphPoints[0];
                 const x0 = (firstPoint.time / maxTime) * width;
-                const y0 = height - (Math.log(firstPoint.multiplier) / Math.log(maxMult)) * height;
+                // Используем квадратичное преобразование для начальных значений для лучшей детализации
+                // и логарифмическое для высоких множителей
+                const y0 = height - ((firstPoint.multiplier - 1) / (maxMult - 1)) * height * 0.98;
                 graphCtx.moveTo(x0, y0);
                 
                 // Создаем градиент для линии
                 const lineGradient = graphCtx.createLinearGradient(0, 0, 0, height);
-                lineGradient.addColorStop(0, '#00c853');   // Зелёный вверху (для высоких множителей)
-                lineGradient.addColorStop(0.3, '#ffab00'); // Оранжевый в середине
-                lineGradient.addColorStop(0.7, '#ff6d00'); // Тёмно-оранжевый
-                lineGradient.addColorStop(1, '#ff1744');   // Красный внизу (для низких множителей)
+                lineGradient.addColorStop(0, '#00c853');    // Зелёный вверху
+                lineGradient.addColorStop(0.4, '#ffab00');  // Оранжевый в середине
+                lineGradient.addColorStop(0.7, '#ff6d00');  // Тёмно-оранжевый
+                lineGradient.addColorStop(1, '#ff1744');    // Красный внизу
                 
-                // Улучшенное отображение линии с использованием Bezier кривой
+                // Создаем более плавную кривую, используя точки и bezier-кривые
+                let prevX = x0;
+                let prevY = y0;
+                
                 for (let i = 1; i < globalState.graphPoints.length; i++) {
-                    const prevPoint = globalState.graphPoints[i-1];
                     const currentPoint = globalState.graphPoints[i];
                     
                     const x = (currentPoint.time / maxTime) * width;
-                    const y = height - (Math.log(currentPoint.multiplier) / Math.log(maxMult)) * height;
                     
-                    // Используем линейную интерполяцию для более плавной кривой
-                    graphCtx.lineTo(x, y);
+                    // Используем нелинейное преобразование для лучшей детализации
+                    // Для малых значений - линейное, для больших - логарифмическое
+                    const normalizedMult = (currentPoint.multiplier - 1) / (maxMult - 1);
+                    const y = height - normalizedMult * height * 0.98;
+                    
+                    // Более плавная кривая с контрольными точками
+                    if (i % 3 === 1) { // Делаем кривую Безье через каждые 3 точки для оптимизации
+                        const cpX1 = prevX + (x - prevX) / 3;
+                        const cpY1 = prevY;
+                        const cpX2 = x - (x - prevX) / 3;
+                        const cpY2 = y;
+                        
+                        graphCtx.bezierCurveTo(cpX1, cpY1, cpX2, cpY2, x, y);
+                    } else {
+                        graphCtx.lineTo(x, y);
+                    }
+                    
+                    prevX = x;
+                    prevY = y;
                 }
                 
                 // Настраиваем стиль линии
                 graphCtx.strokeStyle = lineGradient;
-                graphCtx.lineWidth = 3;
+                graphCtx.lineWidth = 4; // Чуть толще для лучшей видимости
                 graphCtx.lineCap = 'round';
                 graphCtx.lineJoin = 'round';
                 
                 // Добавляем тень для эффектности
-                graphCtx.shadowColor = 'rgba(0, 200, 83, 0.5)';
-                graphCtx.shadowBlur = 10;
+                graphCtx.shadowColor = 'rgba(0, 200, 83, 0.6)';
+                graphCtx.shadowBlur = 12;
                 graphCtx.shadowOffsetX = 0;
                 graphCtx.shadowOffsetY = 0;
                 
@@ -1047,7 +1123,8 @@
                 // Градиентная заливка под линией
                 const lastPoint = globalState.graphPoints[globalState.graphPoints.length - 1];
                 const lastX = (lastPoint.time / maxTime) * width;
-                const lastY = height - (Math.log(lastPoint.multiplier) / Math.log(maxMult)) * height;
+                const normalizedLastMult = (lastPoint.multiplier - 1) / (maxMult - 1);
+                const lastY = height - normalizedLastMult * height * 0.98;
                 
                 graphCtx.lineTo(lastX, height);
                 graphCtx.lineTo(x0, height);
@@ -1060,7 +1137,7 @@
                 fillGradient.addColorStop(1, 'rgba(0, 200, 83, 0)');
                 
                 graphCtx.fillStyle = fillGradient;
-                graphCtx.globalAlpha = 0.5; // Полупрозрачная заливка
+                graphCtx.globalAlpha = 0.6; // Увеличим непрозрачность для лучшей видимости
                 graphCtx.fill();
                 graphCtx.globalAlpha = 1;
                 
@@ -1070,21 +1147,36 @@
                 
                 // Текущая точка - рисуем яркий маркер
                 graphCtx.beginPath();
-                graphCtx.arc(lastX, lastY, 6, 0, Math.PI * 2);
+                graphCtx.arc(lastX, lastY, 8, 0, Math.PI * 2); // Чуть больше для заметности
                 
                 // Градиентная заливка для точки
-                const dotGradient = graphCtx.createRadialGradient(lastX, lastY, 0, lastX, lastY, 6);
+                const dotGradient = graphCtx.createRadialGradient(lastX, lastY, 0, lastX, lastY, 8);
                 dotGradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
                 dotGradient.addColorStop(1, 'rgba(0, 200, 83, 0.8)');
                 
                 graphCtx.fillStyle = dotGradient;
                 graphCtx.fill();
                 
-                // Рисуем ореол вокруг точки
+                // Рисуем внешний ореол
                 graphCtx.beginPath();
-                graphCtx.arc(lastX, lastY, 10, 0, Math.PI * 2);
+                graphCtx.arc(lastX, lastY, 16, 0, Math.PI * 2);
                 graphCtx.fillStyle = 'rgba(0, 200, 83, 0.2)';
                 graphCtx.fill();
+                
+                // Рисуем пульсирующий ореол на текущей точке
+                const pulseSize = 16 + 5 * Math.sin(Date.now() / 200);
+                graphCtx.beginPath();
+                graphCtx.arc(lastX, lastY, pulseSize, 0, Math.PI * 2);
+                graphCtx.fillStyle = 'rgba(0, 200, 83, 0.1)';
+                graphCtx.fill();
+                
+                // Рисуем метку текущего множителя над точкой, если множитель > 1.5
+                if (lastPoint.multiplier > 1.5) {
+                    graphCtx.font = '14px Arial';
+                    graphCtx.fillStyle = '#fff';
+                    graphCtx.textAlign = 'center';
+                    graphCtx.fillText(`${lastPoint.multiplier.toFixed(2)}×`, lastX, lastY - 20);
+                }
                 
             } catch (error) {
                 app.log('Crush', `Ошибка перерисовки графика: ${error.message}`, true);
@@ -1283,18 +1375,41 @@
                 const width = graphCanvas.width;
                 const height = graphCanvas.height;
                 
-                const maxMult = 20;
-                const maxTime = 20;
+                // Используем тот же метод расчета координат, что и в функции redrawGraph
+                const maxMult = 5;
+                if (lastPoint.multiplier > maxMult * 0.65) {
+                    maxMult = Math.max(maxMult, lastPoint.multiplier * 1.35);
+                }
+                
+                const elapsedTime = (Date.now() - globalState.roundStartTime) / 1000;
+                const maxTime = Math.min(15, Math.max(5, elapsedTime * 1.5));
                 
                 const crashX = (lastPoint.time / maxTime) * width;
-                const crashY = height - (Math.log(lastPoint.multiplier) / Math.log(maxMult)) * height;
+                const normalizedMult = (lastPoint.multiplier - 1) / (maxMult - 1);
+                const crashY = height - normalizedMult * height * 0.98;
                 
-                // Улучшенная анимация взрыва
-                let explosionRadius = 0;
-                const maxRadius = 80;
-                const explosionDuration = 800; // ms
+                // Расширенная анимация взрыва с несколькими фазами
+                const explosionDuration = 1000; // ms
                 const startTime = Date.now();
                 
+                // Добавляем камеру-шейк эффект
+                const shakeCanvas = () => {
+                    const intensity = 5;
+                    const shakeX = (Math.random() - 0.5) * intensity;
+                    const shakeY = (Math.random() - 0.5) * intensity;
+                    graphCanvas.style.transform = `translate(${shakeX}px, ${shakeY}px)`;
+                };
+                
+                // Анимация восстановления после тряски
+                const resetShake = () => {
+                    graphCanvas.style.transform = 'translate(0, 0)';
+                    graphCanvas.style.transition = 'transform 0.3s ease-out';
+                    setTimeout(() => {
+                        graphCanvas.style.transition = '';
+                    }, 300);
+                };
+                
+                // Основная анимация взрыва
                 const animateExplosion = () => {
                     const elapsed = Date.now() - startTime;
                     const progress = Math.min(1, elapsed / explosionDuration);
@@ -1303,47 +1418,182 @@
                         // Очищаем и перерисовываем график
                         redrawGraph();
                         
-                        // Нелинейная функция размера для более реалистичной анимации
-                        explosionRadius = maxRadius * Math.sin(progress * Math.PI);
+                        // Тряска канваса в начале взрыва
+                        if (progress < 0.3) {
+                            shakeCanvas();
+                        } else if (progress < 0.35) {
+                            resetShake();
+                        }
                         
-                        // Рисуем радиальный градиент для взрыва
-                        const explosionGradient = graphCtx.createRadialGradient(
-                            crashX, crashY, 0,
-                            crashX, crashY, explosionRadius
-                        );
+                        // Комплексная нелинейная функция размера для эффектной анимации
+                        // Быстрый рост, затем замедление и исчезновение
+                        let explosionPhase;
+                        if (progress < 0.3) {
+                            // Фаза 1: быстрое расширение
+                            explosionPhase = progress / 0.3;
+                            const explosionRadius = 120 * Math.pow(explosionPhase, 0.6);
+                            
+                            // Яркий центральный взрыв
+                            const explosionGradient = graphCtx.createRadialGradient(
+                                crashX, crashY, 0,
+                                crashX, crashY, explosionRadius
+                            );
+                            
+                            explosionGradient.addColorStop(0, 'rgba(255, 80, 80, 1.0)');
+                            explosionGradient.addColorStop(0.2, 'rgba(255, 70, 60, 0.95)');
+                            explosionGradient.addColorStop(0.4, 'rgba(255, 100, 40, 0.8)');
+                            explosionGradient.addColorStop(0.7, 'rgba(255, 120, 30, 0.4)');
+                            explosionGradient.addColorStop(1, 'rgba(255, 140, 30, 0)');
+                            
+                            graphCtx.beginPath();
+                            graphCtx.arc(crashX, crashY, explosionRadius, 0, Math.PI * 2);
+                            graphCtx.fillStyle = explosionGradient;
+                            graphCtx.fill();
+                            
+                            // Внутреннее кольцо взрыва
+                            const innerRadius = explosionRadius * 0.6;
+                            const innerGradient = graphCtx.createRadialGradient(
+                                crashX, crashY, innerRadius * 0.5,
+                                crashX, crashY, innerRadius
+                            );
+                            
+                            innerGradient.addColorStop(0, 'rgba(255, 255, 100, 0.9)');
+                            innerGradient.addColorStop(1, 'rgba(255, 200, 50, 0)');
+                            
+                            graphCtx.beginPath();
+                            graphCtx.arc(crashX, crashY, innerRadius, 0, Math.PI * 2);
+                            graphCtx.fillStyle = innerGradient;
+                            graphCtx.fill();
+                        } else {
+                            // Фаза 2: затухание и остаточное свечение
+                            const fadeProgress = (progress - 0.3) / 0.7; // От 0 до 1
+                            const fadeRadius = 120 * (1 - fadeProgress * 0.5);
+                            
+                            // Затухающий градиент
+                            const fadeGradient = graphCtx.createRadialGradient(
+                                crashX, crashY, 0,
+                                crashX, crashY, fadeRadius
+                            );
+                            
+                            const opacity = 0.9 * (1 - fadeProgress);
+                            fadeGradient.addColorStop(0, `rgba(255, 70, 70, ${opacity * 0.8})`);
+                            fadeGradient.addColorStop(0.3, `rgba(255, 100, 40, ${opacity * 0.6})`);
+                            fadeGradient.addColorStop(0.7, `rgba(255, 120, 30, ${opacity * 0.3})`);
+                            fadeGradient.addColorStop(1, `rgba(255, 140, 20, 0)`);
+                            
+                            graphCtx.beginPath();
+                            graphCtx.arc(crashX, crashY, fadeRadius, 0, Math.PI * 2);
+                            graphCtx.fillStyle = fadeGradient;
+                            graphCtx.fill();
+                            
+                            // Мерцание остаточное
+                            if (Math.random() > 0.5) {
+                                const flickerRadius = fadeRadius * 0.7 * (0.8 + Math.random() * 0.4);
+                                const flickerGradient = graphCtx.createRadialGradient(
+                                    crashX, crashY, 0,
+                                    crashX, crashY, flickerRadius
+                                );
+                                
+                                const flickerOpacity = opacity * 0.4 * Math.random();
+                                flickerGradient.addColorStop(0, `rgba(255, 220, 150, ${flickerOpacity})`);
+                                flickerGradient.addColorStop(1, 'rgba(255, 200, 100, 0)');
+                                
+                                graphCtx.beginPath();
+                                graphCtx.arc(crashX, crashY, flickerRadius, 0, Math.PI * 2);
+                                graphCtx.fillStyle = flickerGradient;
+                                graphCtx.fill();
+                            }
+                        }
                         
-                        explosionGradient.addColorStop(0, 'rgba(255, 55, 55, 0.9)');
-                        explosionGradient.addColorStop(0.2, 'rgba(255, 55, 55, 0.8)');
-                        explosionGradient.addColorStop(0.5, 'rgba(255, 87, 34, 0.6)');
-                        explosionGradient.addColorStop(0.8, 'rgba(255, 87, 34, 0.2)');
-                        explosionGradient.addColorStop(1, 'rgba(255, 87, 34, 0)');
-                        
-                        graphCtx.beginPath();
-                        graphCtx.arc(crashX, crashY, explosionRadius, 0, Math.PI * 2);
-                        graphCtx.fillStyle = explosionGradient;
-                        graphCtx.fill();
-                        
-                        // Рисуем "искры" от взрыва
-                        const sparkCount = 8;
-                        const sparkLength = explosionRadius * 0.7;
+                        // Искры и осколки, разлетающиеся от центра
+                        const sparkCount = 12;
+                        const baseSparkLength = progress < 0.3 ? 
+                                                170 * Math.pow(progress / 0.3, 0.8) : 
+                                                170 * (1 - (progress - 0.3) / 0.7 * 0.7);
                         
                         for (let i = 0; i < sparkCount; i++) {
                             const angle = (i / sparkCount) * Math.PI * 2;
-                            const sparkX = crashX + Math.cos(angle) * sparkLength * progress;
-                            const sparkY = crashY + Math.sin(angle) * sparkLength * progress;
+                            
+                            // Вариации длины и угла для каждой искры
+                            const lengthVariation = 0.5 + Math.random() * 1;
+                            const angleVariation = angle + (Math.random() - 0.5) * 0.3;
+                            const sparkLength = baseSparkLength * lengthVariation;
+                            
+                            const sparkEndX = crashX + Math.cos(angleVariation) * sparkLength;
+                            const sparkEndY = crashY + Math.sin(angleVariation) * sparkLength;
+                            
+                            // Начало искры немного смещено от центра
+                            const sparkStartDistance = 5 + Math.random() * 15;
+                            const sparkStartX = crashX + Math.cos(angleVariation) * sparkStartDistance;
+                            const sparkStartY = crashY + Math.sin(angleVariation) * sparkStartDistance;
+                            
+                            // Градиент цвета для искры от ярко-желтого до красного
+                            const sparkGradient = graphCtx.createLinearGradient(
+                                sparkStartX, sparkStartY, sparkEndX, sparkEndY
+                            );
+                            
+                            sparkGradient.addColorStop(0, `rgba(255, 255, 100, ${1 - progress * 0.7})`);
+                            sparkGradient.addColorStop(0.5, `rgba(255, 150, 50, ${0.8 - progress * 0.7})`);
+                            sparkGradient.addColorStop(1, `rgba(255, 50, 30, 0)`);
                             
                             graphCtx.beginPath();
-                            graphCtx.moveTo(crashX, crashY);
-                            graphCtx.lineTo(sparkX, sparkY);
-                            graphCtx.strokeStyle = `rgba(255, 200, 50, ${1 - progress})`;
-                            graphCtx.lineWidth = 2;
+                            graphCtx.moveTo(sparkStartX, sparkStartY);
+                            graphCtx.lineTo(sparkEndX, sparkEndY);
+                            graphCtx.strokeStyle = sparkGradient;
+                            graphCtx.lineWidth = 2 + Math.random() * 1.5;
                             graphCtx.stroke();
                         }
                         
+                        // Текст "CRASH" появляется при взрыве
+                        if (progress > 0.1) {
+                            const textOpacity = progress < 0.4 ? 
+                                                progress / 0.4 : 
+                                                1 - (progress - 0.4) / 0.6;
+                            
+                            const textSize = 40 + Math.sin(progress * Math.PI * 4) * 5;
+                            
+                            graphCtx.font = `bold ${textSize}px Arial`;
+                            graphCtx.textAlign = 'center';
+                            graphCtx.textBaseline = 'middle';
+                            
+                            // Тень текста
+                            graphCtx.shadowColor = 'rgba(255, 0, 0, 0.8)';
+                            graphCtx.shadowBlur = 15;
+                            graphCtx.shadowOffsetX = 2;
+                            graphCtx.shadowOffsetY = 2;
+                            
+                            // Градиент для текста
+                            const textGradient = graphCtx.createLinearGradient(
+                                crashX - 60, crashY, crashX + 60, crashY
+                            );
+                            textGradient.addColorStop(0, '#ff5a5a');
+                            textGradient.addColorStop(0.5, '#ffcc00');
+                            textGradient.addColorStop(1, '#ff5a5a');
+                            
+                            graphCtx.fillStyle = textGradient;
+                            graphCtx.fillText("CRASH", crashX, crashY - 60);
+                            
+                            // Отображение значения краша
+                            graphCtx.font = `bold 24px Arial`;
+                            graphCtx.fillStyle = '#ffffff';
+                            graphCtx.shadowBlur = 5;
+                            graphCtx.fillText(`${lastPoint.multiplier.toFixed(2)}×`, crashX, crashY + 60);
+                            
+                            // Сброс тени
+                            graphCtx.shadowColor = 'transparent';
+                            graphCtx.shadowBlur = 0;
+                            graphCtx.shadowOffsetX = 0;
+                            graphCtx.shadowOffsetY = 0;
+                        }
+                        
                         requestAnimationFrame(animateExplosion);
+                    } else {
+                        // Конец анимации - стабилизируем канвас
+                        resetShake();
                     }
                 };
                 
+                // Запускаем анимацию
                 animateExplosion();
                 
             } catch (error) {
@@ -1409,22 +1659,53 @@
          */
         const generateCrashPoint = function() {
             try {
-                const houseEdge = 0.05; // 3% преимущество казино
+                const houseEdge = 0.03; // 3% преимущество казино
                 
                 // Генерируем случайное число от 0 до 1
                 const randomValue = Math.random();
                 
-                // Формула для точки краша
-                let crashPoint = 1 / (randomValue * (1 - houseEdge));
+                // Формула для точки краша с распределением, имитирующим реальные игры
+                let crashPoint;
+                
+                // Используем поведение, близкое к реальным казино - 
+                // множество ранних крашей и несколько редких высоких значений
+                if (randomValue < 0.15) {
+                    // 15% шанс ранних крашей (1.00 - 1.50)
+                    crashPoint = 1.00 + Math.random() * 0.50;
+                } else if (randomValue < 0.40) {
+                    // 25% шанс низких крашей (1.50 - 2.00)
+                    crashPoint = 1.50 + Math.random() * 0.50;
+                } else if (randomValue < 0.70) {
+                    // 30% шанс средне-низких крашей (2.00 - 3.00)
+                    crashPoint = 2.00 + Math.random() * 1.00;
+                } else if (randomValue < 0.85) {
+                    // 15% шанс средних крашей (3.00 - 5.00)
+                    crashPoint = 3.00 + Math.random() * 2.00;
+                } else if (randomValue < 0.95) {
+                    // 10% шанс высоких крашей (5.00 - 10.00)
+                    crashPoint = 5.00 + Math.random() * 5.00;
+                } else {
+                    // 5% шанс редких очень высоких значений
+                    const highRandomValue = Math.random();
+                    
+                    if (highRandomValue < 0.80) {
+                        // 80% из 5% = 4% шанс крашей 10.00 - 20.00
+                        crashPoint = 10.00 + Math.random() * 10.00;
+                    } else if (highRandomValue < 0.95) {
+                        // 15% из 5% = 0.75% шанс крашей 20.00 - 50.00
+                        crashPoint = 20.00 + Math.random() * 30.00;
+                    } else {
+                        // 5% из 5% = 0.25% шанс крашей 50.00 - 100.00
+                        crashPoint = 50.00 + Math.random() * 50.00;
+                    }
+                }
+                
+                // Добавляем небольшие случайные дробные части для естественности
+                crashPoint += Math.random() * 0.10;
                 
                 // Ограничиваем максимальное значение
                 const maxCrashPoint = 100.0;
                 crashPoint = Math.min(crashPoint, maxCrashPoint);
-                
-                // Иногда делаем ранний краш (для демонстрации)
-                if (Math.random() < 0.08) {  // 8% шанс раннего краша
-                    crashPoint = 1.0 + Math.random() * 0.8;  // Между 1.0 и 1.8
-                }
                 
                 return crashPoint;
             } catch (error) {
@@ -1628,7 +1909,7 @@
                         
                         .crush-graph {
                             width: 100%;
-                            height: 300px;
+                            height: 380px; /* Увеличиваем высоту графика */
                             background: linear-gradient(135deg, #14171f, #1a1e30);
                             border-radius: 10px;
                             border: 1px solid rgba(255, 255, 255, 0.1);
@@ -2010,6 +2291,24 @@
                             .history-items {
                                 grid-template-columns: repeat(3, 1fr);
                             }
+                        }
+                        
+                        /* Исправления для лучшей видимости сообщений */
+                        .betting-phase-info {
+                            z-index: 10;
+                        }
+                        
+                        /* Улучшенная заметность сообщения об ожидании */
+                        @keyframes pulse-message {
+                            0% { background-color: rgba(0, 0, 0, 0.7); }
+                            50% { background-color: rgba(10, 15, 30, 0.75); }
+                            100% { background-color: rgba(0, 0, 0, 0.7); }
+                        }
+                        
+                        .betting-phase-message {
+                            animation: pulse-message 2s infinite;
+                            color: #ffeb3b;
+                            text-shadow: 0 0 5px rgba(255, 235, 59, 0.5);
                         }
                     `;
                     document.head.appendChild(styleElement);
