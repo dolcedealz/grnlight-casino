@@ -1,13 +1,13 @@
 /**
- * miner.js - Компактная версия игры Майнер
- * Версия 3.3.0
+ * miner.js - Улучшенная версия игры Майнер
+ * Версия 3.3.1
  * 
  * Улучшения:
- * - Оптимизированный и компактный интерфейс
+ * - Современный стильный интерфейс
  * - Полная русификация элементов
  * - Улучшенная производительность
  * - Адаптивный дизайн для мобильных устройств
- * - Оптимизированные анимации
+ * - Оптимизированные анимации и эффекты
  */
 
 // Предопределенные аудио файлы для предзагрузки
@@ -35,7 +35,7 @@ const AUDIO_FILES = {
     }
     
     const app = window.GreenLightApp;
-    app.log('Майнер', 'Инициализация компактной версии игры Майнер v3.3.0');
+    app.log('Майнер', 'Инициализация улучшенной версии игры Майнер v3.3.1');
     
     // Игровая логика в замыкании для изоляции
     const minerGame = (function() {
@@ -479,6 +479,7 @@ const AUDIO_FILES = {
                 // Создаем HTML-разметку для игры
                 container.innerHTML = `
                     <div class="miner-header">
+                        <div class="header-logo">🎮 Майнер</div>
                         <div class="game-info-panel">
                             <div class="info-item">
                                 <span class="info-label">Множитель</span>
@@ -550,59 +551,73 @@ const AUDIO_FILES = {
                     styleElement.id = 'miner-styles';
                     styleElement.textContent = `
                         .miner-container {
-                            padding: 15px;
-                            max-width: 500px;
+                            padding: 20px;
+                            max-width: 560px;
                             margin: 0 auto;
                             font-family: 'Arial', sans-serif;
-                            border-radius: 16px;
-                            background: linear-gradient(145deg, #1a1a1a, #2a2a2a);
-                            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-                            border: 1px solid rgba(255, 255, 255, 0.05);
+                            border-radius: 20px;
+                            background: linear-gradient(145deg, #1e2430, #12161f);
+                            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4), 0 0 80px rgba(0, 123, 255, 0.1);
+                            border: 1px solid rgba(255, 255, 255, 0.08);
                             overflow: hidden;
                         }
                         
                         .miner-header {
-                            margin-bottom: 15px;
-                            background: rgba(0, 0, 0, 0.2);
-                            border-radius: 12px;
-                            padding: 10px;
                             display: flex;
                             justify-content: space-between;
                             align-items: center;
-                            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+                            margin-bottom: 20px;
+                            padding-bottom: 15px;
+                            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                        }
+                        
+                        .header-logo {
+                            font-size: 22px;
+                            font-weight: bold;
+                            color: #fff;
+                            text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+                            padding: 8px 15px;
+                            background: rgba(0, 0, 0, 0.2);
+                            border-radius: 10px;
+                            margin-right: 12px;
                         }
                         
                         .game-info-panel {
                             display: flex;
-                            justify-content: space-around;
-                            align-items: center;
                             flex: 1;
-                            gap: 8px;
+                            gap: 12px;
                         }
                         
                         .sound-controls {
                             display: flex;
-                            gap: 8px;
+                            gap: 10px;
+                            margin-left: 12px;
                         }
                         
                         .sound-btn {
+                            width: 36px;
+                            height: 36px;
                             background: rgba(255, 255, 255, 0.1);
                             border: none;
                             border-radius: 50%;
-                            width: 28px;
-                            height: 28px;
                             display: flex;
                             align-items: center;
                             justify-content: center;
                             cursor: pointer;
-                            transition: all 0.2s;
+                            transition: all 0.3s ease;
                             color: white;
-                            font-size: 14px;
+                            font-size: 16px;
+                            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2);
                         }
                         
                         .sound-btn:hover {
                             background: rgba(255, 255, 255, 0.2);
                             transform: scale(1.1);
+                            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+                        }
+                        
+                        .sound-btn:active {
+                            transform: scale(0.95);
                         }
                         
                         .sound-btn.muted {
@@ -611,26 +626,35 @@ const AUDIO_FILES = {
                         }
                         
                         .info-item {
-                            padding: 6px 10px;
-                            background: rgba(0, 0, 0, 0.2);
-                            border-radius: 8px;
+                            padding: 10px 14px;
+                            background: rgba(0, 0, 0, 0.25);
+                            border-radius: 12px;
                             text-align: center;
                             flex: 1;
                             min-width: 0;
+                            box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.2);
+                            border: 1px solid rgba(255, 255, 255, 0.05);
+                            transition: all 0.3s ease;
+                        }
+                        
+                        .info-item:hover {
+                            background: rgba(0, 0, 0, 0.3);
+                            transform: translateY(-2px);
+                            box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.2), 0 5px 15px rgba(0, 0, 0, 0.2);
                         }
                         
                         .info-label {
                             display: block;
-                            font-size: 10px;
+                            font-size: 11px;
                             color: rgba(255, 255, 255, 0.7);
-                            margin-bottom: 3px;
+                            margin-bottom: 4px;
                             text-transform: uppercase;
                             font-weight: bold;
                             letter-spacing: 0.5px;
                         }
                         
                         .info-value {
-                            font-size: 16px;
+                            font-size: 18px;
                             font-weight: bold;
                             color: white;
                             display: block;
@@ -653,33 +677,34 @@ const AUDIO_FILES = {
                         .miner-grid {
                             display: grid;
                             grid-template-columns: repeat(5, 1fr);
-                            gap: 6px;
-                            margin: 10px auto;
-                            max-width: 400px;
+                            gap: 8px;
+                            margin: 0 auto 20px;
+                            max-width: 520px;
                             perspective: 1000px;
                         }
                         
                         .grid-cell {
                             aspect-ratio: 1;
-                            background: linear-gradient(135deg, #2a2a2a, #1a1a1a);
-                            border-radius: 6px;
+                            background: linear-gradient(145deg, #2a3040, #1a2030);
+                            border-radius: 12px;
                             display: flex;
                             align-items: center;
                             justify-content: center;
-                            font-size: 24px;
+                            font-size: 28px;
                             cursor: pointer;
                             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
                             border: 1px solid rgba(255, 255, 255, 0.1);
                             position: relative;
                             transform-style: preserve-3d;
-                            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+                            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
                             overflow: hidden;
                         }
                         
                         .grid-cell:hover {
-                            transform: translateY(-2px) scale(1.05);
-                            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.4), 0 0 10px rgba(76, 175, 80, 0.3);
-                            border-color: rgba(76, 175, 80, 0.3);
+                            transform: translateY(-4px) scale(1.05);
+                            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4), 0 0 15px rgba(76, 175, 80, 0.4);
+                            border-color: rgba(76, 175, 80, 0.5);
+                            z-index: 2;
                         }
                         
                         .grid-cell.active-cell {
@@ -687,38 +712,40 @@ const AUDIO_FILES = {
                         }
                         
                         .grid-cell.active-cell:hover {
-                            background: linear-gradient(135deg, #3a3a3a, #2a2a2a);
+                            background: linear-gradient(145deg, #303750, #202640);
                         }
                         
                         .grid-cell.revealed {
-                            background: linear-gradient(135deg, #4CAF50, #43A047);
+                            background: linear-gradient(145deg, #4CAF50, #43A047);
                             transform: rotateY(180deg);
                             cursor: default;
                             border-color: #66BB6A;
-                            box-shadow: 0 0 15px rgba(76, 175, 80, 0.5);
+                            box-shadow: 0 0 20px rgba(76, 175, 80, 0.6);
+                            z-index: 3;
                         }
                         
                         .grid-cell.mine {
-                            background: linear-gradient(135deg, #333, #222);
+                            background: linear-gradient(145deg, #333, #222);
                             cursor: default;
+                            z-index: 1;
                         }
                         
                         .grid-cell.exploded {
-                            background: linear-gradient(135deg, #F44336, #D32F2F);
+                            background: linear-gradient(145deg, #F44336, #D32F2F);
                             animation: explode 0.8s cubic-bezier(0.36, 0.07, 0.19, 0.97);
                             border-color: #E57373;
-                            box-shadow: 0 0 20px rgba(244, 67, 54, 0.7);
+                            box-shadow: 0 0 30px rgba(244, 67, 54, 0.8);
                             z-index: 10;
                         }
                         
                         .miner-controls {
-                            margin-top: 15px;
+                            margin-top: 20px;
                         }
                         
                         .bet-settings {
                             display: flex;
-                            gap: 10px;
-                            margin-bottom: 10px;
+                            gap: 15px;
+                            margin-bottom: 15px;
                             justify-content: center;
                             flex-wrap: wrap;
                         }
@@ -726,12 +753,12 @@ const AUDIO_FILES = {
                         .control-group {
                             display: flex;
                             flex-direction: column;
-                            gap: 5px;
+                            gap: 6px;
                         }
                         
                         .control-group label {
-                            color: rgba(255, 255, 255, 0.8);
-                            font-size: 12px;
+                            color: rgba(255, 255, 255, 0.9);
+                            font-size: 13px;
                             font-weight: bold;
                             margin-bottom: 2px;
                         }
@@ -739,51 +766,66 @@ const AUDIO_FILES = {
                         .bet-input-wrapper {
                             display: flex;
                             align-items: center;
-                            gap: 4px;
+                            gap: 8px;
                         }
                         
                         .bet-decrease-btn, .bet-increase-btn {
-                            width: 24px;
-                            height: 24px;
+                            width: 32px;
+                            height: 32px;
                             border-radius: 50%;
                             border: none;
                             display: flex;
                             justify-content: center;
                             align-items: center;
                             cursor: pointer;
-                            background: var(--medium-gray, #444);
-                            color: var(--white, #fff);
-                            font-size: 14px;
+                            background: rgba(0, 123, 255, 0.2);
+                            color: white;
+                            font-size: 16px;
                             font-weight: bold;
-                            transition: all 0.2s;
+                            transition: all 0.3s ease;
+                            box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
                         }
                         
                         .bet-decrease-btn:hover, .bet-increase-btn:hover {
-                            background: var(--primary-green, #4CAF50);
+                            background: rgba(0, 123, 255, 0.4);
                             transform: scale(1.1);
+                            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+                        }
+                        
+                        .bet-decrease-btn:active, .bet-increase-btn:active {
+                            transform: scale(0.95);
+                            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
                         }
                         
                         .bet-input, .mines-select {
-                            padding: 6px 8px;
-                            border-radius: 6px;
+                            padding: 8px 12px;
+                            border-radius: 10px;
                             border: 1px solid rgba(255, 255, 255, 0.1);
                             background: rgba(0, 0, 0, 0.2);
                             color: white;
-                            font-size: 14px;
+                            font-size: 15px;
                             font-weight: bold;
-                            transition: all 0.2s;
-                            width: 70px;
+                            transition: all 0.3s ease;
+                            width: 80px;
                             text-align: center;
+                            box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.1);
                         }
                         
                         .mines-select {
-                            width: 100px;
+                            width: 120px;
+                            cursor: pointer;
+                            appearance: none;
+                            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23ffffff' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
+                            background-repeat: no-repeat;
+                            background-position: right 12px center;
+                            padding-right: 32px;
+                            background-size: 10px;
                         }
                         
                         .bet-input:focus, .mines-select:focus {
-                            border-color: rgba(76, 175, 80, 0.5);
+                            border-color: rgba(0, 123, 255, 0.5);
                             outline: none;
-                            box-shadow: 0 0 10px rgba(76, 175, 80, 0.3);
+                            box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.2), inset 0 2px 5px rgba(0, 0, 0, 0.1);
                         }
                         
                         .mines-select:disabled {
@@ -791,49 +833,65 @@ const AUDIO_FILES = {
                             cursor: not-allowed;
                         }
                         
+                        .mines-select option {
+                            background: #1e2430;
+                            color: white;
+                            padding: 8px;
+                        }
+                        
                         .quick-bet-controls {
                             display: flex;
                             justify-content: center;
-                            gap: 8px;
-                            margin-bottom: 10px;
+                            gap: 10px;
+                            margin-bottom: 15px;
                             flex-wrap: wrap;
                         }
                         
                         .quick-bet-btn {
-                            padding: 5px 10px;
+                            padding: 8px 16px;
                             background: rgba(0, 0, 0, 0.2);
                             border: 1px solid rgba(255, 255, 255, 0.1);
-                            border-radius: 4px;
+                            border-radius: 8px;
                             color: #fff;
-                            font-size: 13px;
+                            font-size: 14px;
+                            font-weight: bold;
                             cursor: pointer;
-                            transition: all 0.2s;
+                            transition: all 0.3s ease;
+                            box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
                         }
                         
                         .quick-bet-btn:hover {
                             background: rgba(76, 175, 80, 0.2);
                             border-color: rgba(76, 175, 80, 0.5);
+                            transform: translateY(-2px);
+                            box-shadow: 0 5px 12px rgba(0, 0, 0, 0.3);
+                        }
+                        
+                        .quick-bet-btn:active {
+                            transform: translateY(0);
+                            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
                         }
                         
                         .game-buttons {
                             display: flex;
-                            gap: 10px;
+                            gap: 15px;
                             justify-content: center;
                         }
                         
                         .action-btn {
-                            padding: 10px 0;
-                            border-radius: 8px;
+                            padding: 14px 30px;
+                            border-radius: 12px;
                             font-weight: bold;
-                            font-size: 14px;
+                            font-size: 16px;
                             cursor: pointer;
-                            transition: all 0.2s;
+                            transition: all 0.3s ease;
                             border: none;
-                            min-width: 120px;
+                            min-width: 140px;
                             text-transform: uppercase;
                             letter-spacing: 1px;
                             position: relative;
                             overflow: hidden;
+                            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.2);
                         }
                         
                         .action-btn::after {
@@ -855,44 +913,60 @@ const AUDIO_FILES = {
                         }
                         
                         .primary-btn {
-                            background: linear-gradient(135deg, #4CAF50, #43A047);
+                            background: linear-gradient(145deg, #4CAF50, #388E3C);
                             color: white;
-                            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+                            box-shadow: 0 6px 15px rgba(76, 175, 80, 0.3), 0 0 5px rgba(76, 175, 80, 0.2);
                         }
                         
                         .primary-btn:hover:not(:disabled) {
-                            transform: translateY(-2px);
-                            box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
+                            background: linear-gradient(145deg, #5CBD60, #429A46);
+                            transform: translateY(-3px);
+                            box-shadow: 0 8px 25px rgba(76, 175, 80, 0.4), 0 0 10px rgba(76, 175, 80, 0.3);
+                        }
+                        
+                        .primary-btn:active:not(:disabled) {
+                            transform: translateY(0);
+                            box-shadow: 0 4px 8px rgba(76, 175, 80, 0.3);
                         }
                         
                         .secondary-btn {
-                            background: linear-gradient(135deg, #2196F3, #1E88E5);
+                            background: linear-gradient(145deg, #2196F3, #1976D2);
                             color: white;
-                            box-shadow: 0 4px 15px rgba(33, 150, 243, 0.3);
+                            box-shadow: 0 6px 15px rgba(33, 150, 243, 0.3), 0 0 5px rgba(33, 150, 243, 0.2);
                         }
                         
                         .secondary-btn:hover:not(:disabled) {
-                            transform: translateY(-2px);
-                            box-shadow: 0 6px 20px rgba(33, 150, 243, 0.4);
+                            background: linear-gradient(145deg, #42A5F5, #1E88E5);
+                            transform: translateY(-3px);
+                            box-shadow: 0 8px 25px rgba(33, 150, 243, 0.4), 0 0 10px rgba(33, 150, 243, 0.3);
+                        }
+                        
+                        .secondary-btn:active:not(:disabled) {
+                            transform: translateY(0);
+                            box-shadow: 0 4px 8px rgba(33, 150, 243, 0.3);
                         }
                         
                         .action-btn:disabled {
-                            background: linear-gradient(135deg, #555, #444);
+                            background: linear-gradient(145deg, #555, #444);
                             cursor: not-allowed;
                             opacity: 0.7;
                             box-shadow: none;
+                            transform: none;
                         }
                         
                         .result {
-                            margin: 15px 0;
-                            padding: 15px;
-                            border-radius: 12px;
+                            margin: 20px 0;
+                            padding: 20px;
+                            border-radius: 15px;
                             text-align: center;
                             font-weight: bold;
-                            transition: all 0.3s;
-                            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+                            transition: all 0.3s ease;
+                            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
                             transform: translateY(0);
                             opacity: 1;
+                            background: rgba(0, 0, 0, 0.2);
+                            backdrop-filter: blur(10px);
+                            border: 2px solid;
                         }
                         
                         .result.hidden {
@@ -902,43 +976,44 @@ const AUDIO_FILES = {
                             padding: 0;
                             margin: 0;
                             overflow: hidden;
+                            pointer-events: none;
                         }
                         
                         .result.win {
-                            background: linear-gradient(135deg, rgba(76, 175, 80, 0.2), rgba(67, 160, 71, 0.2));
-                            border: 1px solid rgba(76, 175, 80, 0.5);
+                            background: linear-gradient(145deg, rgba(76, 175, 80, 0.2), rgba(67, 160, 71, 0.2));
+                            border-color: rgba(76, 175, 80, 0.6);
                             color: #81C784;
                         }
                         
                         .result.lose {
-                            background: linear-gradient(135deg, rgba(244, 67, 54, 0.2), rgba(211, 47, 47, 0.2));
-                            border: 1px solid rgba(244, 67, 54, 0.5);
+                            background: linear-gradient(145deg, rgba(244, 67, 54, 0.2), rgba(211, 47, 47, 0.2));
+                            border-color: rgba(244, 67, 54, 0.6);
                             color: #E57373;
                         }
                         
                         .win-icon, .lose-icon {
-                            font-size: 32px;
-                            margin-bottom: 10px;
+                            font-size: 38px;
+                            margin-bottom: 12px;
                             display: inline-block;
-                            animation: bounce 1s infinite alternate;
+                            animation: bounce 1.2s infinite alternate;
                         }
                         
                         .win-title, .lose-title {
-                            font-size: 18px;
-                            margin-bottom: 8px;
+                            font-size: 22px;
+                            margin-bottom: 10px;
                         }
                         
                         .win-amount {
-                            font-size: 22px;
+                            font-size: 26px;
                             color: #FFD700;
-                            margin: 8px 0;
-                            text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+                            margin: 10px 0;
+                            text-shadow: 0 0 15px rgba(255, 215, 0, 0.6);
                         }
                         
                         .win-multiplier {
-                            font-size: 14px;
+                            font-size: 16px;
                             color: #81C784;
-                            margin-top: 5px;
+                            margin-top: 8px;
                         }
                         
                         .cell-inner {
@@ -946,7 +1021,7 @@ const AUDIO_FILES = {
                             height: 100%;
                             position: relative;
                             transform-style: preserve-3d;
-                            transition: transform 0.6s;
+                            transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
                         }
                         
                         .cell-back, .cell-front {
@@ -957,7 +1032,7 @@ const AUDIO_FILES = {
                             display: flex;
                             align-items: center;
                             justify-content: center;
-                            border-radius: 6px;
+                            border-radius: 12px;
                         }
                         
                         .cell-front {
@@ -968,12 +1043,12 @@ const AUDIO_FILES = {
                             transform: rotateY(180deg);
                         }
                         
-                        /* Улучшенные анимации */
+                        /* Анимации */
                         @keyframes explode {
                             0% { transform: scale3d(1, 1, 1); }
                             10%, 20% { transform: scale3d(0.9, 0.9, 0.9) rotate3d(0, 0, 1, -5deg); }
-                            30%, 50%, 70%, 90% { transform: scale3d(1.1, 1.1, 1.1) rotate3d(0, 0, 1, 5deg); }
-                            40%, 60%, 80% { transform: scale3d(1.1, 1.1, 1.1) rotate3d(0, 0, 1, -5deg); }
+                            30%, 50%, 70%, 90% { transform: scale3d(1.2, 1.2, 1.2) rotate3d(0, 0, 1, 5deg); }
+                            40%, 60%, 80% { transform: scale3d(1.2, 1.2, 1.2) rotate3d(0, 0, 1, -5deg); }
                             100% { transform: scale3d(1, 1, 1); }
                         }
                         
@@ -985,7 +1060,7 @@ const AUDIO_FILES = {
                         
                         @keyframes bounce {
                             from { transform: translateY(0); }
-                            to { transform: translateY(-10px); }
+                            to { transform: translateY(-12px); }
                         }
                         
                         @keyframes ripple {
@@ -1017,67 +1092,80 @@ const AUDIO_FILES = {
                         .multiplier-value.level-7 { color: #FF5722; text-shadow: 0 0 10px rgba(255, 87, 34, 0.7); }
                         
                         /* Адаптивный дизайн */
-                        @media (max-width: 480px) {
+                        @media (max-width: 576px) {
                             .miner-container {
-                                padding: 10px;
-                                border-radius: 10px;
+                                padding: 15px 10px;
+                                border-radius: 15px;
                             }
                             
                             .miner-header {
-                                padding: 8px;
-                                margin-bottom: 10px;
+                                flex-wrap: wrap;
+                                gap: 10px;
+                                margin-bottom: 15px;
+                                padding-bottom: 10px;
+                            }
+                            
+                            .header-logo {
+                                font-size: 18px;
+                                order: 1;
+                            }
+                            
+                            .sound-controls {
+                                order: 2;
+                                margin-left: auto;
+                            }
+                            
+                            .game-info-panel {
+                                order: 3;
+                                width: 100%;
+                                margin-top: 10px;
                             }
                             
                             .info-item {
-                                padding: 5px;
+                                padding: 8px;
                             }
                             
                             .info-label {
-                                font-size: 9px;
-                                margin-bottom: 2px;
+                                font-size: 10px;
                             }
                             
                             .info-value {
-                                font-size: 14px;
-                            }
-                            
-                            .sound-btn {
-                                width: 24px;
-                                height: 24px;
-                                font-size: 12px;
+                                font-size: 16px;
                             }
                             
                             .miner-grid {
-                                gap: 4px;
-                            }
-                            
-                            .grid-cell {
-                                font-size: 20px;
-                                border-radius: 5px;
-                            }
-                            
-                            .bet-settings {
                                 gap: 6px;
                             }
                             
-                            .control-group label {
-                                font-size: 11px;
+                            .grid-cell {
+                                border-radius: 10px;
+                                font-size: 24px;
+                            }
+                            
+                            .bet-settings {
+                                gap: 10px;
+                                margin-bottom: 10px;
                             }
                             
                             .bet-input, .mines-select {
-                                padding: 5px;
-                                font-size: 13px;
-                                width: 60px;
+                                padding: 8px;
+                                font-size: 14px;
                             }
                             
-                            .mines-select {
-                                width: 90px;
+                            .quick-bet-controls {
+                                gap: 6px;
+                                margin-bottom: 10px;
+                            }
+                            
+                            .quick-bet-btn {
+                                padding: 6px 12px;
+                                font-size: 13px;
                             }
                             
                             .action-btn {
-                                padding: 8px 0;
-                                font-size: 13px;
-                                min-width: 100px;
+                                padding: 12px 20px;
+                                font-size: 14px;
+                                min-width: 120px;
                             }
                         }
                     `;
@@ -2123,7 +2211,7 @@ const AUDIO_FILES = {
                     'win',
                     winAmount,
                     {
-                        revealedCells: state.gameData.revealedCells, // Добавлена запятая здесь
+                        revealedCells: state.gameData.revealedCells,
                         multiplier: state.gameData.currentMultiplier,
                         minesCount: state.gameData.minesCount,
                         perfectGame: true
