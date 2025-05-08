@@ -2389,7 +2389,41 @@
                 } catch (error) {
                     app.log('Crush', `Ошибка добавления стилей: ${error.message}`, true);
                 }
-            }   // конец addStyles
-        };      // конец возвращаемого объекта
-
-    })});          // закрываем (function(){…}) и вызываем её
+            }
+        };
+    })();
+    
+    // Регистрируем игру
+    try {
+        if (window.registerGame) {
+            window.registerGame('crushGame', crushGame);
+            app.log('Crush', 'Игра зарегистрирована через новую систему registerGame');
+        }
+        
+        window.crushGame = crushGame;
+        app.log('Crush', 'Игра экспортирована в глобальное пространство имен');
+        
+        crushGame.addStyles();
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(() => {
+                if (!crushGame.getStatus().user.initialized && !crushGame.getStatus().user.initializationStarted) {
+                    app.log('Crush', 'Запускаем автоматическую инициализацию');
+                    crushGame.init();
+                }
+            }, 500);
+        });
+        
+        if (document.readyState === 'complete' || document.readyState === 'interactive') {
+            setTimeout(() => {
+                if (!crushGame.getStatus().user.initialized && !crushGame.getStatus().user.initializationStarted) {
+                    app.log('Crush', 'Запускаем автоматическую инициализацию (DOM уже загружен)');
+                    crushGame.init();
+                }
+            }, 500);
+        }
+        
+    } catch (error) {
+        app.log('Crush', `Ошибка регистрации игры: ${error.message}`, true);
+    }
+})();
