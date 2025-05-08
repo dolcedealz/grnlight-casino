@@ -1,16 +1,16 @@
 /**
- * miner.js - Enhanced version of the Miner game
- * Version 3.2.0
+ * miner.js - Компактная версия игры Майнер
+ * Версия 3.3.0
  * 
- * Improvements:
- * - Enhanced visual design with animations and effects
- * - Added sound effects and background music
- * - Improved coefficient system with balanced formulas
- * - Added particle effects for explosions
- * - Implemented progressive multiplier growth
+ * Улучшения:
+ * - Оптимизированный и компактный интерфейс
+ * - Полная русификация элементов
+ * - Улучшенная производительность
+ * - Адаптивный дизайн для мобильных устройств
+ * - Оптимизированные анимации
  */
 
-// Predefined audio files to preload
+// Предопределенные аудио файлы для предзагрузки
 const AUDIO_FILES = {
     background: 'https://assets.mixkit.co/music/preview/mixkit-tech-house-vibes-130.mp3',
     click: 'https://assets.mixkit.co/sfx/preview/mixkit-modern-technology-select-3124.mp3',
@@ -21,11 +21,11 @@ const AUDIO_FILES = {
     perfectWin: 'https://assets.mixkit.co/sfx/preview/mixkit-magical-coin-win-1936.mp3'
 };
 
-// Prevent conflicts and ensure isolated environment
+// Предотвращаем конфликты и обеспечиваем изолированную среду
 (function() {
-    // Check for GreenLightApp object
+    // Проверка наличия основного объекта приложения
     if (!window.GreenLightApp) {
-        console.error('[Miner] GreenLightApp not initialized!');
+        console.error('[Майнер] GreenLightApp не инициализирован!');
         window.GreenLightApp = {
             log: function(source, message, isError) {
                 if (isError) console.error(`[${source}] ${message}`);
@@ -35,11 +35,11 @@ const AUDIO_FILES = {
     }
     
     const app = window.GreenLightApp;
-    app.log('Miner', 'Initializing enhanced Miner game module v3.2.0');
+    app.log('Майнер', 'Инициализация компактной версии игры Майнер v3.3.0');
     
-    // Game logic in closure for isolation
+    // Игровая логика в замыкании для изоляции
     const minerGame = (function() {
-        // Game elements
+        // Элементы игры
         let elements = {
             newGameBtn: null,
             cashoutBtn: null,
@@ -57,7 +57,7 @@ const AUDIO_FILES = {
             volumeControl: null
         };
         
-        // Audio elements
+        // Аудио элементы
         let audio = {
             background: null,
             click: null,
@@ -72,29 +72,10 @@ const AUDIO_FILES = {
             volume: 0.5
         };
         
-        // Private mine data storage (encrypted)
+        // Приватное хранилище данных мин (зашифрованное)
         let _minesData = null;
         
-        // Data encryption function
-        const encodeData = function(data) {
-            // Simple encryption to obfuscate data
-            return btoa(JSON.stringify(data).split('').map(c => 
-                String.fromCharCode(c.charCodeAt(0) + 7)
-            ).join(''));
-        };
-        
-        // Data decryption function
-        const decodeData = function(encoded) {
-            try {
-                return JSON.parse(atob(encoded).split('').map(c => 
-                    String.fromCharCode(c.charCodeAt(0) - 7)
-                ).join(''));
-            } catch (e) {
-                return [];
-            }
-        };
-        
-        // Game state
+        // Состояние игры
         let state = {
             isPlaying: false,
             initialized: false,
@@ -103,18 +84,18 @@ const AUDIO_FILES = {
             gameData: {
                 grid: [],
                 revealedCells: [],
-                totalCells: 25,  // 5x5 grid
+                totalCells: 25,  // Сетка 5x5
                 minesCount: 3,
                 currentMultiplier: 1,
                 betAmount: 0,
                 baseMultiplier: 1.0,
-                maxMultiplier: 1000, // Maximum multiplier for balance
-                houseEdge: 0.05, // 5% house edge for fair gameplay
+                maxMultiplier: 1000, // Максимальный множитель для баланса
+                houseEdge: 0.05, // 5% преимущество казино для честной игры
                 explosionAnimationActive: false
             }
         };
         
-        // Multiplier configuration for different mine counts
+        // Конфигурация множителей для разного количества мин
         const MULTIPLIER_CONFIG = {
             1: { base: 1.05, growth: 0.15, maxBonus: 1.5 },
             3: { base: 1.15, growth: 0.25, maxBonus: 2.0 },
@@ -126,19 +107,19 @@ const AUDIO_FILES = {
         };
         
         /**
-         * Initialize audio system
+         * Инициализация аудио системы
          */
         const initAudio = function() {
             if (audio.initialized) return;
             
             try {
-                // Create audio container
+                // Создаем контейнер для аудио
                 const audioContainer = document.createElement('div');
                 audioContainer.id = 'miner-audio-container';
                 audioContainer.style.display = 'none';
                 document.body.appendChild(audioContainer);
                 
-                // Initialize all audio elements
+                // Инициализируем все аудио элементы
                 for (const [key, url] of Object.entries(AUDIO_FILES)) {
                     const audioElement = document.createElement('audio');
                     audioElement.src = url;
@@ -146,7 +127,7 @@ const AUDIO_FILES = {
                     
                     if (key === 'background') {
                         audioElement.loop = true;
-                        audioElement.volume = 0.3; // Lower volume for background music
+                        audioElement.volume = 0.3; // Пониженная громкость для фоновой музыки
                     } else {
                         audioElement.volume = 0.5;
                     }
@@ -156,37 +137,37 @@ const AUDIO_FILES = {
                 }
                 
                 audio.initialized = true;
-                app.log('Miner', 'Audio system initialized successfully');
+                app.log('Майнер', 'Аудио система успешно инициализирована');
                 
             } catch (error) {
-                app.log('Miner', `Error initializing audio: ${error.message}`, true);
+                app.log('Майнер', `Ошибка инициализации аудио: ${error.message}`, true);
             }
         };
         
         /**
-         * Play sound effect
+         * Воспроизведение звукового эффекта
          */
         const playSound = function(sound) {
             if (!audio.initialized || audio.muted || !audio[sound]) return;
             
             try {
-                // Stop the sound if it's already playing
+                // Останавливаем звук, если он уже воспроизводится
                 audio[sound].pause();
                 audio[sound].currentTime = 0;
                 
-                // Set volume and play
+                // Устанавливаем громкость и воспроизводим
                 audio[sound].volume = audio.volume;
                 audio[sound].play().catch(e => {
-                    // Silently catch autoplay errors
-                    app.log('Miner', `Autoplay prevented for ${sound}: ${e.message}`);
+                    // Тихо ловим ошибки автовоспроизведения
+                    app.log('Майнер', `Автовоспроизведение звука ${sound} предотвращено: ${e.message}`);
                 });
             } catch (error) {
-                app.log('Miner', `Error playing sound ${sound}: ${error.message}`, true);
+                app.log('Майнер', `Ошибка воспроизведения звука ${sound}: ${error.message}`, true);
             }
         };
         
         /**
-         * Toggle background music
+         * Переключение фоновой музыки
          */
         const toggleMusic = function() {
             if (!audio.initialized) return;
@@ -197,38 +178,38 @@ const AUDIO_FILES = {
                 if (audio.musicMuted) {
                     audio.background.pause();
                     
-                    // Update music toggle button
+                    // Обновляем кнопку переключения музыки
                     if (elements.musicToggle) {
                         elements.musicToggle.innerHTML = '🔇';
                         elements.musicToggle.classList.add('muted');
                     }
                 } else {
                     audio.background.play().catch(e => {
-                        // Silently catch autoplay errors
-                        app.log('Miner', `Autoplay prevented for background music: ${e.message}`);
+                        // Тихо ловим ошибки автовоспроизведения
+                        app.log('Майнер', `Автовоспроизведение фоновой музыки предотвращено: ${e.message}`);
                     });
                     
-                    // Update music toggle button
+                    // Обновляем кнопку переключения музыки
                     if (elements.musicToggle) {
                         elements.musicToggle.innerHTML = '🔊';
                         elements.musicToggle.classList.remove('muted');
                     }
                 }
                 
-                app.log('Miner', `Background music ${audio.musicMuted ? 'muted' : 'enabled'}`);
+                app.log('Майнер', `Фоновая музыка ${audio.musicMuted ? 'отключена' : 'включена'}`);
             } catch (error) {
-                app.log('Miner', `Error toggling music: ${error.message}`, true);
+                app.log('Майнер', `Ошибка переключения музыки: ${error.message}`, true);
             }
         };
         
         /**
-         * Toggle sound effects
+         * Переключение звуковых эффектов
          */
         const toggleSound = function() {
             try {
                 audio.muted = !audio.muted;
                 
-                // Update sound toggle button
+                // Обновляем кнопку переключения звука
                 if (elements.soundToggle) {
                     elements.soundToggle.innerHTML = audio.muted ? '🔇' : '🔊';
                     if (audio.muted) {
@@ -238,42 +219,42 @@ const AUDIO_FILES = {
                     }
                 }
                 
-                app.log('Miner', `Sound effects ${audio.muted ? 'muted' : 'enabled'}`);
+                app.log('Майнер', `Звуковые эффекты ${audio.muted ? 'отключены' : 'включены'}`);
             } catch (error) {
-                app.log('Miner', `Error toggling sound: ${error.message}`, true);
+                app.log('Майнер', `Ошибка переключения звука: ${error.message}`, true);
             }
         };
         
         /**
-         * Set audio volume
+         * Установка громкости аудио
          */
         const setVolume = function(value) {
             try {
                 audio.volume = Math.max(0, Math.min(1, value));
                 
-                // Update all audio elements
+                // Обновляем все аудио элементы
                 for (const [key, element] of Object.entries(audio)) {
                     if (element && typeof element === 'object' && element.volume !== undefined) {
                         if (key === 'background') {
-                            element.volume = audio.volume * 0.3; // Keep background music quieter
+                            element.volume = audio.volume * 0.3; // Держим фоновую музыку тише
                         } else {
                             element.volume = audio.volume;
                         }
                     }
                 }
                 
-                app.log('Miner', `Audio volume set to ${audio.volume}`);
+                app.log('Майнер', `Громкость аудио установлена на ${audio.volume}`);
             } catch (error) {
-                app.log('Miner', `Error setting volume: ${error.message}`, true);
+                app.log('Майнер', `Ошибка установки громкости: ${error.message}`, true);
             }
         };
         
         /**
-         * Create particle effect
+         * Создание эффекта частиц
          */
         const createParticleEffect = function(x, y, type) {
             try {
-                // Create particles container if it doesn't exist
+                // Создаем контейнер для частиц, если его нет
                 let particlesContainer = document.getElementById('particles-container');
                 if (!particlesContainer) {
                     particlesContainer = document.createElement('div');
@@ -288,7 +269,7 @@ const AUDIO_FILES = {
                     document.body.appendChild(particlesContainer);
                 }
                 
-                // Define particle settings based on type
+                // Настраиваем параметры частиц в зависимости от типа
                 let particleCount, particleColors, particleSize, particleSpeed, particleLife;
                 
                 switch(type) {
@@ -321,19 +302,19 @@ const AUDIO_FILES = {
                         particleLife = { min: 500, max: 1000 };
                 }
                 
-                // Create particles
+                // Создаем частицы
                 for (let i = 0; i < particleCount; i++) {
                     setTimeout(() => {
                         const particle = document.createElement('div');
                         
-                        // Random particle properties
+                        // Случайные свойства частиц
                         const color = particleColors[Math.floor(Math.random() * particleColors.length)];
                         const size = Math.random() * (particleSize.max - particleSize.min) + particleSize.min;
                         const angle = Math.random() * Math.PI * 2;
                         const speed = Math.random() * (particleSpeed.max - particleSpeed.min) + particleSpeed.min;
                         const life = Math.random() * (particleLife.max - particleLife.min) + particleLife.min;
                         
-                        // Set particle styles
+                        // Устанавливаем стили частиц
                         particle.style.position = 'absolute';
                         particle.style.left = `${x}px`;
                         particle.style.top = `${y}px`;
@@ -344,7 +325,7 @@ const AUDIO_FILES = {
                         particle.style.opacity = '1';
                         particle.style.pointerEvents = 'none';
                         
-                        // Give some particles a custom shape for variety
+                        // Даем некоторым частицам пользовательскую форму для разнообразия
                         if (type === 'confetti' && Math.random() > 0.5) {
                             particle.style.width = `${size / 2}px`;
                             particle.style.height = `${size * 2}px`;
@@ -353,17 +334,17 @@ const AUDIO_FILES = {
                         
                         particlesContainer.appendChild(particle);
                         
-                        // Calculate velocity
+                        // Рассчитываем скорость
                         const vx = Math.cos(angle) * speed;
                         const vy = Math.sin(angle) * speed;
                         
-                        // Animation variables
+                        // Переменные анимации
                         let posX = x;
                         let posY = y;
                         let opacity = 1;
                         let startTime = Date.now();
                         
-                        // Animate particle
+                        // Анимируем частицу
                         const animateParticle = function() {
                             const elapsed = Date.now() - startTime;
                             if (elapsed >= life) {
@@ -373,33 +354,33 @@ const AUDIO_FILES = {
                                 return;
                             }
                             
-                            // Update position with gravity effect
+                            // Обновляем позицию с эффектом гравитации
                             posX += vx;
-                            posY += vy + (elapsed / life) * 5; // Add gravity effect
+                            posY += vy + (elapsed / life) * 5; // Добавляем эффект гравитации
                             
-                            // Fade out
+                            // Затухание
                             opacity = 1 - (elapsed / life);
                             
-                            // Update styles
+                            // Обновляем стили
                             particle.style.left = `${posX}px`;
                             particle.style.top = `${posY}px`;
                             particle.style.opacity = opacity.toString();
                             
-                            // Continue animation
+                            // Продолжаем анимацию
                             requestAnimationFrame(animateParticle);
                         };
                         
-                        // Start animation
+                        // Запускаем анимацию
                         requestAnimationFrame(animateParticle);
-                    }, Math.random() * 200); // Stagger particle creation
+                    }, Math.random() * 200); // Создаем частицы с задержкой
                 }
             } catch (error) {
-                app.log('Miner', `Error creating particle effect: ${error.message}`, true);
+                app.log('Майнер', `Ошибка создания эффекта частиц: ${error.message}`, true);
             }
         };
         
         /**
-         * Create screen shake effect
+         * Создание эффекта тряски экрана
          */
         const screenShake = function(intensity = 5, duration = 500) {
             if (!state.animationsEnabled) return;
@@ -408,13 +389,13 @@ const AUDIO_FILES = {
                 const minerScreen = document.getElementById('miner-screen');
                 if (!minerScreen) return;
                 
-                // Save original transform
+                // Сохраняем исходное значение transform
                 const originalTransform = minerScreen.style.transform || '';
                 
-                // Animation variables
+                // Переменные анимации
                 let startTime = Date.now();
                 
-                // Animation function
+                // Функция анимации
                 const shake = function() {
                     const elapsed = Date.now() - startTime;
                     if (elapsed >= duration) {
@@ -422,104 +403,104 @@ const AUDIO_FILES = {
                         return;
                     }
                     
-                    // Calculate intensity based on remaining time
+                    // Вычисляем интенсивность на основе оставшегося времени
                     const remaining = 1 - (elapsed / duration);
                     const currentIntensity = intensity * remaining;
                     
-                    // Generate random offset
+                    // Генерируем случайное смещение
                     const offsetX = (Math.random() - 0.5) * 2 * currentIntensity;
                     const offsetY = (Math.random() - 0.5) * 2 * currentIntensity;
                     
-                    // Apply transform
+                    // Применяем трансформацию
                     minerScreen.style.transform = `${originalTransform} translate(${offsetX}px, ${offsetY}px)`;
                     
-                    // Continue animation
+                    // Продолжаем анимацию
                     requestAnimationFrame(shake);
                 };
                 
-                // Start animation
+                // Запускаем анимацию
                 requestAnimationFrame(shake);
             } catch (error) {
-                app.log('Miner', `Error creating screen shake: ${error.message}`, true);
+                app.log('Майнер', `Ошибка создания тряски экрана: ${error.message}`, true);
             }
         };
         
         /**
-         * Create main game container
+         * Создание основного контейнера игры
          */
         const createGameContainer = function() {
             try {
-                // Check if container already exists
+                // Проверяем существование контейнера
                 let container = document.querySelector('.miner-container');
                 if (container) {
                     elements.container = container;
                     return container;
                 }
                 
-                // Find game screen
+                // Ищем игровой экран
                 const minerScreen = document.getElementById('miner-screen');
                 if (!minerScreen) {
-                    app.log('Miner', 'Game screen not found', true);
+                    app.log('Майнер', 'Игровой экран не найден', true);
                     return null;
                 }
                 
-                // Create container for the game
+                // Создаем контейнер для игры
                 container = document.createElement('div');
                 container.className = 'miner-container game-container';
                 minerScreen.appendChild(container);
                 
                 elements.container = container;
-                app.log('Miner', 'Main game container created');
+                app.log('Майнер', 'Основной контейнер игры создан');
                 
                 return container;
             } catch (error) {
-                app.log('Miner', `Error creating container: ${error.message}`, true);
+                app.log('Майнер', `Ошибка создания контейнера: ${error.message}`, true);
                 return null;
             }
         };
         
         /**
-         * Create game interface
+         * Создание игрового интерфейса
          */
         const createGameInterface = function() {
             try {
                 const container = elements.container || createGameContainer();
                 if (!container) {
-                    app.log('Miner', 'Cannot create interface: container not found', true);
+                    app.log('Майнер', 'Невозможно создать интерфейс: контейнер не найден', true);
                     return false;
                 }
                 
-                // Check if interface already exists
+                // Проверяем, существует ли уже интерфейс
                 if (container.querySelector('#miner-grid')) {
-                    app.log('Miner', 'Interface already created');
+                    app.log('Майнер', 'Интерфейс уже создан');
                     return true;
                 }
                 
-                // Create HTML markup for the game
+                // Создаем HTML-разметку для игры
                 container.innerHTML = `
                     <div class="miner-header">
                         <div class="game-info-panel">
                             <div class="info-item">
-                                <span class="info-label">Multiplier</span>
+                                <span class="info-label">Множитель</span>
                                 <span id="current-multiplier" class="info-value multiplier-value">1.00x</span>
                             </div>
                             <div class="info-item">
-                                <span class="info-label">Safe Cells</span>
+                                <span class="info-label">Безопасных</span>
                                 <span id="safe-count" class="info-value">0/25</span>
                             </div>
                             <div class="info-item">
-                                <span class="info-label">Potential Win</span>
+                                <span class="info-label">Выигрыш</span>
                                 <span id="potential-win" class="info-value win-value">0 ⭐</span>
                             </div>
                         </div>
                         <div class="sound-controls">
-                            <button id="sound-toggle" class="sound-btn" title="Toggle Sound Effects">🔊</button>
-                            <button id="music-toggle" class="sound-btn" title="Toggle Music">🔊</button>
+                            <button id="sound-toggle" class="sound-btn" title="Звук">🔊</button>
+                            <button id="music-toggle" class="sound-btn" title="Музыка">🔊</button>
                         </div>
                     </div>
                     
                     <div id="miner-grid" class="miner-grid">
-                        <!-- Grid will be created dynamically -->
+                        <!-- Сетка будет создана динамически -->
                     </div>
                     
                     <div id="miner-result" class="result hidden"></div>
@@ -527,39 +508,50 @@ const AUDIO_FILES = {
                     <div class="miner-controls">
                         <div class="bet-settings">
                             <div class="control-group">
-                                <label for="miner-bet">Bet:</label>
-                                <input type="number" id="miner-bet" min="1" max="1000" value="10" class="bet-input">
+                                <label for="miner-bet">Ставка:</label>
+                                <div class="bet-input-wrapper">
+                                    <button class="bet-decrease-btn" aria-label="Уменьшить ставку">-</button>
+                                    <input type="number" id="miner-bet" inputmode="numeric" min="1" max="1000" value="10" class="bet-input">
+                                    <button class="bet-increase-btn" aria-label="Увеличить ставку">+</button>
+                                </div>
                             </div>
                             
                             <div class="control-group">
-                                <label for="mines-count">Mines:</label>
+                                <label for="mines-count">Мины:</label>
                                 <select id="mines-count" class="mines-select">
-                                    <option value="1">1 mine</option>
-                                    <option value="3" selected>3 mines</option>
-                                    <option value="5">5 mines</option>
-                                    <option value="10">10 mines</option>
-                                    <option value="15">15 mines</option>
-                                    <option value="20">20 mines</option>
-                                    <option value="24">24 mines</option>
+                                    <option value="1">1 мина</option>
+                                    <option value="3" selected>3 мины</option>
+                                    <option value="5">5 мин</option>
+                                    <option value="10">10 мин</option>
+                                    <option value="15">15 мин</option>
+                                    <option value="20">20 мин</option>
+                                    <option value="24">24 мины</option>
                                 </select>
                             </div>
                         </div>
                         
+                        <div class="quick-bet-controls">
+                            <button class="quick-bet-btn" data-amount="10">10</button>
+                            <button class="quick-bet-btn" data-amount="20">20</button>
+                            <button class="quick-bet-btn" data-amount="50">50</button>
+                            <button class="quick-bet-btn" data-amount="100">100</button>
+                        </div>
+                        
                         <div class="game-buttons">
-                            <button id="new-game-btn" class="action-btn primary-btn">NEW GAME</button>
-                            <button id="cashout-btn" class="action-btn secondary-btn" disabled>CASH OUT</button>
+                            <button id="new-game-btn" class="action-btn primary-btn">НАЧАТЬ</button>
+                            <button id="cashout-btn" class="action-btn secondary-btn" disabled>ЗАБРАТЬ</button>
                         </div>
                     </div>
                 `;
                 
-                // Create styles if they don't exist
+                // Создаем стили, если их еще нет
                 if (!document.getElementById('miner-styles')) {
                     const styleElement = document.createElement('style');
                     styleElement.id = 'miner-styles';
                     styleElement.textContent = `
                         .miner-container {
-                            padding: 20px;
-                            max-width: 600px;
+                            padding: 15px;
+                            max-width: 500px;
                             margin: 0 auto;
                             font-family: 'Arial', sans-serif;
                             border-radius: 16px;
@@ -570,10 +562,10 @@ const AUDIO_FILES = {
                         }
                         
                         .miner-header {
-                            margin-bottom: 20px;
+                            margin-bottom: 15px;
                             background: rgba(0, 0, 0, 0.2);
                             border-radius: 12px;
-                            padding: 15px;
+                            padding: 10px;
                             display: flex;
                             justify-content: space-between;
                             align-items: center;
@@ -585,26 +577,27 @@ const AUDIO_FILES = {
                             justify-content: space-around;
                             align-items: center;
                             flex: 1;
+                            gap: 8px;
                         }
                         
                         .sound-controls {
                             display: flex;
-                            gap: 10px;
+                            gap: 8px;
                         }
                         
                         .sound-btn {
                             background: rgba(255, 255, 255, 0.1);
                             border: none;
                             border-radius: 50%;
-                            width: 32px;
-                            height: 32px;
+                            width: 28px;
+                            height: 28px;
                             display: flex;
                             align-items: center;
                             justify-content: center;
                             cursor: pointer;
                             transition: all 0.2s;
                             color: white;
-                            font-size: 16px;
+                            font-size: 14px;
                         }
                         
                         .sound-btn:hover {
@@ -618,28 +611,32 @@ const AUDIO_FILES = {
                         }
                         
                         .info-item {
-                            text-align: center;
+                            padding: 6px 10px;
                             background: rgba(0, 0, 0, 0.2);
-                            padding: 8px 12px;
                             border-radius: 8px;
-                            min-width: 120px;
+                            text-align: center;
+                            flex: 1;
+                            min-width: 0;
                         }
                         
                         .info-label {
                             display: block;
-                            font-size: 12px;
+                            font-size: 10px;
                             color: rgba(255, 255, 255, 0.7);
-                            margin-bottom: 5px;
+                            margin-bottom: 3px;
                             text-transform: uppercase;
                             font-weight: bold;
-                            letter-spacing: 1px;
+                            letter-spacing: 0.5px;
                         }
                         
                         .info-value {
-                            font-size: 18px;
+                            font-size: 16px;
                             font-weight: bold;
                             color: white;
                             display: block;
+                            white-space: nowrap;
+                            overflow: hidden;
+                            text-overflow: ellipsis;
                         }
                         
                         .multiplier-value {
@@ -656,8 +653,8 @@ const AUDIO_FILES = {
                         .miner-grid {
                             display: grid;
                             grid-template-columns: repeat(5, 1fr);
-                            gap: 8px;
-                            margin: 20px auto;
+                            gap: 6px;
+                            margin: 10px auto;
                             max-width: 400px;
                             perspective: 1000px;
                         }
@@ -665,7 +662,7 @@ const AUDIO_FILES = {
                         .grid-cell {
                             aspect-ratio: 1;
                             background: linear-gradient(135deg, #2a2a2a, #1a1a1a);
-                            border-radius: 8px;
+                            border-radius: 6px;
                             display: flex;
                             align-items: center;
                             justify-content: center;
@@ -675,7 +672,7 @@ const AUDIO_FILES = {
                             border: 1px solid rgba(255, 255, 255, 0.1);
                             position: relative;
                             transform-style: preserve-3d;
-                            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+                            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
                             overflow: hidden;
                         }
                         
@@ -715,30 +712,59 @@ const AUDIO_FILES = {
                         }
                         
                         .miner-controls {
-                            margin-top: 20px;
+                            margin-top: 15px;
                         }
                         
                         .bet-settings {
                             display: flex;
-                            gap: 20px;
-                            margin-bottom: 15px;
+                            gap: 10px;
+                            margin-bottom: 10px;
                             justify-content: center;
+                            flex-wrap: wrap;
                         }
                         
                         .control-group {
                             display: flex;
-                            align-items: center;
-                            gap: 10px;
+                            flex-direction: column;
+                            gap: 5px;
                         }
                         
                         .control-group label {
                             color: rgba(255, 255, 255, 0.8);
+                            font-size: 12px;
+                            font-weight: bold;
+                            margin-bottom: 2px;
+                        }
+                        
+                        .bet-input-wrapper {
+                            display: flex;
+                            align-items: center;
+                            gap: 4px;
+                        }
+                        
+                        .bet-decrease-btn, .bet-increase-btn {
+                            width: 24px;
+                            height: 24px;
+                            border-radius: 50%;
+                            border: none;
+                            display: flex;
+                            justify-content: center;
+                            align-items: center;
+                            cursor: pointer;
+                            background: var(--medium-gray, #444);
+                            color: var(--white, #fff);
                             font-size: 14px;
                             font-weight: bold;
+                            transition: all 0.2s;
+                        }
+                        
+                        .bet-decrease-btn:hover, .bet-increase-btn:hover {
+                            background: var(--primary-green, #4CAF50);
+                            transform: scale(1.1);
                         }
                         
                         .bet-input, .mines-select {
-                            padding: 8px 12px;
+                            padding: 6px 8px;
                             border-radius: 6px;
                             border: 1px solid rgba(255, 255, 255, 0.1);
                             background: rgba(0, 0, 0, 0.2);
@@ -746,6 +772,12 @@ const AUDIO_FILES = {
                             font-size: 14px;
                             font-weight: bold;
                             transition: all 0.2s;
+                            width: 70px;
+                            text-align: center;
+                        }
+                        
+                        .mines-select {
+                            width: 100px;
                         }
                         
                         .bet-input:focus, .mines-select:focus {
@@ -759,21 +791,45 @@ const AUDIO_FILES = {
                             cursor: not-allowed;
                         }
                         
+                        .quick-bet-controls {
+                            display: flex;
+                            justify-content: center;
+                            gap: 8px;
+                            margin-bottom: 10px;
+                            flex-wrap: wrap;
+                        }
+                        
+                        .quick-bet-btn {
+                            padding: 5px 10px;
+                            background: rgba(0, 0, 0, 0.2);
+                            border: 1px solid rgba(255, 255, 255, 0.1);
+                            border-radius: 4px;
+                            color: #fff;
+                            font-size: 13px;
+                            cursor: pointer;
+                            transition: all 0.2s;
+                        }
+                        
+                        .quick-bet-btn:hover {
+                            background: rgba(76, 175, 80, 0.2);
+                            border-color: rgba(76, 175, 80, 0.5);
+                        }
+                        
                         .game-buttons {
                             display: flex;
-                            gap: 15px;
+                            gap: 10px;
                             justify-content: center;
                         }
                         
                         .action-btn {
-                            padding: 12px 24px;
+                            padding: 10px 0;
                             border-radius: 8px;
                             font-weight: bold;
-                            font-size: 16px;
+                            font-size: 14px;
                             cursor: pointer;
                             transition: all 0.2s;
                             border: none;
-                            min-width: 140px;
+                            min-width: 120px;
                             text-transform: uppercase;
                             letter-spacing: 1px;
                             position: relative;
@@ -828,8 +884,8 @@ const AUDIO_FILES = {
                         }
                         
                         .result {
-                            margin: 20px 0;
-                            padding: 20px;
+                            margin: 15px 0;
+                            padding: 15px;
                             border-radius: 12px;
                             text-align: center;
                             font-weight: bold;
@@ -861,26 +917,26 @@ const AUDIO_FILES = {
                         }
                         
                         .win-icon, .lose-icon {
-                            font-size: 36px;
+                            font-size: 32px;
                             margin-bottom: 10px;
                             display: inline-block;
                             animation: bounce 1s infinite alternate;
                         }
                         
                         .win-title, .lose-title {
-                            font-size: 20px;
-                            margin-bottom: 10px;
+                            font-size: 18px;
+                            margin-bottom: 8px;
                         }
                         
                         .win-amount {
-                            font-size: 24px;
+                            font-size: 22px;
                             color: #FFD700;
-                            margin: 10px 0;
+                            margin: 8px 0;
                             text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
                         }
                         
                         .win-multiplier {
-                            font-size: 16px;
+                            font-size: 14px;
                             color: #81C784;
                             margin-top: 5px;
                         }
@@ -901,7 +957,7 @@ const AUDIO_FILES = {
                             display: flex;
                             align-items: center;
                             justify-content: center;
-                            border-radius: 8px;
+                            border-radius: 6px;
                         }
                         
                         .cell-front {
@@ -912,7 +968,7 @@ const AUDIO_FILES = {
                             transform: rotateY(180deg);
                         }
                         
-                        /* Enhanced animations */
+                        /* Улучшенные анимации */
                         @keyframes explode {
                             0% { transform: scale3d(1, 1, 1); }
                             10%, 20% { transform: scale3d(0.9, 0.9, 0.9) rotate3d(0, 0, 1, -5deg); }
@@ -951,7 +1007,7 @@ const AUDIO_FILES = {
                             animation: pulse 1.5s infinite;
                         }
                         
-                        /* Progressive multiplier colors */
+                        /* Цвета для прогрессивных множителей */
                         .multiplier-value.level-1 { color: #4CAF50; text-shadow: 0 0 10px rgba(76, 175, 80, 0.5); }
                         .multiplier-value.level-2 { color: #8BC34A; text-shadow: 0 0 10px rgba(139, 195, 74, 0.5); }
                         .multiplier-value.level-3 { color: #CDDC39; text-shadow: 0 0 10px rgba(205, 220, 57, 0.5); }
@@ -960,24 +1016,67 @@ const AUDIO_FILES = {
                         .multiplier-value.level-6 { color: #FF9800; text-shadow: 0 0 10px rgba(255, 152, 0, 0.5); }
                         .multiplier-value.level-7 { color: #FF5722; text-shadow: 0 0 10px rgba(255, 87, 34, 0.7); }
                         
-                        /* Responsive design */
-                        @media (max-width: 600px) {
+                        /* Адаптивный дизайн */
+                        @media (max-width: 480px) {
+                            .miner-container {
+                                padding: 10px;
+                                border-radius: 10px;
+                            }
+                            
                             .miner-header {
-                                flex-direction: column;
-                                gap: 15px;
-                            }
-                            
-                            .game-info-panel {
-                                flex-wrap: wrap;
-                                gap: 10px;
-                            }
-                            
-                            .bet-settings {
-                                flex-direction: column;
-                                align-items: center;
+                                padding: 8px;
+                                margin-bottom: 10px;
                             }
                             
                             .info-item {
+                                padding: 5px;
+                            }
+                            
+                            .info-label {
+                                font-size: 9px;
+                                margin-bottom: 2px;
+                            }
+                            
+                            .info-value {
+                                font-size: 14px;
+                            }
+                            
+                            .sound-btn {
+                                width: 24px;
+                                height: 24px;
+                                font-size: 12px;
+                            }
+                            
+                            .miner-grid {
+                                gap: 4px;
+                            }
+                            
+                            .grid-cell {
+                                font-size: 20px;
+                                border-radius: 5px;
+                            }
+                            
+                            .bet-settings {
+                                gap: 6px;
+                            }
+                            
+                            .control-group label {
+                                font-size: 11px;
+                            }
+                            
+                            .bet-input, .mines-select {
+                                padding: 5px;
+                                font-size: 13px;
+                                width: 60px;
+                            }
+                            
+                            .mines-select {
+                                width: 90px;
+                            }
+                            
+                            .action-btn {
+                                padding: 8px 0;
+                                font-size: 13px;
                                 min-width: 100px;
                             }
                         }
@@ -985,90 +1084,103 @@ const AUDIO_FILES = {
                     document.head.appendChild(styleElement);
                 }
                 
-                app.log('Miner', 'Game interface successfully created');
+                // Находим и добавляем обработчики событий для кнопок быстрой ставки
+                const quickBetButtons = document.querySelectorAll('.quick-bet-btn');
+                quickBetButtons.forEach(button => {
+                    button.addEventListener('click', function() {
+                        const amount = parseInt(this.dataset.amount);
+                        if (elements.minerBet) {
+                            elements.minerBet.value = amount;
+                        }
+                        // Проигрываем звук клика
+                        playSound('click');
+                    });
+                });
+                
+                app.log('Майнер', 'Игровой интерфейс успешно создан');
                 return true;
             } catch (error) {
-                app.log('Miner', `Error creating interface: ${error.message}`, true);
+                app.log('Майнер', `Ошибка создания интерфейса: ${error.message}`, true);
                 return false;
             }
         };
         
         /**
-         * Initialize the game
-         * With protection against repeated initialization and timeout
+         * Инициализация игры
+         * С защитой от повторной инициализации и таймаутом
          */
         const init = async function() {
-            // Prevent repeated initialization
+            // Предотвращаем повторную инициализацию
             if (state.initialized || state.initializationStarted) {
-                app.log('Miner', 'Initialization already complete or in progress');
+                app.log('Майнер', 'Инициализация уже завершена или выполняется');
                 return true;
             }
             
             state.initializationStarted = true;
-            app.log('Miner', 'Starting game initialization');
+            app.log('Майнер', 'Запуск инициализации игры');
             
             try {
-                // Set timeout for initialization
+                // Устанавливаем таймаут для инициализации
                 const initPromise = new Promise(async (resolve) => {
                     try {
-                        // First create interface
+                        // Сначала создаем интерфейс
                         if (!createGameInterface()) {
-                            app.log('Miner', 'Failed to create game interface', true);
+                            app.log('Майнер', 'Не удалось создать игровой интерфейс', true);
                             resolve(false);
                             return;
                         }
                         
-                        // Initialize audio system
+                        // Инициализируем аудио систему
                         initAudio();
                         
-                        // Then get DOM elements
+                        // Затем получаем DOM элементы
                         await findDOMElements();
                         
-                        // Create game grid
+                        // Создаем игровую сетку
                         createGrid();
                         
-                        // Update potential win
+                        // Обновляем потенциальный выигрыш
                         updatePotentialWin();
                         
-                        // Add event listeners
+                        // Добавляем обработчики событий
                         setupEventListeners();
                         
                         state.initialized = true;
-                        app.log('Miner', 'Initialization successfully completed');
+                        app.log('Майнер', 'Инициализация успешно завершена');
                         resolve(true);
                     } catch (innerError) {
-                        app.log('Miner', `Error during initialization process: ${innerError.message}`, true);
+                        app.log('Майнер', `Ошибка в процессе инициализации: ${innerError.message}`, true);
                         resolve(false);
                     }
                 });
                 
-                // Set timeout (3 seconds)
+                // Устанавливаем таймаут (3 секунды)
                 const timeoutPromise = new Promise((resolve) => {
                     setTimeout(() => {
-                        app.log('Miner', 'Initialization timeout', true);
+                        app.log('Майнер', 'Таймаут инициализации', true);
                         resolve(false);
                     }, 3000);
                 });
                 
-                // Use Promise.race to prevent hanging
+                // Используем Promise.race для предотвращения зависания
                 const result = await Promise.race([initPromise, timeoutPromise]);
                 
                 return result;
                 
             } catch (error) {
-                app.log('Miner', `Critical initialization error: ${error.message}`, true);
+                app.log('Майнер', `Критическая ошибка инициализации: ${error.message}`, true);
                 return false;
             }
         };
         
         /**
-         * Find DOM elements with null protection
+         * Поиск DOM элементов с защитой от null
          */
         const findDOMElements = async function() {
-            // Use Promise for asynchronicity
+            // Используем Promise для асинхронности
             return new Promise((resolve, reject) => {
                 try {
-                    // Timeout for waiting for DOM readiness
+                    // Таймаут для ожидания готовности DOM
                     setTimeout(() => {
                         elements.newGameBtn = document.getElementById('new-game-btn');
                         elements.cashoutBtn = document.getElementById('cashout-btn');
@@ -1082,50 +1194,50 @@ const AUDIO_FILES = {
                         elements.soundToggle = document.getElementById('sound-toggle');
                         elements.musicToggle = document.getElementById('music-toggle');
                         
-                        // Check critical elements and report on them
+                        // Проверка критических элементов и отчет о них
                         if (!elements.newGameBtn) {
-                            app.log('Miner', 'Warning: element new-game-btn not found', true);
+                            app.log('Майнер', 'Предупреждение: элемент new-game-btn не найден', true);
                         } else {
-                            app.log('Miner', 'Element new-game-btn found successfully');
+                            app.log('Майнер', 'Элемент new-game-btn успешно найден');
                         }
                         
                         if (!elements.minerGrid) {
-                            app.log('Miner', 'Warning: element miner-grid not found', true);
+                            app.log('Майнер', 'Предупреждение: элемент miner-grid не найден', true);
                         } else {
-                            app.log('Miner', 'Element miner-grid found successfully');
+                            app.log('Майнер', 'Элемент miner-grid успешно найден');
                         }
                         
                         resolve();
                     }, 100);
                 } catch (error) {
-                    app.log('Miner', `Error finding DOM elements: ${error.message}`, true);
-                    reject(error);
+                    app.log('Майнер', `Ошибка поиска DOM элементов: ${error.message}`, true);
+                    resolve(); // Резолвим промис, чтобы не блокировать инициализацию
                 }
             });
         };
         
         /**
-         * Setup event listeners
+         * Настройка обработчиков событий
          */
         const setupEventListeners = function() {
             try {
-                // New game button
+                // Кнопка новой игры
                 if (elements.newGameBtn) {
-                    // Clear current handlers (prevent duplication)
+                    // Очищаем текущие обработчики (предотвращение дублирования)
                     const newGameBtn = elements.newGameBtn.cloneNode(true);
                     if (elements.newGameBtn.parentNode) {
                         elements.newGameBtn.parentNode.replaceChild(newGameBtn, elements.newGameBtn);
                     }
                     elements.newGameBtn = newGameBtn;
                     
-                    // Add handler
+                    // Добавляем обработчик
                     elements.newGameBtn.addEventListener('click', startNewGame);
-                    app.log('Miner', 'Handler for new game button set');
+                    app.log('Майнер', 'Обработчик для кнопки новой игры установлен');
                 } else {
-                    app.log('Miner', 'Cannot set handler: new game button not found', true);
+                    app.log('Майнер', 'Невозможно установить обработчик: кнопка новой игры не найдена', true);
                 }
                 
-                // Cashout button
+                // Кнопка вывода
                 if (elements.cashoutBtn) {
                     const cashoutBtn = elements.cashoutBtn.cloneNode(true);
                     if (elements.cashoutBtn.parentNode) {
@@ -1134,53 +1246,130 @@ const AUDIO_FILES = {
                     elements.cashoutBtn = cashoutBtn;
                     
                     elements.cashoutBtn.addEventListener('click', cashout);
-                    app.log('Miner', 'Handler for cashout button set');
+                    app.log('Майнер', 'Обработчик для кнопки вывода установлен');
                 }
                 
-                // Mine count selection
+                // Выбор количества мин
                 if (elements.minesCount) {
                     elements.minesCount.addEventListener('change', updateMineCount);
-                    app.log('Miner', 'Handler for mine count selection set');
+                    app.log('Майнер', 'Обработчик для выбора количества мин установлен');
                 }
                 
-                // Bet change
+                // Изменение ставки
                 if (elements.minerBet) {
                     elements.minerBet.addEventListener('input', updatePotentialWin);
-                    app.log('Miner', 'Handler for bet change set');
+                    app.log('Майнер', 'Обработчик для изменения ставки установлен');
                 }
                 
-                // Sound toggle
+                // Кнопки +/- для ставки
+                const decreaseBtn = document.querySelector('.bet-decrease-btn');
+                const increaseBtn = document.querySelector('.bet-increase-btn');
+                
+                if (decreaseBtn) {
+                    decreaseBtn.addEventListener('click', () => {
+                        adjustBet(-1);
+                    });
+                }
+                
+                if (increaseBtn) {
+                    increaseBtn.addEventListener('click', () => {
+                        adjustBet(1);
+                    });
+                }
+                
+                // Переключатель звука
                 if (elements.soundToggle) {
                     elements.soundToggle.addEventListener('click', toggleSound);
-                    app.log('Miner', 'Handler for sound toggle set');
+                    app.log('Майнер', 'Обработчик для переключателя звука установлен');
                 }
                 
-                // Music toggle
+                // Переключатель музыки
                 if (elements.musicToggle) {
                     elements.musicToggle.addEventListener('click', toggleMusic);
-                    app.log('Miner', 'Handler for music toggle set');
+                    app.log('Майнер', 'Обработчик для переключателя музыки установлен');
                 }
                 
-                app.log('Miner', 'Event handlers set');
+                app.log('Майнер', 'Обработчики событий установлены');
             } catch (error) {
-                app.log('Miner', `Error setting handlers: ${error.message}`, true);
+                app.log('Майнер', `Ошибка установки обработчиков: ${error.message}`, true);
             }
         };
         
         /**
-         * Create game grid
+         * Регулировка ставки
+         */
+        const adjustBet = function(change) {
+            try {
+                if (!elements.minerBet) return;
+                
+                // Получаем текущую ставку
+                let currentBet = parseInt(elements.minerBet.value) || 10;
+                
+                // Общие значения ставок
+                const commonBets = [1, 5, 10, 20, 50, 100, 200, 500, 1000];
+                
+                if (change < 0) {
+                    // Уменьшаем ставку
+                    let newBet = currentBet;
+                    
+                    // Находим следующую меньшую общую ставку
+                    for (let i = commonBets.length - 1; i >= 0; i--) {
+                        if (commonBets[i] < currentBet) {
+                            newBet = commonBets[i];
+                            break;
+                        }
+                    }
+                    
+                    // Гарантируем минимальную ставку
+                    currentBet = Math.max(1, newBet);
+                } else {
+                    // Увеличиваем ставку
+                    let newBet = currentBet;
+                    
+                    // Находим следующую большую общую ставку
+                    for (let i = 0; i < commonBets.length; i++) {
+                        if (commonBets[i] > currentBet) {
+                            newBet = commonBets[i];
+                            break;
+                        }
+                    }
+                    
+                    // Гарантируем максимальную ставку
+                    currentBet = Math.min(1000, newBet);
+                }
+                
+                // Обновляем поле ввода
+                elements.minerBet.value = currentBet;
+                
+                // Обновляем потенциальный выигрыш
+                updatePotentialWin();
+                
+                // Проигрываем звук клика
+                playSound('click');
+                
+                // Тактильная обратная связь
+                if (window.casinoApp && window.casinoApp.provideTactileFeedback) {
+                    window.casinoApp.provideTactileFeedback('light');
+                }
+            } catch (error) {
+                app.log('Майнер', `Ошибка регулировки ставки: ${error.message}`, true);
+            }
+        };
+        
+        /**
+         * Создание игровой сетки
          */
         const createGrid = function() {
             try {
                 if (!elements.minerGrid) {
-                    app.log('Miner', 'Cannot create grid: element minerGrid not found', true);
+                    app.log('Майнер', 'Невозможно создать сетку: элемент minerGrid не найден', true);
                     return;
                 }
                 
-                // Clear current grid
+                // Очищаем текущую сетку
                 elements.minerGrid.innerHTML = '';
                 
-                // Create 5x5 grid
+                // Создаем сетку 5x5
                 for (let i = 0; i < 5; i++) {
                     for (let j = 0; j < 5; j++) {
                         const cell = document.createElement('div');
@@ -1189,7 +1378,7 @@ const AUDIO_FILES = {
                         cell.dataset.col = j;
                         cell.dataset.index = i * 5 + j;
                         
-                        // Create inner cell structure
+                        // Создаем внутреннюю структуру ячейки
                         const cellInner = document.createElement('div');
                         cellInner.className = 'cell-inner';
                         
@@ -1203,7 +1392,7 @@ const AUDIO_FILES = {
                         cellInner.appendChild(cellFront);
                         cell.appendChild(cellInner);
                         
-                        // Add handler only if game is active
+                        // Добавляем обработчик только если игра активна
                         if (state.isPlaying) {
                             cell.addEventListener('click', () => revealCell(i * 5 + j));
                             cell.classList.add('active-cell');
@@ -1213,60 +1402,60 @@ const AUDIO_FILES = {
                     }
                 }
                 
-                app.log('Miner', 'Game grid successfully created');
+                app.log('Майнер', 'Игровая сетка успешно создана');
             } catch (error) {
-                app.log('Miner', `Error creating grid: ${error.message}`, true);
+                app.log('Майнер', `Ошибка создания сетки: ${error.message}`, true);
             }
         };
         
         /**
-         * Update mine count
+         * Обновление количества мин
          */
         const updateMineCount = function() {
             try {
-                // If game has already started, don't allow changing mine count
+                // Если игра уже началась, не разрешаем менять количество мин
                 if (state.isPlaying) {
-                    // Return to previous value
+                    // Возвращаем к предыдущему значению
                     if (elements.minesCount) {
                         elements.minesCount.value = state.gameData.minesCount;
                     }
                     if (window.casinoApp && window.casinoApp.showNotification) {
-                        window.casinoApp.showNotification('Cannot change mine count during game');
+                        window.casinoApp.showNotification('Нельзя менять количество мин во время игры');
                     }
                     return;
                 }
                 
                 if (!elements.minesCount) {
-                    app.log('Miner', 'Element minesCount not found', true);
+                    app.log('Майнер', 'Элемент minesCount не найден', true);
                     return;
                 }
                 
                 state.gameData.minesCount = parseInt(elements.minesCount.value);
                 
-                // Update config based on selected mine count
+                // Обновляем конфигурацию в зависимости от выбранного количества мин
                 const config = MULTIPLIER_CONFIG[state.gameData.minesCount] || MULTIPLIER_CONFIG[3];
                 state.gameData.baseMultiplier = config.base;
                 
-                // Update display
+                // Обновляем отображение
                 updatePotentialWin();
                 
-                // Tactile feedback
+                // Тактильная обратная связь
                 if (window.casinoApp && window.casinoApp.provideTactileFeedback) {
                     window.casinoApp.provideTactileFeedback('light');
                 }
                 
-                // Play sound
+                // Проигрываем звук
                 playSound('click');
                 
-                app.log('Miner', `Mine count updated: ${state.gameData.minesCount}`);
+                app.log('Майнер', `Количество мин обновлено: ${state.gameData.minesCount}`);
             } catch (error) {
-                app.log('Miner', `Error updating mine count: ${error.message}`, true);
+                app.log('Майнер', `Ошибка обновления количества мин: ${error.message}`, true);
             }
         };
         
         /**
-         * Calculate win multiplier
-         * Using probabilistic formula for fair calculation
+         * Вычисление множителя выигрыша
+         * Использует вероятностную формулу для честного расчета
          */
         const calculateMultiplier = function(revealed, total, mines) {
             if (revealed === 0) return state.gameData.baseMultiplier;
@@ -1275,39 +1464,39 @@ const AUDIO_FILES = {
                 const safeSpots = total - mines;
                 let probability = 1;
                 
-                // Calculate probability of safe choice for each move
+                // Вычисляем вероятность безопасного выбора для каждого хода
                 for (let i = 0; i < revealed; i++) {
                     probability *= (safeSpots - i) / (total - i);
                 }
                 
-                // Apply house edge (5%)
+                // Учитываем преимущество казино (5%)
                 probability = probability * (1 - state.gameData.houseEdge);
                 
-                // Multiplier = 1 / probability (with adjustment for balance)
+                // Множитель = 1 / вероятность (с корректировкой для баланса)
                 let multiplier = 1 / probability;
                 
-                // Apply configuration for game balance
+                // Применяем конфигурацию для баланса игры
                 const config = MULTIPLIER_CONFIG[mines] || MULTIPLIER_CONFIG[3];
                 
-                // Progressive multiplier growth
+                // Прогрессивный рост множителя
                 const progressFactor = Math.min(1, revealed / safeSpots * 2);
                 const bonusMult = config.maxBonus * progressFactor;
                 
                 multiplier = config.base + (multiplier - 1) * config.growth * (1 + bonusMult);
                 
-                // Limit maximum multiplier
+                // Ограничиваем максимальный множитель
                 multiplier = Math.min(multiplier, state.gameData.maxMultiplier);
                 
-                // Round to 2 decimal places
+                // Округляем до 2 десятичных знаков
                 return Math.floor(multiplier * 100) / 100;
             } catch (error) {
-                app.log('Miner', `Error calculating multiplier: ${error.message}`, true);
+                app.log('Майнер', `Ошибка вычисления множителя: ${error.message}`, true);
                 return state.gameData.baseMultiplier;
             }
         };
         
         /**
-         * Update potential win display
+         * Обновление отображения потенциального выигрыша
          */
         const updatePotentialWin = function() {
             try {
@@ -1318,26 +1507,26 @@ const AUDIO_FILES = {
                 const betAmt = parseInt(elements.minerBet.value) || 0;
                 const revealedCount = state.gameData.revealedCells.length;
                 
-                // Calculate multiplier
+                // Вычисляем множитель
                 const multiplier = calculateMultiplier(
                     revealedCount,
                     state.gameData.totalCells,
                     state.gameData.minesCount
                 );
                 
-                // Calculate potential win
+                // Вычисляем потенциальный выигрыш
                 const potential = Math.floor(betAmt * multiplier);
                 
-                // Update display
+                // Обновляем отображение
                 elements.potentialWin.textContent = `${potential} ⭐`;
                 
                 if (elements.multiplierDisplay) {
                     elements.multiplierDisplay.textContent = `${multiplier.toFixed(2)}x`;
                     
-                    // Remove all level classes
+                    // Удаляем все классы уровней
                     elements.multiplierDisplay.className = 'info-value multiplier-value';
                     
-                    // Add visual effects for multiplier levels
+                    // Добавляем визуальные эффекты для уровней множителя
                     if (multiplier >= 50) {
                         elements.multiplierDisplay.classList.add('level-7', 'pulse');
                     } else if (multiplier >= 20) {
@@ -1360,64 +1549,64 @@ const AUDIO_FILES = {
                     elements.safeCountDisplay.textContent = `${revealedCount}/${safeCells}`;
                 }
                 
-                // Update game data
+                // Обновляем игровые данные
                 state.gameData.currentMultiplier = multiplier;
                 
-                app.log('Miner', `Potential win updated: ${potential}, multiplier: ${multiplier}`);
+                app.log('Майнер', `Потенциальный выигрыш обновлен: ${potential}, множитель: ${multiplier}`);
             } catch (error) {
-                app.log('Miner', `Error updating potential win: ${error.message}`, true);
+                app.log('Майнер', `Ошибка обновления потенциального выигрыша: ${error.message}`, true);
             }
         };
         
         /**
-         * Start new game
+         * Начало новой игры
          */
         const startNewGame = async function() {
-            app.log('Miner', 'Starting new game');
+            app.log('Майнер', 'Начало новой игры');
             
-            // Check initialization
+            // Проверяем инициализацию
             if (!state.initialized) {
-                app.log('Miner', 'Game not initialized, starting initialization', true);
+                app.log('Майнер', 'Игра не инициализирована, запускаем инициализацию', true);
                 await init();
                 
-                // If initialization failed, exit
+                // Если инициализация не удалась, выходим
                 if (!state.initialized) {
-                    app.log('Miner', 'Failed to start game: initialization error', true);
+                    app.log('Майнер', 'Не удалось запустить игру: ошибка инициализации', true);
                     return;
                 }
             }
             
             try {
-                // Check for casinoApp
+                // Проверяем наличие casinoApp
                 if (!window.casinoApp) {
-                    app.log('Miner', 'casinoApp not found', true);
-                    alert('Application initialization error');
+                    app.log('Майнер', 'casinoApp не найден', true);
+                    alert('Ошибка инициализации приложения');
                     return;
                 }
                 
-                // Check for elements
+                // Проверяем наличие элементов
                 if (!elements.minerBet) {
-                    app.log('Miner', 'Bet element not found', true);
+                    app.log('Майнер', 'Элемент ставки не найден', true);
                     return;
                 }
                 
-                // Get bet amount
+                // Получаем сумму ставки
                 const betAmount = parseInt(elements.minerBet.value);
                 
-                // Check bet
+                // Проверяем ставку
                 if (isNaN(betAmount) || betAmount <= 0) {
-                    window.casinoApp.showNotification('Please enter a valid bet');
+                    window.casinoApp.showNotification('Пожалуйста, введите корректную ставку');
                     return;
                 }
                 
-                // Check if enough funds
+                // Проверяем достаточность средств
                 if (window.GreenLightApp && window.GreenLightApp.user && 
                     betAmount > window.GreenLightApp.user.balance) {
-                    window.casinoApp.showNotification('Insufficient funds for this bet');
+                    window.casinoApp.showNotification('Недостаточно средств для этой ставки');
                     return;
                 }
                 
-                // Reset game state
+                // Сбрасываем состояние игры
                 state.isPlaying = true;
                 state.gameData = {
                     grid: Array(state.gameData.totalCells).fill('empty'),
@@ -1430,52 +1619,52 @@ const AUDIO_FILES = {
                     houseEdge: 0.05
                 };
                 
-                // Clear previous mine data
+                // Очищаем предыдущие данные мин
                 _minesData = null;
                 
-                // Place mines
+                // Размещаем мины
                 placeMines();
                 
-                // Update interface
+                // Обновляем интерфейс
                 createGrid();
                 
-                // Lock mine count selection
+                // Блокируем выбор количества мин
                 if (elements.minesCount) {
                     elements.minesCount.disabled = true;
                 }
                 
-                // Update buttons
+                // Обновляем кнопки
                 if (elements.cashoutBtn) {
-                    elements.cashoutBtn.disabled = true; // Disable until at least one cell is opened
+                    elements.cashoutBtn.disabled = true; // Отключаем до открытия хотя бы одной ячейки
                 }
                 
                 if (elements.newGameBtn) {
                     elements.newGameBtn.disabled = true;
                 }
                 
-                // Hide result
+                // Скрываем результат
                 if (elements.minerResult) {
                     elements.minerResult.className = 'result hidden';
                     elements.minerResult.textContent = '';
                 }
                 
-                // Start background music if not muted
+                // Запускаем фоновую музыку, если не отключена
                 if (audio.initialized && !audio.musicMuted) {
                     audio.background.currentTime = 0;
                     audio.background.play().catch(e => {
-                        app.log('Miner', `Autoplay prevented for background music: ${e.message}`);
+                        app.log('Майнер', `Автовоспроизведение фоновой музыки предотвращено: ${e.message}`);
                     });
                 }
                 
-                // Play game start sound
+                // Проигрываем звук начала игры
                 playSound('click');
                 
-                // Tactile feedback
+                // Тактильная обратная связь
                 if (window.casinoApp.provideTactileFeedback) {
                     window.casinoApp.provideTactileFeedback('medium');
                 }
                 
-                // Process initial bet
+                // Обрабатываем начальную ставку
                 await window.casinoApp.processGameResult(
                     'miner',
                     betAmount,
@@ -1486,12 +1675,12 @@ const AUDIO_FILES = {
                     }
                 );
                 
-                // Update potential win display
+                // Обновляем отображение потенциального выигрыша
                 updatePotentialWin();
                 
-                app.log('Miner', 'New game successfully started');
+                app.log('Майнер', 'Новая игра успешно запущена');
             } catch (error) {
-                app.log('Miner', `Error starting new game: ${error.message}`, true);
+                app.log('Майнер', `Ошибка запуска новой игры: ${error.message}`, true);
                 state.isPlaying = false;
                 
                 if (elements.newGameBtn) {
@@ -1505,37 +1694,60 @@ const AUDIO_FILES = {
         };
         
         /**
-         * Place mines (without logging positions to console)
+         * Функция шифрования данных
+         */
+        const encodeData = function(data) {
+            // Простое шифрование для маскировки данных
+            return btoa(JSON.stringify(data).split('').map(c => 
+                String.fromCharCode(c.charCodeAt(0) + 7)
+            ).join(''));
+        };
+        
+        /**
+         * Функция дешифрования данных
+         */
+        const decodeData = function(encoded) {
+            try {
+                return JSON.parse(atob(encoded).split('').map(c => 
+                    String.fromCharCode(c.charCodeAt(0) - 7)
+                ).join(''));
+            } catch (e) {
+                return [];
+            }
+        };
+        
+        /**
+         * Размещение мин (без вывода позиций в консоль)
          */
         const placeMines = function() {
             try {
-                // Create new array for mines
+                // Создаем новый массив для мин
                 const mines = [];
                 
-                // Place new mines
+                // Размещаем новые мины
                 while (mines.length < state.gameData.minesCount) {
                     const randomIndex = Math.floor(Math.random() * state.gameData.totalCells);
                     
-                    // Add only if not already a mine
+                    // Добавляем, только если еще не мина
                     if (!mines.includes(randomIndex)) {
                         mines.push(randomIndex);
                         state.gameData.grid[randomIndex] = 'mine';
                     }
                 }
                 
-                // Encrypt mine positions
+                // Шифруем позиции мин
                 _minesData = encodeData(mines);
                 
-                // DO NOT log mine positions to console for security
-                app.log('Miner', 'Mines placed');
+                // НЕ выводим позиции мин в консоль для безопасности
+                app.log('Майнер', 'Мины размещены');
             } catch (error) {
-                app.log('Miner', `Error placing mines: ${error.message}`, true);
+                app.log('Майнер', `Ошибка размещения мин: ${error.message}`, true);
             }
         };
         
         /**
-         * Check if cell is a mine
-         * Uses encrypted data
+         * Проверка, является ли ячейка миной
+         * Использует зашифрованные данные
          */
         const isMine = function(index) {
             if (!_minesData) return false;
@@ -1544,61 +1756,61 @@ const AUDIO_FILES = {
                 const mines = decodeData(_minesData);
                 return mines.includes(index);
             } catch (error) {
-                app.log('Miner', `Error checking mine: ${error.message}`, true);
+                app.log('Майнер', `Ошибка проверки мины: ${error.message}`, true);
                 return false;
             }
         };
         
         /**
-         * Reveal cell
+         * Открытие ячейки
          */
         const revealCell = async function(index) {
             try {
-                // Check if cell already opened
+                // Проверяем, открыта ли уже ячейка
                 if (state.gameData.revealedCells.includes(index)) {
                     return;
                 }
                 
-                // Check if game is active
+                // Проверяем, активна ли игра
                 if (!state.isPlaying) {
                     return;
                 }
                 
-                // Get cell element
+                // Получаем элемент ячейки
                 const cell = document.querySelector(`.grid-cell[data-index="${index}"]`);
                 if (!cell) {
-                    app.log('Miner', `Cell with index ${index} not found`, true);
+                    app.log('Майнер', `Ячейка с индексом ${index} не найдена`, true);
                     return;
                 }
                 
-                // Play click sound
+                // Проигрываем звук клика
                 playSound('click');
                 
-                // Tactile feedback
+                // Тактильная обратная связь
                 if (window.casinoApp && window.casinoApp.provideTactileFeedback) {
                     window.casinoApp.provideTactileFeedback('light');
                 }
                 
-                // Check if cell is a mine (using encrypted data)
+                // Проверяем, является ли ячейка миной (используя зашифрованные данные)
                 if (isMine(index)) {
-                    // Game over - mine found
+                    // Конец игры - найдена мина
                     revealAllMines();
                     
-                    // Get cell position for explosion effect
+                    // Получаем позицию ячейки для эффекта взрыва
                     const cellRect = cell.getBoundingClientRect();
                     const explosionX = cellRect.left + cellRect.width / 2;
                     const explosionY = cellRect.top + cellRect.height / 2;
                     
-                    // Play explosion sound
+                    // Проигрываем звук взрыва
                     playSound('explosion');
                     
-                    // Create explosion particle effect
+                    // Создаем эффект частиц взрыва
                     createParticleEffect(explosionX, explosionY, 'explosion');
                     
-                    // Screen shake effect
+                    // Эффект тряски экрана
                     screenShake(8, 800);
                     
-                    // Update interface
+                    // Обновляем интерфейс
                     cell.classList.add('mine', 'exploded');
                     const cellFront = cell.querySelector('.cell-front');
                     if (cellFront) {
@@ -1607,12 +1819,12 @@ const AUDIO_FILES = {
                         cell.innerHTML = '💥';
                     }
                     
-                    // Vibration for explosion
+                    // Вибрация для взрыва
                     if (window.casinoApp && window.casinoApp.provideTactileFeedback) {
                         window.casinoApp.provideTactileFeedback('error');
                     }
                     
-                    // Set game state
+                    // Устанавливаем состояние игры
                     state.isPlaying = false;
                     
                     if (elements.cashoutBtn) {
@@ -1627,17 +1839,21 @@ const AUDIO_FILES = {
                         elements.minesCount.disabled = false;
                     }
                     
-                    // Show result
+                    // Показываем результат
                     if (elements.minerResult) {
-                        elements.minerResult.textContent = 'BOOM! You hit a mine. Game over!';
+                        elements.minerResult.innerHTML = `
+                            <div class="lose-icon">💥</div>
+                            <div class="lose-title">БУМ! Вы наткнулись на мину.</div>
+                            <div class="lose-message">Игра окончена!</div>
+                        `;
                         elements.minerResult.className = 'result lose';
                     }
                     
-                    // Process loss (DO NOT send mine positions to server)
+                    // Обрабатываем проигрыш (НЕ отправляем позиции мин на сервер)
                     if (window.casinoApp) {
                         await window.casinoApp.processGameResult(
                             'miner',
-                            0, // No additional bet
+                            0, // Нет дополнительной ставки
                             'lose',
                             0,
                             {
@@ -1649,7 +1865,7 @@ const AUDIO_FILES = {
                         );
                     }
                     
-                    // Stop background music
+                    // Останавливаем фоновую музыку
                     if (audio.initialized && audio.background) {
                         const fadeOutInterval = setInterval(() => {
                             if (audio.background.volume > 0.05) {
@@ -1661,10 +1877,10 @@ const AUDIO_FILES = {
                         }, 100);
                     }
                 } else {
-                    // Safe cell
+                    // Безопасная ячейка
                     state.gameData.revealedCells.push(index);
                     
-                    // Update interface with animation
+                    // Обновляем интерфейс с анимацией
                     cell.classList.add('revealed');
                     const cellFront = cell.querySelector('.cell-front');
                     if (cellFront) {
@@ -1673,41 +1889,41 @@ const AUDIO_FILES = {
                         cell.innerHTML = '💰';
                     }
                     
-                    // Play reveal sound
+                    // Проигрываем звук открытия
                     playSound('reveal');
                     
-                    // Small particles for safe cell
+                    // Небольшие частицы для безопасной ячейки
                     const cellRect = cell.getBoundingClientRect();
                     const cellX = cellRect.left + cellRect.width / 2;
                     const cellY = cellRect.top + cellRect.height / 2;
                     createParticleEffect(cellX, cellY, 'coins');
                     
-                    // Enable cashout button after first opened cell
+                    // Включаем кнопку вывода после первой открытой ячейки
                     if (state.gameData.revealedCells.length === 1 && elements.cashoutBtn) {
                         elements.cashoutBtn.disabled = false;
                     }
                     
-                    // Update multiplier and potential win
+                    // Обновляем множитель и потенциальный выигрыш
                     updatePotentialWin();
                     
-                    // Tactile feedback for safe cell
+                    // Тактильная обратная связь для безопасной ячейки
                     if (window.casinoApp && window.casinoApp.provideTactileFeedback) {
                         window.casinoApp.provideTactileFeedback('success');
                     }
                     
-                    // Check if all safe cells are open (win condition)
+                    // Проверяем, открыты ли все безопасные ячейки (условие победы)
                     if (state.gameData.revealedCells.length === state.gameData.totalCells - state.gameData.minesCount) {
-                        // Player opened all safe cells
+                        // Игрок открыл все безопасные ячейки
                         await automaticCashout();
                     }
                 }
             } catch (error) {
-                app.log('Miner', `Error revealing cell: ${error.message}`, true);
+                app.log('Майнер', `Ошибка открытия ячейки: ${error.message}`, true);
             }
         };
         
         /**
-         * Reveal all mines
+         * Показ всех мин
          */
         const revealAllMines = function() {
             try {
@@ -1716,7 +1932,7 @@ const AUDIO_FILES = {
                 const mines = decodeData(_minesData);
                 
                 mines.forEach(index => {
-                    // Skip the exploded mine
+                    // Пропускаем взорвавшуюся мину
                     if (document.querySelector(`.grid-cell[data-index="${index}"].exploded`)) {
                         return;
                     }
@@ -1731,7 +1947,7 @@ const AUDIO_FILES = {
                             cell.innerHTML = '💣';
                         }
                         
-                        // Small delay for each mine
+                        // Небольшая задержка для каждой мины
                         const delay = Math.random() * 300;
                         setTimeout(() => {
                             cell.classList.add('mine-reveal');
@@ -1739,53 +1955,53 @@ const AUDIO_FILES = {
                     }
                 });
             } catch (error) {
-                app.log('Miner', `Error revealing all mines: ${error.message}`, true);
+                app.log('Майнер', `Ошибка показа всех мин: ${error.message}`, true);
             }
         };
         
         /**
-         * Cash out
+         * Вывод выигрыша
          */
         const cashout = async function() {
             try {
-                // Check game state
+                // Проверяем состояние игры
                 if (!state.isPlaying || state.gameData.revealedCells.length === 0) {
                     return;
                 }
                 
-                // Check for casinoApp
+                // Проверяем наличие casinoApp
                 if (!window.casinoApp) {
                     return;
                 }
                 
-                // Calculate win
+                // Вычисляем выигрыш
                 const winAmount = Math.floor(state.gameData.betAmount * state.gameData.currentMultiplier);
                 
-                // Play cashout sound
+                // Проигрываем звук вывода
                 playSound('cashout');
                 
-                // Create confetti particle effect
+                // Создаем эффект частиц конфетти
                 const containerRect = elements.container.getBoundingClientRect();
                 const centerX = containerRect.left + containerRect.width / 2;
                 const centerY = containerRect.top + containerRect.height / 2;
                 createParticleEffect(centerX, centerY, 'confetti');
                 
-                // Tactile feedback
+                // Тактильная обратная связь
                 if (window.casinoApp.provideTactileFeedback) {
                     window.casinoApp.provideTactileFeedback('success');
                 }
                 
-                // Update interface
+                // Обновляем интерфейс
                 if (elements.minerResult) {
                     elements.minerResult.innerHTML = `
                         <div class="win-icon">🎉</div>
-                        <div class="win-title">You won ${winAmount} Stars!</div>
-                        <div class="win-multiplier">Multiplier: x${state.gameData.currentMultiplier.toFixed(2)}</div>
+                        <div class="win-title">Вы выиграли ${winAmount} ⭐!</div>
+                        <div class="win-multiplier">Множитель: x${state.gameData.currentMultiplier.toFixed(2)}</div>
                     `;
                     elements.minerResult.className = 'result win';
                 }
                 
-                // Reset game state
+                // Сбрасываем состояние игры
                 state.isPlaying = false;
                 
                 if (elements.cashoutBtn) {
@@ -1800,13 +2016,13 @@ const AUDIO_FILES = {
                     elements.minesCount.disabled = false;
                 }
                 
-                // Show all mines
+                // Показываем все мины
                 revealAllMines();
                 
-                // Process win (DO NOT send mine positions to server)
+                // Обрабатываем выигрыш (НЕ отправляем позиции мин на сервер)
                 await window.casinoApp.processGameResult(
                     'miner',
-                    0, // No additional bet
+                    0, // Нет дополнительной ставки
                     'win',
                     winAmount,
                     {
@@ -1816,7 +2032,7 @@ const AUDIO_FILES = {
                     }
                 );
                 
-                // Fade out background music
+                // Затухание фоновой музыки
                 if (audio.initialized && audio.background) {
                     const fadeOutInterval = setInterval(() => {
                         if (audio.background.volume > 0.05) {
@@ -1828,34 +2044,34 @@ const AUDIO_FILES = {
                     }, 100);
                 }
                 
-                app.log('Miner', `Successful cashout: ${winAmount} with multiplier ${state.gameData.currentMultiplier.toFixed(2)}`);
+                app.log('Майнер', `Успешный вывод: ${winAmount} с множителем ${state.gameData.currentMultiplier.toFixed(2)}`);
             } catch (error) {
-                app.log('Miner', `Error cashing out: ${error.message}`, true);
+                app.log('Майнер', `Ошибка вывода выигрыша: ${error.message}`, true);
             }
         };
         
         /**
-         * Automatic cashout when all safe cells are opened
+         * Автоматический вывод при открытии всех безопасных ячеек
          */
         const automaticCashout = async function() {
             try {
-                // Check game state
+                // Проверяем состояние игры
                 if (!state.isPlaying) {
                     return;
                 }
                 
-                // Check for casinoApp
+                // Проверяем наличие casinoApp
                 if (!window.casinoApp) {
                     return;
                 }
                 
-                // Calculate win
+                // Вычисляем выигрыш
                 const winAmount = Math.floor(state.gameData.betAmount * state.gameData.currentMultiplier);
                 
-                // Play perfect win sound
+                // Проигрываем звук идеального выигрыша
                 playSound('perfectWin');
                 
-                // Create big confetti particle effect
+                // Создаем большой эффект частиц конфетти
                 const containerRect = elements.container.getBoundingClientRect();
                 for (let i = 0; i < 3; i++) {
                     setTimeout(() => {
@@ -1865,24 +2081,24 @@ const AUDIO_FILES = {
                     }, i * 300);
                 }
                 
-                // Tactile feedback - big win
+                // Тактильная обратная связь - большой выигрыш
                 if (window.casinoApp.provideTactileFeedback) {
                     window.casinoApp.provideTactileFeedback('success');
                     setTimeout(() => window.casinoApp.provideTactileFeedback('success'), 300);
                 }
                 
-                // Update interface
+                // Обновляем интерфейс
                 if (elements.minerResult) {
                     elements.minerResult.innerHTML = `
                         <div class="win-icon">🏆</div>
-                        <div class="win-title">Perfect! You revealed all safe cells!</div>
+                        <div class="win-title">Идеально! Все безопасные ячейки открыты!</div>
                         <div class="win-amount">${winAmount} ⭐</div>
-                        <div class="win-multiplier">Multiplier: x${state.gameData.currentMultiplier.toFixed(2)}</div>
+                        <div class="win-multiplier">Множитель: x${state.gameData.currentMultiplier.toFixed(2)}</div>
                     `;
                     elements.minerResult.className = 'result win big-win';
                 }
                 
-                // Reset game state
+                // Сбрасываем состояние игры
                 state.isPlaying = false;
                 
                 if (elements.cashoutBtn) {
@@ -1897,24 +2113,24 @@ const AUDIO_FILES = {
                     elements.minesCount.disabled = false;
                 }
                 
-                // Show all mines
+                // Показываем все мины
                 revealAllMines();
                 
-                // Process win
+                // Обрабатываем выигрыш
                 await window.casinoApp.processGameResult(
                     'miner',
-                    0, // No additional bet
+                    0, // Нет дополнительной ставки
                     'win',
                     winAmount,
                     {
-                        revealedCells: state.gameData.revealedCells,
+                        revealedCells: state.gameData.revealedCells, // Добавлена запятая здесь
                         multiplier: state.gameData.currentMultiplier,
                         minesCount: state.gameData.minesCount,
                         perfectGame: true
                     }
                 );
                 
-                // Fade out background music
+                // Затухание фоновой музыки
                 if (audio.initialized && audio.background) {
                     const fadeOutInterval = setInterval(() => {
                         if (audio.background.volume > 0.05) {
@@ -1926,29 +2142,29 @@ const AUDIO_FILES = {
                     }, 100);
                 }
                 
-                app.log('Miner', `Perfect game completed with win ${winAmount}`);
+                app.log('Майнер', `Идеальная игра завершена с выигрышем ${winAmount}`);
             } catch (error) {
-                app.log('Miner', `Error with automatic cashout: ${error.message}`, true);
+                app.log('Майнер', `Ошибка автоматического вывода: ${error.message}`, true);
             }
         };
         
-        // Return public interface
+        // Возвращаем публичный интерфейс
         return {
-            // Main methods
+            // Основные методы
             init: init,
             startNewGame: startNewGame,
             cashout: cashout,
             
-            // Sound controls
+            // Управление звуком
             toggleSound: toggleSound,
             toggleMusic: toggleMusic,
             setVolume: setVolume,
             
-            // Animation controls
+            // Управление анимациями
             createParticleEffect: createParticleEffect,
             screenShake: screenShake,
             
-            // Method for checking state
+            // Метод для проверки состояния
             getStatus: function() {
                 return {
                     initialized: state.initialized,
@@ -1975,42 +2191,42 @@ const AUDIO_FILES = {
         };
     })();
     
-    // Register game in all formats for maximum compatibility
+    // Регистрируем игру во всех форматах для максимальной совместимости
     try {
-        // 1. Registration using new system
+        // 1. Регистрация через новую систему
         if (window.registerGame) {
             window.registerGame('minerGame', minerGame);
-            app.log('Miner', 'Game registered through new registerGame system');
+            app.log('Майнер', 'Игра зарегистрирована через новую систему registerGame');
         }
         
-        // 2. Export to global namespace (backward compatibility)
+        // 2. Экспорт в глобальное пространство имен (обратная совместимость)
         window.minerGame = minerGame;
-        app.log('Miner', 'Game exported to global namespace');
+        app.log('Майнер', 'Игра экспортирована в глобальное пространство имен');
         
-        // 3. Log completion of module loading
-        app.log('Miner', 'Module successfully loaded and ready for initialization');
+        // 3. Логируем завершение загрузки модуля
+        app.log('Майнер', 'Модуль успешно загружен и готов к инициализации');
         
-        // 4. Automatic initialization when page loads
+        // 4. Автоматическая инициализация при загрузке страницы
         document.addEventListener('DOMContentLoaded', function() {
             setTimeout(() => {
                 if (!minerGame.getStatus().initialized && !minerGame.getStatus().initializationStarted) {
-                    app.log('Miner', 'Starting automatic initialization');
+                    app.log('Майнер', 'Запуск автоматической инициализации');
                     minerGame.init();
                 }
             }, 500);
         });
         
-        // 5. If DOM already loaded, initialize immediately
+        // 5. Если DOM уже загружен, инициализируем немедленно
         if (document.readyState === 'complete' || document.readyState === 'interactive') {
             setTimeout(() => {
                 if (!minerGame.getStatus().initialized && !minerGame.getStatus().initializationStarted) {
-                    app.log('Miner', 'Starting automatic initialization (DOM already loaded)');
+                    app.log('Майнер', 'Запуск автоматической инициализации (DOM уже загружен)');
                     minerGame.init();
                 }
             }, 500);
         }
         
     } catch (error) {
-        app.log('Miner', `Error registering game: ${error.message}`, true);
+        app.log('Майнер', `Ошибка регистрации игры: ${error.message}`, true);
     }
 })();
