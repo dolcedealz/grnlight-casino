@@ -35,8 +35,8 @@ app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/games', require('./routes/gameRoutes'));
 app.use('/api/admin', require('./routes/adminRoutes'));
 app.use('/api/disputes', require('./routes/disputeRoutes'));
-app.use('/api/crypto', require('./routes/cryptoPayRoutes')); // Исправлено
-app.use('/api/users', require('./routes/ExchangeRate.js')); // Исправлено
+app.use('/api/crypto', require('./routes/cryptoPayRoutes')); // Исправлено requier на require
+// Убираем неправильную строку с ExchangeRate.js, так как это модель, а не маршрут
 
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
