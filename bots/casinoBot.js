@@ -1061,7 +1061,7 @@ bot.action(/^amount_(.+)_(\d+|custom)$/, async (ctx) => {
     await ctx.reply(`Счет на оплату создан!\n\nСумма: ${amount} ${currency}\n\nПерейдите по ссылке для оплаты:`, {
       reply_markup: {
         inline_keyboard: [
-          [{ text: '💰 Оплатить', url: invoice.payUrl }]
+          [{ text: '💰 Оплатить', url: invoice.pay_url }]
         ]
       }
     });
