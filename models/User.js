@@ -476,12 +476,27 @@ userSchema.methods.addCryptoPayInvoice = function(invoiceData) {
     this.cryptoPay = { invoices: [], transfers: [] };
   }
   
+  // Проверяем и корректно преобразуем дату
+  let createdAt;
+  if (invoiceData.created_at) {
+    // Проверяем, что created_at - число
+    const timestamp = Number(invoiceData.created_at);
+    if (!isNaN(timestamp)) {
+      createdAt = new Date(timestamp * 1000); // Unix timestamp в мс
+    }
+  }
+  
+  // Если createdAt не удалось создать, используем текущую дату
+  if (!createdAt || isNaN(createdAt.getTime())) {
+    createdAt = new Date();
+  }
+  
   this.cryptoPay.invoices.push({
     invoiceId: invoiceData.invoice_id,
     amount: invoiceData.amount,
     currency: invoiceData.currency,
     status: invoiceData.status,
-    createdAt: new Date(invoiceData.created_at * 1000), // Unix timestamp в мс
+    createdAt: createdAt,
     description: invoiceData.description,
     externalId: invoiceData.external_id
   });
