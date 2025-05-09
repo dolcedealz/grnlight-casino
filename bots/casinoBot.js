@@ -2,6 +2,8 @@ const { Telegraf } = require('telegraf');
 const User = require('../models/User');
 const Dispute = require('../models/Dispute'); // Добавляем модель для споров
 const Transaction = require('../models/Transaction'); // Добавляем модель транзакций для споров
+// Импортируем сервис для крипто-платежей
+const cryptoPayService = require('../services/cryptoPayService');
 
 // Экспортируем функцию, которая создает и возвращает бота
 module.exports = (token) => {
@@ -949,32 +951,505 @@ bot.action(/^accept_([a-f0-9]+)$/, async (ctx) => {
   }
 });
 
-// Help command - обновляем, добавляя информацию о спорах
-bot.help((ctx) => {
-  console.log('Получена команда /help от пользователя:', ctx.from.id);
-  ctx.replyWithHTML(`<b>Здарова чепуха лудомановская!</b> 🎩✨
+// Команда для пополнения баланса
+bot.command('deposit', async (ctx) => {
+  try {
+    const user = await User.findOne({ telegramId: ctx.from.id });
+    if (!user) {
+      return ctx.reply('Сначала зарегистрируйтесь с помощью команды /start');
+    }
 
-Available commands:
-/start - Start the bot and get the game link
-/balance - Check your current Stars balance
-/dispute - Create a dispute (see new inline method!)
-/help - Show this help message
-/test - Test the bot functionality
+    // Отображаем кнопки для выбора метода пополнения
+    ctx.reply('Выберите валюту для пополнения:', {
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: 'USDT TRC20', callback_data: 'deposit_USDT_TRC20' },
+            { text: 'USDT BEP20', callback_data: 'deposit_USDT_BSC' }
+          ],
+          [
+            { text: 'Биткоин (BTC)', callback_data: 'deposit_BTC' },
+            { text: 'Ethereum (ETH)', callback_data: 'deposit_ETH' }
+          ],
+          [
+            { text: 'TON', callback_data: 'deposit_TON' },
+            { text: 'BNB', callback_data: 'deposit_BNB' }
+          ]
+        ]
+      }
+    });
+  } catch (error) {
+    console.error('Ошибка команды deposit:', error);
+    ctx.reply('Произошла ошибка при обработке запроса.');
+  }
+});
 
-To create a dispute:
-1. In any chat, type @${ctx.botInfo.username}
-2. Enter: amount question (e.g., 100 Who will win?)
-3. Send to your opponent
+// Обработчик колбэков для пополнения
+bot.action(/^deposit_(.+)$/, async (ctx) => {
+  try {
+    const currency = ctx.match[1]; // USDT_TRC20, BTC, ETH, и т.д.
+    const telegramId = ctx.from.id;
+    
+    // Отправляем сообщение о выборе суммы
+    await ctx.reply(`Вы выбрали ${currency}. Выберите сумму пополнения:`, {
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: '10 USD', callback_data: `amount_${currency}_10` },
+            { text: '50 USD', callback_data: `amount_${currency}_50` },
+            { text: '100 USD', callback_data: `amount_${currency}_100` }
+          ],
+          [
+            { text: '200 USD', callback_data: `amount_${currency}_200` },
+            { text: '500 USD', callback_data: `amount_${currency}_500` },
+            { text: '1000 USD', callback_data: `amount_${currency}_1000` }
+          ],
+          [
+            { text: 'Другая сумма', callback_data: `amount_${currency}_custom` }
+          ]
+        ]
+      }
+    });
+    
+    ctx.answerCbQuery();
+  } catch (error) {
+    console.error('Ошибка обработки deposit callback:', error);
+    ctx.answerCbQuery('Ошибка обработки запроса');
+  }
+});
 
-Games available:
-🎰 Slots
-🎲 Roulette
-🔢 Guess the Number
-💣 Miner
-📈 Crush
-🎲 Disputes (use inline mode!)
+// Обработчик выбора суммы
+bot.action(/^amount_(.+)_(\d+|custom)$/, async (ctx) => {
+  try {
+    const [currency, amountStr] = ctx.match.slice(1);
+    const telegramId = ctx.from.id;
+    
+    // Проверка пользователя
+    const user = await User.findOne({ telegramId });
+    if (!user) {
+      return ctx.answerCbQuery('Пользователь не найден');
+    }
+    
+    // Если выбрана опция "Другая сумма"
+    if (amountStr === 'custom') {
+      await ctx.reply(`Введите сумму для пополнения в ${currency} (например, 25):`, {
+        reply_markup: {
+          force_reply: true
+        }
+      });
+      
+      // Сохраняем выбранную валюту в сессии пользователя
+      ctx.session = ctx.session || {};
+      ctx.session.depositCurrency = currency;
+      
+      return ctx.answerCbQuery();
+    }
+    
+    // Конвертируем строку в число
+    const amount = parseFloat(amountStr);
+    
+    // Создаем счет через Crypto Pay API
+    const invoice = await cryptoPayService.createInvoice(telegramId, amount, currency);
+    
+    // Отправляем сообщение со ссылкой на оплату
+    await ctx.reply(`Счет на оплату создан!\n\nСумма: ${amount} ${currency}\n\nПерейдите по ссылке для оплаты:`, {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '💰 Оплатить', url: invoice.payUrl }]
+        ]
+      }
+    });
+    
+    ctx.answerCbQuery();
+  } catch (error) {
+    console.error('Ошибка обработки выбора суммы:', error);
+    ctx.answerCbQuery('Ошибка при создании счета');
+  }
+});
 
-Good luck and enjoy the Gatsby-inspired experience!`);
+// Обработчик ввода кастомной суммы
+bot.on('text', async (ctx, next) => {
+  try {
+    // Проверяем, есть ли у пользователя активная сессия с выбором суммы
+    if (ctx.session && ctx.session.depositCurrency) {
+      const amount = parseFloat(ctx.message.text.trim());
+      
+      // Проверка корректности введенной суммы
+      if (isNaN(amount) || amount <= 0) {
+        return ctx.reply('Пожалуйста, введите корректную сумму (положительное число).');
+      }
+      
+      const currency = ctx.session.depositCurrency;
+      const telegramId = ctx.from.id;
+      
+      // Создаем счет через Crypto Pay API
+      const invoice = await cryptoPayService.createInvoice(telegramId, amount, currency);
+      
+      // Отправляем сообщение со ссылкой на оплату
+      await ctx.reply(`Счет на оплату создан!\n\nСумма: ${amount} ${currency}\n\nПерейдите по ссылке для оплаты:`, {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: '💰 Оплатить', url: invoice.payUrl }]
+          ]
+        }
+      });
+      
+      // Очищаем сессию
+      delete ctx.session.depositCurrency;
+    } else {
+      // Если это не продолжение сессии, передаем управление следующему обработчику
+      return next();
+    }
+  } catch (error) {
+    console.error('Ошибка обработки ввода суммы:', error);
+    ctx.reply('Произошла ошибка при создании счета.');
+  }
+});
+
+// Команда для вывода средств
+bot.command('withdraw', async (ctx) => {
+  try {
+    const user = await User.findOne({ telegramId: ctx.from.id });
+    if (!user) {
+      return ctx.reply('Сначала зарегистрируйтесь с помощью команды /start');
+    }
+
+    // Проверка наличия средств
+    if (user.usdtBalance <= 0) {
+      return ctx.reply('У вас недостаточно средств для вывода. Пожалуйста, пополните баланс.');
+    }
+
+    // Отображаем информацию о балансе и кнопки для выбора валюты
+    ctx.reply(`💰 Ваш текущий баланс:\n\nUSDT: ${user.usdtBalance.toFixed(2)}\nРубли: ${user.rubleBalance.toFixed(2)}\nЗвезды: ${user.balance}\n\nВыберите валюту для вывода:`, {
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: 'USDT TRC20', callback_data: 'withdraw_USDT_TRC20' },
+            { text: 'USDT BEP20', callback_data: 'withdraw_USDT_BSC' }
+          ],
+          [
+            { text: 'Биткоин (BTC)', callback_data: 'withdraw_BTC' },
+            { text: 'Ethereum (ETH)', callback_data: 'withdraw_ETH' }
+          ],
+          [
+            { text: 'TON', callback_data: 'withdraw_TON' },
+            { text: 'BNB', callback_data: 'withdraw_BNB' }
+          ]
+        ]
+      }
+    });
+  } catch (error) {
+    console.error('Ошибка команды withdraw:', error);
+    ctx.reply('Произошла ошибка при обработке запроса.');
+  }
+});
+
+// Обработчик колбэков для вывода
+bot.action(/^withdraw_(.+)$/, async (ctx) => {
+  try {
+    const currency = ctx.match[1]; // USDT_TRC20, BTC, ETH, и т.д.
+    const telegramId = ctx.from.id;
+    
+    // Находим пользователя
+    const user = await User.findOne({ telegramId });
+    if (!user) {
+      return ctx.answerCbQuery('Пользователь не найден');
+    }
+    
+    // Сохраняем выбор валюты
+    ctx.session = ctx.session || {};
+    ctx.session.withdrawCurrency = currency;
+    
+    // Проверяем доступный баланс для вывода
+    let availableBalance = user.usdtBalance;
+    
+    // Запрашиваем сумму для вывода
+    await ctx.reply(`Вы выбрали вывод в ${currency}.\n\nДоступно для вывода: ${availableBalance.toFixed(2)} USDT\n\nВведите сумму для вывода:`, {
+      reply_markup: {
+        force_reply: true
+      }
+    });
+    
+    ctx.answerCbQuery();
+  } catch (error) {
+    console.error('Ошибка обработки withdraw callback:', error);
+    ctx.answerCbQuery('Ошибка обработки запроса');
+  }
+});
+
+// Обработчик ввода суммы для вывода
+bot.on('text', async (ctx, next) => {
+  try {
+    // Проверяем, есть ли у пользователя активная сессия с выбором валюты для вывода
+    if (ctx.session && ctx.session.withdrawCurrency) {
+      const amount = parseFloat(ctx.message.text.trim());
+      
+      // Проверка корректности введенной суммы
+      if (isNaN(amount) || amount <= 0) {
+        return ctx.reply('Пожалуйста, введите корректную сумму (положительное число).');
+      }
+      
+      const currency = ctx.session.withdrawCurrency;
+      const telegramId = ctx.from.id;
+      
+      // Находим пользователя
+      const user = await User.findOne({ telegramId });
+      if (!user) {
+        return ctx.reply('Пользователь не найден');
+      }
+      
+      // Проверяем достаточность средств (с учетом комиссии)
+      const fee = 0.01; // 1% комиссия
+      const totalAmount = amount * (1 + fee);
+      
+      if (user.usdtBalance < totalAmount) {
+        return ctx.reply(`Недостаточно средств для вывода. Доступно: ${user.usdtBalance.toFixed(2)} USDT\nТребуется (с комиссией): ${totalAmount.toFixed(2)} USDT`);
+      }
+      
+      // Пытаемся выполнить перевод
+      try {
+        const transfer = await cryptoPayService.transfer(telegramId, amount, currency, 'Вывод средств');
+        
+        // Отправляем сообщение об успешном выводе
+        await ctx.reply(`✅ Вывод средств успешно выполнен!\n\nСумма: ${amount} ${currency}\nКомиссия: ${transfer.fee.toFixed(2)} USDT\nИтого списано: ${transfer.total.toFixed(2)} USDT\n\nОставшийся баланс:\nUSDT: ${user.usdtBalance.toFixed(2)}\nРубли: ${user.rubleBalance.toFixed(2)}\nЗвезды: ${user.balance}`);
+      } catch (transferError) {
+        console.error('Ошибка перевода средств:', transferError);
+        await ctx.reply(`❌ Ошибка при выводе средств: ${transferError.message}`);
+      }
+      
+      // Очищаем сессию
+      delete ctx.session.withdrawCurrency;
+    } else {
+      // Если это не продолжение сессии, передаем управление следующему обработчику
+      return next();
+    }
+  } catch (error) {
+    console.error('Ошибка обработки ввода суммы для вывода:', error);
+    ctx.reply('Произошла ошибка при обработке вывода средств.');
+  }
+});
+
+// Команда для обмена валют
+bot.command('exchange', async (ctx) => {
+  try {
+    const user = await User.findOne({ telegramId: ctx.from.id });
+    if (!user) {
+      return ctx.reply('Сначала зарегистрируйтесь с помощью команды /start');
+    }
+
+    // Получаем текущие курсы обмена
+    const rates = await ExchangeRate.findOne({ base: 'usdt' }).sort({ updatedAt: -1 }).limit(1);
+    
+    const usdtToRub = rates?.rates?.rub || 90;
+    const usdtToStars = rates?.rates?.stars || 100;
+    const rubToStars = usdtToStars / usdtToRub;
+    
+    // Отображаем информацию о балансе и курсах
+    ctx.reply(`💰 Ваш текущий баланс:\n\nUSDT: ${user.usdtBalance.toFixed(2)}\nРубли: ${user.rubleBalance.toFixed(2)}\nЗвезды: ${user.balance}\n\n📊 Текущие курсы:\n1 USDT = ${usdtToRub.toFixed(2)} ₽\n1 USDT = ${usdtToStars} ⭐\n1 ₽ = ${rubToStars.toFixed(2)} ⭐\n\nВыберите обмен:`, {
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: 'USDT → Рубли', callback_data: 'exchange_usdt_rub' },
+            { text: 'USDT → Звезды', callback_data: 'exchange_usdt_stars' }
+          ],
+          [
+            { text: 'Рубли → USDT', callback_data: 'exchange_rub_usdt' },
+            { text: 'Рубли → Звезды', callback_data: 'exchange_rub_stars' }
+          ],
+          [
+            { text: 'Звезды → USDT', callback_data: 'exchange_stars_usdt' },
+            { text: 'Звезды → Рубли', callback_data: 'exchange_stars_rub' }
+          ]
+        ]
+      }
+    });
+  } catch (error) {
+    console.error('Ошибка команды exchange:', error);
+    ctx.reply('Произошла ошибка при обработке запроса.');
+  }
+});
+
+// Обработчик колбэков для обмена валют
+bot.action(/^exchange_(.+)_(.+)$/, async (ctx) => {
+  try {
+    const [fromCurrency, toCurrency] = ctx.match.slice(1);
+    const telegramId = ctx.from.id;
+    
+    // Находим пользователя
+    const user = await User.findOne({ telegramId });
+    if (!user) {
+      return ctx.answerCbQuery('Пользователь не найден');
+    }
+    
+    // Получаем текущие курсы обмена
+    const rates = await ExchangeRate.findOne({ base: 'usdt' }).sort({ updatedAt: -1 }).limit(1);
+    
+    // Определяем доступный баланс
+    let availableBalance;
+    if (fromCurrency === 'usdt') {
+      availableBalance = user.usdtBalance;
+    } else if (fromCurrency === 'rub') {
+      availableBalance = user.rubleBalance;
+    } else {
+      availableBalance = user.balance; // stars
+    }
+    
+    // Сохраняем выбор валют и курсы в сессии
+    ctx.session = ctx.session || {};
+    ctx.session.exchange = {
+      fromCurrency,
+      toCurrency,
+      rates: rates?.rates || { rub: 90, stars: 100 }
+    };
+    
+    // Формируем сообщение с текущим курсом
+    let rateMessage = '';
+    const usdtToRub = rates?.rates?.rub || 90;
+    const usdtToStars = rates?.rates?.stars || 100;
+    
+    if (fromCurrency === 'usdt' && toCurrency === 'rub') {
+      rateMessage = `1 USDT = ${usdtToRub.toFixed(2)} ₽`;
+    } else if (fromCurrency === 'usdt' && toCurrency === 'stars') {
+      rateMessage = `1 USDT = ${usdtToStars} ⭐`;
+    } else if (fromCurrency === 'rub' && toCurrency === 'usdt') {
+      rateMessage = `${usdtToRub.toFixed(2)} ₽ = 1 USDT`;
+    } else if (fromCurrency === 'rub' && toCurrency === 'stars') {
+      const rubToStars = usdtToStars / usdtToRub;
+      rateMessage = `1 ₽ = ${rubToStars.toFixed(2)} ⭐`;
+    } else if (fromCurrency === 'stars' && toCurrency === 'usdt') {
+      rateMessage = `${usdtToStars} ⭐ = 1 USDT`;
+    } else if (fromCurrency === 'stars' && toCurrency === 'rub') {
+      const starsToRub = usdtToRub / usdtToStars;
+      rateMessage = `1 ⭐ = ${starsToRub.toFixed(4)} ₽`;
+    }
+    
+    // Формируем запрос на ввод суммы
+    const currencySymbols = {
+      usdt: 'USDT',
+      rub: '₽',
+      stars: '⭐'
+    };
+    
+    await ctx.reply(
+      `Вы выбрали обмен ${currencySymbols[fromCurrency]} → ${currencySymbols[toCurrency]}\n\nКурс: ${rateMessage}\n\nДоступно: ${availableBalance.toFixed(2)} ${currencySymbols[fromCurrency]}\n\nВведите сумму для обмена:`,
+      {
+        reply_markup: {
+          force_reply: true
+        }
+      }
+    );
+    
+    ctx.answerCbQuery();
+  } catch (error) {
+    console.error('Ошибка обработки exchange callback:', error);
+    ctx.answerCbQuery('Ошибка обработки запроса');
+  }
+});
+
+// Обработчик ввода суммы для обмена
+bot.on('text', async (ctx, next) => {
+  try {
+    // Проверяем, есть ли у пользователя активная сессия с обменом
+    if (ctx.session && ctx.session.exchange) {
+      const amount = parseFloat(ctx.message.text.trim());
+      
+      // Проверка корректности введенной суммы
+      if (isNaN(amount) || amount <= 0) {
+        return ctx.reply('Пожалуйста, введите корректную сумму (положительное число).');
+      }
+      
+      const { fromCurrency, toCurrency, rates } = ctx.session.exchange;
+      const telegramId = ctx.from.id;
+      
+      // Находим пользователя
+      const user = await User.findOne({ telegramId });
+      if (!user) {
+        return ctx.reply('Пользователь не найден');
+      }
+      
+      // Проверяем достаточность средств
+      let fromBalance;
+      if (fromCurrency === 'usdt') {
+        fromBalance = user.usdtBalance;
+      } else if (fromCurrency === 'rub') {
+        fromBalance = user.rubleBalance;
+      } else {
+        fromBalance = user.balance; // stars
+      }
+      
+      if (fromBalance < amount) {
+        return ctx.reply(`Недостаточно средств для обмена. Доступно: ${fromBalance.toFixed(2)} ${fromCurrency.toUpperCase()}`);
+      }
+      
+      // Выполняем конвертацию
+      try {
+        const result = await user.convertCurrency(fromCurrency, toCurrency, amount);
+        
+        // Отправляем сообщение об успешном обмене
+        const currencySymbols = {
+          usdt: 'USDT',
+          rub: '₽',
+          stars: '⭐'
+        };
+        
+        await ctx.reply(
+          `✅ Обмен успешно выполнен!\n\n${amount} ${currencySymbols[fromCurrency]} → ${result.toAmount.toFixed(2)} ${currencySymbols[toCurrency]}\n\nКурс: ${result.rate.toFixed(6)}\n\nТекущий баланс:\nUSDT: ${user.usdtBalance.toFixed(2)}\nРубли: ${user.rubleBalance.toFixed(2)}\nЗвезды: ${user.balance}`
+        );
+      } catch (convertError) {
+        console.error('Ошибка конвертации:', convertError);
+        await ctx.reply(`❌ Ошибка при обмене валют: ${convertError.message}`);
+      }
+      
+      // Очищаем сессию
+      delete ctx.session.exchange;
+    } else {
+      // Если это не продолжение сессии, передаем управление следующему обработчику
+      return next();
+    }
+  } catch (error) {
+    console.error('Ошибка обработки ввода суммы для обмена:', error);
+    ctx.reply('Произошла ошибка при обработке обмена валют.');
+  }
+});
+
+// Команда для проверки баланса
+bot.command('balance', async (ctx) => {
+  try {
+    const user = await User.findOne({ telegramId: ctx.from.id });
+    if (!user) {
+      return ctx.reply('Сначала зарегистрируйтесь с помощью команды /start');
+    }
+    
+    // Получаем текущие курсы обмена
+    const rates = await ExchangeRate.findOne({ base: 'usdt' }).sort({ updatedAt: -1 }).limit(1);
+    
+    const usdtToRub = rates?.rates?.rub || 90;
+    const usdtToStars = rates?.rates?.stars || 100;
+    
+    // Рассчитываем общий баланс в USDT
+    const totalBalance = user.usdtBalance + 
+                        (user.rubleBalance / usdtToRub) + 
+                        (user.balance / usdtToStars);
+    
+    // Отправляем информацию о балансе
+    await ctx.reply(
+      `💰 *Ваш баланс:*\n\n`+
+      `USDT: *${user.usdtBalance.toFixed(2)} USDT*\n`+
+      `Рубли: *${user.rubleBalance.toFixed(2)} ₽*\n`+
+      `Звезды: *${user.balance} ⭐*\n\n`+
+      `Общий баланс (в USDT): *${totalBalance.toFixed(2)} USDT*\n\n`+
+      `📊 *Текущие курсы:*\n`+
+      `1 USDT = ${usdtToRub.toFixed(2)} ₽\n`+
+      `1 USDT = ${usdtToStars} ⭐\n\n`+
+      `🔄 Используйте /exchange для обмена валют\n`+
+      `💰 Используйте /deposit для пополнения\n`+
+      `📤 Используйте /withdraw для вывода средств`,
+      { parse_mode: 'Markdown' }
+    );
+  } catch (error) {
+    console.error('Ошибка команды balance:', error);
+    ctx.reply('Произошла ошибка при получении баланса.');
+  }
 });
 
 // Handle other messages

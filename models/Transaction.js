@@ -29,6 +29,13 @@ const transactionSchema = new mongoose.Schema({
     ref: 'Dispute',
     required: false
   },
+  // Добавляем информацию о криптоплатеже
+  cryptoDetails: {
+    invoiceId: String,
+    asset: String,
+    amount: String,
+    status: String
+  },
   createdAt: {
     type: Date,
     default: Date.now

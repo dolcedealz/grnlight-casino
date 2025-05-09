@@ -7,6 +7,7 @@ const connectDB  = require('./config/db');
 // Импортируем фабрики ботов под другими именами
 const createCasinoBot = require('./bots/casinoBot');
 const createAdminBot  = require('./bots/adminBot');
+const cryptoPayRoutes = require('./routes/cryptoPayRoutes');
 
 // Load environment variables
 dotenv.config({ path: path.resolve(__dirname, '.env') });
@@ -34,8 +35,9 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/games', require('./routes/gameRoutes'));
 app.use('/api/admin', require('./routes/adminRoutes'));
-app.use('/api/disputes', require('./routes/disputeRoutes')); // Добавляем маршруты для споров
-
+app.use('/api/disputes', require('./routes/disputeRoutes'));
+app.use('/api/crypto', requier('./routes/cryptoPayRoutes')); // Добавляем маршруты для споров
+app.use('/api/users', require('.routes/ExchangeRate.js'));
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
