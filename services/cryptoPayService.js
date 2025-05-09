@@ -17,34 +17,28 @@ const WEBAPP_URL = process.env.WEBAPP_URL || 'https://grnlight-casino.onrender.c
  * @returns {Promise<Object>} - Данные созданного счета
  */
 exports.createInvoice = async (telegramId, amount, currency, description = '') => {
-  try {
-    // Проверка пользователя
-    const user = await User.findOne({ telegramId });
-    if (!user) {
-      throw new Error('Пользователь не найден');
-    }
-    
-    // Создание описания платежа, если не указано
-    if (!description) {
-      description = `Пополнение баланса Greenlight Casino: ${user.firstName} (ID: ${telegramId})`;
-    }
-    
-    // Формирование данных для запроса
-    const payload = JSON.stringify({ 
-      type: 'deposit',
-      userId: user._id.toString(),
-      telegramId: telegramId,
-      amount: amount
-    });
-    
-    // Создание инвойса через API
-    const response = await fetch(`${CRYPTO_PAY_API_URL}/createInvoice`, {
-      method: 'POST',
-      headers: {
-        'Crypto-Pay-API-Token': CRYPTO_PAY_API_TOKEN,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
+    try {
+      // Проверка пользователя
+      const user = await User.findOne({ telegramId });
+      if (!user) {
+        throw new Error('Пользователь не найден');
+      }
+      
+      // Создание описания платежа, если не указано
+      if (!description) {
+        description = `Пополнение баланса Greenlight Casino: ${user.firstName} (ID: ${telegramId})`;
+      }
+      
+      // Формирование данных для запроса
+      const payload = JSON.stringify({ 
+        type: 'deposit',
+        userId: user._id.toString(),
+        telegramId: telegramId,
+        amount: amount
+      });
+      
+      // Для отладки, логируем отправляемые данные
+      const requestBody = {
         asset: currency,
         amount: amount.toString(),
         description: description,
@@ -52,27 +46,42 @@ exports.createInvoice = async (telegramId, amount, currency, description = '') =
         paid_btn_name: 'return',
         paid_btn_url: WEBAPP_URL,
         payload: payload
-      })
-    });
-    
-    const data = await response.json();
-    
-    if (!data.ok) {
-      throw new Error(`Ошибка API: ${data.error}`);
+      };
+      console.log('Отправляемые данные в Crypto Pay API:', requestBody);
+      
+      // Создание инвойса через API
+      const response = await fetch(`${CRYPTO_PAY_API_URL}/createInvoice`, {
+        method: 'POST',
+        headers: {
+          'Crypto-Pay-API-Token': CRYPTO_PAY_API_TOKEN,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+      });
+      
+      const data = await response.json();
+      console.log('Ответ от Crypto Pay API:', data);
+      
+      if (!data.ok) {
+        console.error('Ошибка от Crypto Pay API:', data);
+        // Корректно обрабатываем объект ошибки
+        const errorMessage = typeof data.error === 'object' ? 
+          JSON.stringify(data.error) : data.error;
+        throw new Error(`Ошибка API: ${errorMessage}`);
+      }
+      
+      // Сохраняем информацию о счете в профиле пользователя
+      user.addCryptoPayInvoice(data.result);
+      await user.save();
+      
+      console.log(`Создан счет на оплату: ID ${data.result.invoice_id}, ${amount} ${currency} для пользователя ${telegramId}`);
+      
+      return data.result;
+    } catch (error) {
+      console.error('Ошибка создания счета:', error);
+      throw error;
     }
-    
-    // Сохраняем информацию о счете в профиле пользователя
-    user.addCryptoPayInvoice(data.result);
-    await user.save();
-    
-    console.log(`Создан счет на оплату: ID ${data.result.invoice_id}, ${amount} ${currency} для пользователя ${telegramId}`);
-    
-    return data.result;
-  } catch (error) {
-    console.error('Ошибка создания счета:', error);
-    throw error;
-  }
-};
+  };
 
 /**
  * Получение информации о счете
