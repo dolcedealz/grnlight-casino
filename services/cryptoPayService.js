@@ -134,7 +134,7 @@ exports.createInvoice = async (telegramId, amount, currency, description = '') =
       amount: amount.toString(),
       description: description,
       hidden_message: `Payment for user ${telegramId}`,
-      paid_btn_name: 'return',
+      paid_btn_name: 'callback', // ИСПРАВЛЕНО: изменено с 'return' на 'callback'
       paid_btn_url: WEBAPP_URL,
       payload: payload
     };
