@@ -8,6 +8,91 @@ const CRYPTO_PAY_API_TOKEN = process.env.CRYPTO_PAY_API_TOKEN;
 const CRYPTO_PAY_API_URL = process.env.CRYPTO_PAY_API_URL || 'https://pay.crypt.bot/api';
 const WEBAPP_URL = process.env.WEBAPP_URL || 'https://grnlight-casino.onrender.com';
 
+// Вывод отладочной информации о конфигурации
+console.log('Используется CRYPTO_PAY_API_URL:', CRYPTO_PAY_API_URL);
+console.log('Используется CRYPTO_PAY_API_TOKEN:', CRYPTO_PAY_API_TOKEN ? 
+  CRYPTO_PAY_API_TOKEN.substring(0, 5) + '...' : 'не задан');
+
+/**
+ * Нормализация имени актива для API
+ * @param {string} asset - Имя актива, возможно с суффиксом сети
+ * @returns {string} - Нормализованное имя актива
+ */
+function normalizeAssetName(asset) {
+  // Список поддерживаемых активов
+  const supportedAssets = [
+    'USDT', 'TON', 'SOL', 'TRX', 'GRAM', 'BTC', 'ETH', 
+    'DOGE', 'LTC', 'NOT', 'TRUMP', 'MELANIA', 'PEPE', 
+    'WIF', 'BONK', 'MAJOR', 'MY', 'DOGS', 'MEMHASH', 
+    'BNB', 'HMSTR', 'CATI', 'USDC'
+  ];
+  
+  // Если актив содержит подчеркивание, берем только часть до него
+  if (asset.includes('_')) {
+    const baseName = asset.split('_')[0];
+    if (supportedAssets.includes(baseName)) {
+      return baseName;
+    }
+  }
+  
+  // Проверяем, есть ли актив в списке поддерживаемых
+  if (supportedAssets.includes(asset)) {
+    return asset;
+  }
+  
+  // Проверяем, есть ли актив в списке в верхнем регистре
+  const upperAsset = asset.toUpperCase();
+  if (supportedAssets.includes(upperAsset)) {
+    return upperAsset;
+  }
+  
+  // По умолчанию возвращаем USDT, если актив неизвестен
+  console.warn(`Неизвестный актив: ${asset}, используем USDT`);
+  return 'USDT';
+}
+
+/**
+ * Функция проверки доступности API
+ * @returns {Promise<Object>} - Результат проверки
+ */
+exports.testApiConnection = async () => {
+  try {
+    console.log('Тестирование соединения с Crypto Pay API...');
+    
+    // Запрос списка доступных активов как самый простой способ проверки
+    const response = await fetch(`${CRYPTO_PAY_API_URL}/getAssets`, {
+      method: 'POST',
+      headers: {
+        'Crypto-Pay-API-Token': CRYPTO_PAY_API_TOKEN,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    const data = await response.json();
+    
+    if (!data.ok) {
+      console.error('Ошибка при тестировании API:', data);
+      return {
+        success: false,
+        error: data.error
+      };
+    }
+    
+    console.log('Соединение с Crypto Pay API успешно установлено!');
+    console.log('Доступные активы:', data.result.map(asset => asset.currency).join(', '));
+    return {
+      success: true,
+      assets: data.result
+    };
+  } catch (error) {
+    console.error('Ошибка при тестировании соединения с API:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+};
+
 /**
  * Создание счета на оплату
  * @param {string} telegramId - ID пользователя в Telegram
@@ -17,71 +102,78 @@ const WEBAPP_URL = process.env.WEBAPP_URL || 'https://grnlight-casino.onrender.c
  * @returns {Promise<Object>} - Данные созданного счета
  */
 exports.createInvoice = async (telegramId, amount, currency, description = '') => {
-    try {
-      // Проверка пользователя
-      const user = await User.findOne({ telegramId });
-      if (!user) {
-        throw new Error('Пользователь не найден');
-      }
-      
-      // Создание описания платежа, если не указано
-      if (!description) {
-        description = `Пополнение баланса Greenlight Casino: ${user.firstName} (ID: ${telegramId})`;
-      }
-      
-      // Формирование данных для запроса
-      const payload = JSON.stringify({ 
-        type: 'deposit',
-        userId: user._id.toString(),
-        telegramId: telegramId,
-        amount: amount
-      });
-      
-      // Для отладки, логируем отправляемые данные
-      const requestBody = {
-        asset: currency,
-        amount: amount.toString(),
-        description: description,
-        hidden_message: `Payment for user ${telegramId}`,
-        paid_btn_name: 'return',
-        paid_btn_url: WEBAPP_URL,
-        payload: payload
-      };
-      console.log('Отправляемые данные в Crypto Pay API:', requestBody);
-      
-      // Создание инвойса через API
-      const response = await fetch(`${CRYPTO_PAY_API_URL}/createInvoice`, {
-        method: 'POST',
-        headers: {
-          'Crypto-Pay-API-Token': CRYPTO_PAY_API_TOKEN,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(requestBody)
-      });
-      
-      const data = await response.json();
-      console.log('Ответ от Crypto Pay API:', data);
-      
-      if (!data.ok) {
-        console.error('Ошибка от Crypto Pay API:', data);
-        // Корректно обрабатываем объект ошибки
-        const errorMessage = typeof data.error === 'object' ? 
-          JSON.stringify(data.error) : data.error;
-        throw new Error(`Ошибка API: ${errorMessage}`);
-      }
-      
-      // Сохраняем информацию о счете в профиле пользователя
-      user.addCryptoPayInvoice(data.result);
-      await user.save();
-      
-      console.log(`Создан счет на оплату: ID ${data.result.invoice_id}, ${amount} ${currency} для пользователя ${telegramId}`);
-      
-      return data.result;
-    } catch (error) {
-      console.error('Ошибка создания счета:', error);
-      throw error;
+  try {
+    // Проверка пользователя
+    const user = await User.findOne({ telegramId });
+    if (!user) {
+      throw new Error('Пользователь не найден');
     }
-  };
+    
+    // Создание описания платежа, если не указано
+    if (!description) {
+      description = `Пополнение баланса Greenlight Casino: ${user.firstName} (ID: ${telegramId})`;
+    }
+    
+    // Нормализуем валюту
+    const normalizedAsset = normalizeAssetName(currency);
+    if (normalizedAsset !== currency) {
+      console.log(`Валюта нормализована: ${currency} -> ${normalizedAsset}`);
+    }
+    
+    // Формирование данных для запроса
+    const payload = JSON.stringify({ 
+      type: 'deposit',
+      userId: user._id.toString(),
+      telegramId: telegramId,
+      amount: amount
+    });
+    
+    // Создание данных для запроса
+    const requestBody = {
+      asset: normalizedAsset,
+      amount: amount.toString(),
+      description: description,
+      hidden_message: `Payment for user ${telegramId}`,
+      paid_btn_name: 'return',
+      paid_btn_url: WEBAPP_URL,
+      payload: payload
+    };
+    
+    console.log('Отправляемые данные в Crypto Pay API:', requestBody);
+    
+    // Создание инвойса через API
+    const response = await fetch(`${CRYPTO_PAY_API_URL}/createInvoice`, {
+      method: 'POST',
+      headers: {
+        'Crypto-Pay-API-Token': CRYPTO_PAY_API_TOKEN,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(requestBody)
+    });
+    
+    const data = await response.json();
+    console.log('Ответ от Crypto Pay API:', data);
+    
+    if (!data.ok) {
+      console.error('Ошибка от Crypto Pay API:', data);
+      // Корректно обрабатываем объект ошибки
+      const errorMessage = typeof data.error === 'object' ? 
+        JSON.stringify(data.error) : data.error;
+      throw new Error(`Ошибка API: ${errorMessage}`);
+    }
+    
+    // Сохраняем информацию о счете в профиле пользователя
+    user.addCryptoPayInvoice(data.result);
+    await user.save();
+    
+    console.log(`Создан счет на оплату: ID ${data.result.invoice_id}, ${amount} ${normalizedAsset} для пользователя ${telegramId}`);
+    
+    return data.result;
+  } catch (error) {
+    console.error('Ошибка создания счета:', error);
+    throw error;
+  }
+};
 
 /**
  * Получение информации о счете
@@ -268,14 +360,20 @@ exports.transfer = async (telegramId, amount, currency, comment = '') => {
       throw new Error('Пользователь не найден');
     }
     
+    // Нормализуем валюту
+    const normalizedAsset = normalizeAssetName(currency);
+    if (normalizedAsset !== currency) {
+      console.log(`Валюта нормализована: ${currency} -> ${normalizedAsset}`);
+    }
+    
     // Проверка баланса пользователя
     let userBalance = 0;
     let withdrawCurrency = '';
     
-    if (currency === 'USDT' || currency === 'USDT_TRC20' || currency === 'USDT_BEP20') {
+    if (normalizedAsset === 'USDT') {
       userBalance = user.usdtBalance;
       withdrawCurrency = 'usdt';
-    } else if (currency === 'TON' || currency === 'BTC' || currency === 'ETH') {
+    } else if (['TON', 'BTC', 'ETH', 'BNB'].includes(normalizedAsset)) {
       // Для криптовалют другого типа проверяем USDT баланс
       // и конвертируем по текущему курсу
       userBalance = user.usdtBalance;
@@ -283,12 +381,12 @@ exports.transfer = async (telegramId, amount, currency, comment = '') => {
       
       // Получаем курсы обмена
       const rates = await this.getExchangeRates();
-      const assetRate = rates.rates[currency.toLowerCase()] || 1;
+      const assetRate = rates.rates[normalizedAsset.toLowerCase()] || 1;
       
       // Рассчитываем, сколько USDT нужно для вывода
       amount = amount / assetRate;
     } else {
-      throw new Error(`Неподдерживаемая валюта для вывода: ${currency}`);
+      throw new Error(`Неподдерживаемая валюта для вывода: ${normalizedAsset}`);
     }
     
     // Определяем комиссию (например, 1%)
@@ -312,7 +410,7 @@ exports.transfer = async (telegramId, amount, currency, comment = '') => {
       },
       body: JSON.stringify({
         user_id: telegramId,
-        asset: currency,
+        asset: normalizedAsset,
         amount: amount.toString(),
         spend_id: `withdraw_${Date.now()}_${telegramId}`,
         comment: comment || 'Вывод средств из Greenlight Casino'
@@ -340,7 +438,7 @@ exports.transfer = async (telegramId, amount, currency, comment = '') => {
       game: 'none',
       cryptoDetails: {
         transferId: data.result.transfer_id,
-        asset: currency,
+        asset: normalizedAsset,
         amount: amount.toString(),
         status: 'completed'
       }
@@ -357,7 +455,7 @@ exports.transfer = async (telegramId, amount, currency, comment = '') => {
       game: 'none',
       cryptoDetails: {
         transferId: data.result.transfer_id,
-        asset: currency,
+        asset: normalizedAsset,
         amount: fee.toString(),
         status: 'fee'
       }
@@ -365,12 +463,12 @@ exports.transfer = async (telegramId, amount, currency, comment = '') => {
     
     await feeTransaction.save();
     
-    console.log(`Выполнен вывод средств для пользователя ${telegramId}: ${amount} ${currency}, комиссия: ${fee} ${withdrawCurrency.toUpperCase()}`);
+    console.log(`Выполнен вывод средств для пользователя ${telegramId}: ${amount} ${normalizedAsset}, комиссия: ${fee} ${withdrawCurrency.toUpperCase()}`);
     
     // Отправляем уведомление пользователю
     await this.sendNotification(telegramId, 
       `✅ Вывод средств успешно выполнен!\n\n` +
-      `Сумма: ${amount} ${currency}\n` +
+      `Сумма: ${amount} ${normalizedAsset}\n` +
       `Комиссия: ${fee} ${withdrawCurrency.toUpperCase()}\n` +
       `Итого списано: ${totalAmount} ${withdrawCurrency.toUpperCase()}\n\n` +
       `Спасибо за использование Greenlight Casino!`
@@ -382,7 +480,7 @@ exports.transfer = async (telegramId, amount, currency, comment = '') => {
       amount: amount,
       fee: fee,
       total: totalAmount,
-      currency: currency
+      currency: normalizedAsset
     };
   } catch (error) {
     console.error('Ошибка перевода средств:', error);
@@ -471,6 +569,19 @@ exports.updateExchangeRates = async () => {
       },
       updatedAt: new Date()
     };
+  }
+};
+
+/**
+ * Получение курсов обмена
+ * @returns {Promise<Object>} - Актуальные курсы обмена
+ */
+exports.getExchangeRates = async () => {
+  try {
+    return await this.updateExchangeRates();
+  } catch (error) {
+    console.error('Ошибка получения курсов обмена:', error);
+    throw error;
   }
 };
 

@@ -964,20 +964,20 @@ bot.command('deposit', async (ctx) => {
       reply_markup: {
         inline_keyboard: [
           [
-            { text: 'USDT TRC20', callback_data: 'deposit_USDT_TRC20' },
-            { text: 'USDT BEP20', callback_data: 'deposit_USDT_BSC' }
-          ],
-          [
-            { text: 'Биткоин (BTC)', callback_data: 'deposit_BTC' },
-            { text: 'Ethereum (ETH)', callback_data: 'deposit_ETH' }
-          ],
-          [
-            { text: 'TON', callback_data: 'deposit_TON' },
-            { text: 'BNB', callback_data: 'deposit_BNB' }
+            { text: 'USDT', callback_data: 'deposit_USDT' },
+           { text: 'TON', callback_data: 'deposit_TON' }
+         ],
+         [
+           { text: 'BTC', callback_data: 'deposit_BTC' },
+           { text: 'ETH', callback_data: 'deposit_ETH' }
+         ],
+         [
+          { text: 'BNB', callback_data: 'deposit_BNB' },
+           { text: 'SOL', callback_data: 'deposit_SOL' }
           ]
         ]
       }
-    });
+  });
   } catch (error) {
     console.error('Ошибка команды deposit:', error);
     ctx.reply('Произошла ошибка при обработке запроса.');
@@ -987,7 +987,13 @@ bot.command('deposit', async (ctx) => {
 // Обработчик колбэков для пополнения
 bot.action(/^deposit_(.+)$/, async (ctx) => {
   try {
-    const currency = ctx.match[1]; // USDT_TRC20, BTC, ETH, и т.д.
+    // Получаем чистую валюту без суффикса сети
+    let currency = ctx.match[1]; 
+    // Убираем суффикс _TRC20 или _BSC, если они есть
+    if (currency.includes('_')) {
+      currency = currency.split('_')[0];
+    }
+    
     const telegramId = ctx.from.id;
     
     // Отправляем сообщение о выборе суммы
