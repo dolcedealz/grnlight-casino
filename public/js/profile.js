@@ -1,6 +1,6 @@
 /**
  * profile.js - Модуль для управления функционалом профиля
- * Версия 1.0.0
+ * Версия 1.1.0 - С улучшенной безопасностью
  */
 
 (function() {
@@ -16,7 +16,7 @@
     }
     
     const app = window.GreenLightApp;
-    app.log('Profile', 'Инициализация модуля профиля v1.0.0');
+    app.log('Profile', 'Инициализация модуля профиля v1.1.0');
     
     // Профильный модуль
     const profileModule = (function() {
@@ -115,9 +115,15 @@
             // Обновляем профиль при каждой транзакции
             document.addEventListener('transaction', function(e) {
                 if (e.detail && e.detail.amount) {
-                    // Обновляем дневной оборот только для положительных транзакций
-                    if (e.detail.amount > 0) {
-                        updateDailyTurnover(e.detail.amount);
+                    // Валидация данных транзакции
+                    const amount = parseFloat(e.detail.amount);
+                    if (!isNaN(amount) && isFinite(amount)) {
+                        // Обновляем дневной оборот только для положительных транзакций
+                        if (amount > 0) {
+                            updateDailyTurnover(amount);
+                        }
+                    } else {
+                        app.log('Profile', `Получена транзакция с невалидной суммой: ${e.detail.amount}`, true);
                     }
                 }
             });
@@ -130,12 +136,62 @@
             try {
                 const savedState = localStorage.getItem('profileState');
                 if (savedState) {
-                    const parsedState = JSON.parse(savedState);
+                    let secureState;
                     
-                    // Обновляем состояние из сохранения
-                    state.activityPoints = parsedState.activityPoints || 0;
-                    state.dailyTurnover = parsedState.dailyTurnover || 0;
-                    state.lastActivityReset = parsedState.lastActivityReset ? new Date(parsedState.lastActivityReset) : new Date();
+                    try {
+                        secureState = JSON.parse(savedState);
+                    } catch (parseError) {
+                        throw new Error('Ошибка при парсинге данных состояния профиля');
+                    }
+                    
+                    // Проверяем структуру данных
+                    if (!secureState || typeof secureState !== 'object') {
+                        throw new Error('Некорректный формат данных состояния');
+                    }
+                    
+                    // Проверяем наличие всех необходимых полей
+                    if (!secureState.data || !secureState.timestamp || !secureState.signature) {
+                        throw new Error('Отсутствуют обязательные поля в данных состояния');
+                    }
+                    
+                    // Проверяем актуальность данных (не старше 1 дня)
+                    const now = Date.now();
+                    if (now - secureState.timestamp > 86400000) {
+                        throw new Error('Устаревшие данные состояния профиля');
+                    }
+                    
+                    // Проверяем подпись для обеспечения целостности данных
+                    const dataToSign = JSON.stringify(secureState.data) + secureState.timestamp;
+                    const expectedSignature = generateDataSignature(dataToSign);
+                    
+                    if (expectedSignature !== secureState.signature) {
+                        throw new Error('Нарушена целостность данных состояния профиля');
+                    }
+                    
+                    // Проверяем значения на допустимые диапазоны
+                    const data = secureState.data;
+                    
+                    // Безопасно извлекаем значения с проверкой типов и ограничениями
+                    state.activityPoints = typeof data.activityPoints === 'number' && isFinite(data.activityPoints) && data.activityPoints >= 0 
+                                        ? Math.min(data.activityPoints, 100000) // Разумное максимальное значение
+                                        : 0;
+                                        
+                    state.dailyTurnover = typeof data.dailyTurnover === 'number' && isFinite(data.dailyTurnover) && data.dailyTurnover >= 0 
+                                       ? Math.min(data.dailyTurnover, 1000000) // Разумное максимальное значение
+                                       : 0;
+                    
+                    // Безопасно преобразуем дату
+                    try {
+                        const resetDate = new Date(data.lastActivityReset);
+                        // Проверяем, что дата валидна
+                        if (!isNaN(resetDate.getTime())) {
+                            state.lastActivityReset = resetDate;
+                        } else {
+                            state.lastActivityReset = new Date();
+                        }
+                    } catch (dateError) {
+                        state.lastActivityReset = new Date();
+                    }
                     
                     app.log('Profile', 'Состояние профиля загружено из хранилища');
                 }
@@ -154,18 +210,54 @@
          */
         const saveProfileState = function() {
             try {
+                // Ограничиваем сохраняемые данные только необходимыми
                 const stateToSave = {
                     activityPoints: state.activityPoints,
                     dailyTurnover: state.dailyTurnover,
                     lastActivityReset: state.lastActivityReset.toISOString()
                 };
                 
-                localStorage.setItem('profileState', JSON.stringify(stateToSave));
+                // Добавляем подпись и временную метку для обеспечения целостности
+                const timestamp = Date.now();
+                const dataToSign = JSON.stringify(stateToSave) + timestamp;
+                
+                // Используем простую хеш-функцию для проверки целостности
+                const signature = generateDataSignature(dataToSign);
+                
+                // Сохраняем с подписью и временной меткой
+                const secureState = {
+                    data: stateToSave,
+                    timestamp: timestamp,
+                    signature: signature
+                };
+                
+                localStorage.setItem('profileState', JSON.stringify(secureState));
                 app.log('Profile', 'Состояние профиля сохранено в хранилище');
             } catch (error) {
                 app.log('Profile', `Ошибка сохранения состояния профиля: ${error.message}`, true);
             }
         };
+        
+        /**
+         * Генерация подписи данных для проверки целостности
+         * @param {string} data - Данные для подписи
+         * @returns {string} - Хеш-подпись
+         */
+        function generateDataSignature(data) {
+            // Простая хеш-функция для генерации подписи
+            let hash = 0;
+            const domain = window.location.hostname || 'greenlight-casino';
+            const saltedData = data + '-' + domain;
+            
+            for (let i = 0; i < saltedData.length; i++) {
+                const char = saltedData.charCodeAt(i);
+                hash = ((hash << 5) - hash) + char;
+                hash = hash & hash; // Преобразование в 32-битное целое
+            }
+            
+            // Добавляем префикс для дополнительной защиты
+            return 'gl-' + Math.abs(hash).toString(16);
+        }
         
         /**
          * Проверка необходимости сброса дневной активности
@@ -199,13 +291,28 @@
          */
         const updateDailyTurnover = function(amount) {
             try {
+                if (typeof amount !== 'number' || !isFinite(amount) || amount <= 0) {
+                    app.log('Profile', `Невалидное значение для обновления оборота: ${amount}`, true);
+                    return;
+                }
+                
+                // Устанавливаем разумные ограничения для предотвращения манипуляций
+                const maxSingleTransaction = 100000; // Максимальная сумма для единичного обновления
+                const safeAmount = Math.min(amount, maxSingleTransaction);
+                
                 // Увеличиваем дневной оборот
-                state.dailyTurnover += amount;
+                state.dailyTurnover += safeAmount;
+                
+                // Ограничиваем максимальное значение дневного оборота
+                const maxDailyTurnover = 1000000; // Разумный максимум
+                state.dailyTurnover = Math.min(state.dailyTurnover, maxDailyTurnover);
                 
                 // Начисляем баллы активности (1 балл за каждые 100 звезд оборота)
-                const newPoints = Math.floor(amount / 100);
+                const newPoints = Math.floor(safeAmount / 100);
                 if (newPoints > 0) {
-                    state.activityPoints += newPoints;
+                    // Ограничиваем максимальное количество баллов
+                    const maxActivityPoints = 100000;
+                    state.activityPoints = Math.min(state.activityPoints + newPoints, maxActivityPoints);
                     app.log('Profile', `Начислено ${newPoints} баллов активности`);
                 }
                 
@@ -259,35 +366,67 @@
         };
         
         /**
-         * Обработка введенного промокода
+         * Обработка введенного промокода с улучшенной безопасностью
          */
         const processPromoCode = function(code) {
-            if (!code || code.trim() === '') {
-                showNotification('Введите промокод');
+            // Валидация промокода
+            if (!code || typeof code !== 'string' || code.trim() === '') {
+                showNotification('Введите корректный промокод');
                 return;
             }
             
-            app.log('Profile', `Обработка промокода: ${code}`);
+            // Очистка и нормализация кода для безопасной обработки
+            const normalizedCode = code.trim().toUpperCase();
+            
+            // Логируем попытку использования промокода
+            app.log('Profile', `Обработка промокода: ${normalizedCode}`);
+            
+            // Добавим проверку максимальной длины промокода
+            if (normalizedCode.length > 20) {
+                showNotification('Слишком длинный промокод');
+                return;
+            }
+            
+            // Проверяем на наличие недопустимых символов
+            if (!/^[A-Z0-9]+$/.test(normalizedCode)) {
+                showNotification('Промокод может содержать только буквы и цифры');
+                return;
+            }
+            
+            // Проверяем, использовался ли промокод ранее
+            const usedCodes = JSON.parse(localStorage.getItem('usedPromoCodes') || '[]');
+            if (usedCodes.includes(normalizedCode)) {
+                showNotification('Вы уже использовали этот промокод');
+                return;
+            }
             
             // Здесь должна быть логика проверки промокода на сервере
             // Для демо просто выводим уведомление
             
             // Пример обработки промокода (можно заменить на реальную логику API)
-            if (code === 'BONUS100') {
+            if (normalizedCode === 'BONUS100') {
                 // Начисляем 100 звезд
                 if (window.GreenLightApp.user) {
-                    window.GreenLightApp.user.balance += 100;
+                    // Устанавливаем лимит для бонуса
+                    const maxBonus = 1000;
+                    const bonusAmount = Math.min(100, maxBonus);
+                    
+                    window.GreenLightApp.user.balance += bonusAmount;
                     
                     // Обновляем интерфейс
                     updateUI();
                     
+                    // Сохраняем использованный промокод
+                    usedCodes.push(normalizedCode);
+                    localStorage.setItem('usedPromoCodes', JSON.stringify(usedCodes));
+                    
                     // Отправляем событие транзакции
                     const transactionEvent = new CustomEvent('transaction', {
-                        detail: { amount: 100, type: 'promo' }
+                        detail: { amount: bonusAmount, type: 'promo' }
                     });
                     document.dispatchEvent(transactionEvent);
                     
-                    showNotification('Промокод активирован! +100 звезд');
+                    showNotification(`Промокод активирован! +${bonusAmount} звезд`);
                     provideTactileFeedback('success');
                 }
             } else {
@@ -302,15 +441,23 @@
         };
         
         /**
-         * Показ уведомления
+         * Показ уведомления с защитой от XSS
          */
         const showNotification = function(message) {
+            // Безопасно экранируем сообщение
+            const safeMessage = String(message)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+                
             // Используем существующую функцию уведомлений из основного приложения
             if (window.casinoApp && window.casinoApp.showNotification) {
-                window.casinoApp.showNotification(message);
+                window.casinoApp.showNotification(safeMessage);
             } else {
                 // Запасной вариант
-                alert(message);
+                alert(safeMessage);
             }
         };
         

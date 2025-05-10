@@ -207,6 +207,32 @@ exports.getInvoice = async (invoiceId) => {
 };
 
 /**
+ * Проверка подписи webhook-уведомления
+ * @param {Object} update - Данные обновления
+ * @param {string} signature - Подпись от Crypto Pay
+ * @returns {boolean} - Результат проверки
+ */
+function verifySignature(update, signature) {
+  if (!signature || !CRYPTO_PAY_API_TOKEN) {
+    console.warn('Отсутствует подпись или API токен для проверки');
+    return false;
+  }
+  
+  const crypto = require('crypto');
+  const data = JSON.stringify(update);
+  const hmac = crypto.createHmac('sha256', CRYPTO_PAY_API_TOKEN)
+                     .update(data)
+                     .digest('hex');
+  
+  const isValid = hmac === signature;
+  if (!isValid) {
+    console.warn('Неверная подпись webhook-уведомления');
+  }
+  
+  return isValid;
+}
+
+/**
  * Обработка webhook-уведомлений от Crypto Pay
  * @param {Object} update - Данные обновления
  * @param {string} signature - Подпись для верификации
@@ -214,101 +240,138 @@ exports.getInvoice = async (invoiceId) => {
  */
 exports.handleUpdate = async (update, signature) => {
   try {
-    // Проверяем подпись, если предоставлена
-    // TODO: Реализовать проверку подписи
+    // Проверяем подпись
+    if (!verifySignature(update, signature)) {
+      console.error('Неверная подпись webhook-уведомления');
+      return { status: 'error', reason: 'invalid_signature' };
+    }
+    
+    // Проверяем структуру данных
+    if (!update || !update.update_type) {
+      console.error('Некорректный формат webhook-уведомления');
+      return { status: 'error', reason: 'invalid_format' };
+    }
     
     // Обрабатываем только уведомления о платежах
     if (update.update_type !== 'invoice_paid') {
       return { status: 'skipped', reason: 'not_invoice_paid' };
     }
     
+    // Проверяем наличие данных invoice
+    if (!update.payload || !update.payload.invoice_id) {
+      console.error('Отсутствуют данные invoice в уведомлении');
+      return { status: 'error', reason: 'missing_invoice_data' };
+    }
+    
     const invoice = update.payload;
     
     // Проверяем, существует ли инвойс
-    const invoiceData = await this.getInvoice(invoice.invoice_id);
-    
-    // Если инвойс уже обработан, пропускаем
-    if (invoiceData.paid && invoiceData.processed) {
-      return { status: 'skipped', reason: 'already_processed' };
-    }
-    
-    // Если инвойс оплачен, но не обработан
-    if (invoiceData.paid && !invoiceData.processed) {
-      // Парсим payload инвойса
-      const payload = JSON.parse(invoiceData.payload || '{}');
+    try {
+      const invoiceData = await this.getInvoice(invoice.invoice_id);
       
-      if (payload.type === 'deposit' && payload.telegramId) {
-        // Находим пользователя
-        const user = await User.findOne({ telegramId: payload.telegramId });
-        
-        if (!user) {
-          throw new Error(`Пользователь с ID ${payload.telegramId} не найден`);
-        }
-        
-        // Определяем валюту и сумму
-        let currency = 'stars'; // По умолчанию звезды
-        let amount = parseFloat(payload.amount);
-        
-        // Если валюта не звезды, производим конвертацию
-        if (invoiceData.asset !== 'STARS') {
-          // Получаем курсы обмена
-          const rates = await this.getExchangeRates();
-          
-          // Конвертируем в USDT
-          if (invoiceData.asset === 'USDT' || invoiceData.asset === 'USDT_TRC20' || invoiceData.asset === 'USDT_BEP20') {
-            // Если это USDT, просто добавляем на USDT баланс
-            currency = 'usdt';
-          } else if (invoiceData.asset === 'TON' || invoiceData.asset === 'BTC' || invoiceData.asset === 'ETH') {
-            // Конвертируем в USDT через курсы
-            const assetRate = rates.rates[invoiceData.asset.toLowerCase()] || 1;
-            amount = amount * assetRate;
-            currency = 'usdt';
-          }
-        }
-        
-        // Добавляем средства на баланс пользователя
-        await user.addFunds(amount, currency);
-        
-        // Создаем запись о транзакции
-        const transaction = new Transaction({
-          userId: user._id,
-          telegramId: user.telegramId,
-          amount: amount,
-          type: 'deposit',
-          game: 'none',
-          cryptoDetails: {
-            invoiceId: invoiceData.invoice_id,
-            asset: invoiceData.asset,
-            amount: invoiceData.amount,
-            status: 'paid'
-          }
-        });
-        
-        await transaction.save();
-        
-        // Отмечаем инвойс как обработанный
-        await this.markInvoiceAsProcessed(invoice.invoice_id);
-        
-        console.log(`Баланс пользователя ${user.telegramId} пополнен: ${amount} ${currency}`);
-        
-        // Отправляем уведомление пользователю
-        await this.sendNotification(user.telegramId, 
-          `✅ Ваш баланс успешно пополнен!\n\n${amount} ${getCurrencySymbol(currency)}\n\nСпасибо за использование Greenlight Casino!`
-        );
-        
-        return { 
-          status: 'success', 
-          user: user.telegramId, 
-          amount: amount, 
-          currency: currency 
-        };
+      // Если инвойс уже обработан, пропускаем
+      if (invoiceData.paid && invoiceData.processed) {
+        return { status: 'skipped', reason: 'already_processed' };
       }
+      
+      // Если инвойс оплачен, но не обработан
+      if (invoiceData.paid && !invoiceData.processed) {
+        // Безопасный парсинг payload инвойса
+        let payload = {};
+        try {
+          payload = JSON.parse(invoiceData.payload || '{}');
+        } catch (parseError) {
+          console.error('Ошибка парсинга payload инвойса:', parseError);
+          return { status: 'error', reason: 'invalid_payload' };
+        }
+        
+        // Проверяем корректность payload
+        if (!payload.type || !payload.telegramId) {
+          console.error('Некорректный формат payload инвойса');
+          return { status: 'error', reason: 'invalid_payload_format' };
+        }
+        
+        if (payload.type === 'deposit' && payload.telegramId) {
+          // Находим пользователя
+          const user = await User.findOne({ telegramId: payload.telegramId });
+          
+          if (!user) {
+            throw new Error(`Пользователь с ID ${payload.telegramId} не найден`);
+          }
+          
+          // Определяем валюту и сумму
+          let currency = 'stars'; // По умолчанию звезды
+          let amount = parseFloat(payload.amount);
+          
+          if (isNaN(amount) || amount <= 0) {
+            console.error('Некорректная сумма в payload инвойса');
+            return { status: 'error', reason: 'invalid_amount' };
+          }
+          
+          // Если валюта не звезды, производим конвертацию
+          if (invoiceData.asset !== 'STARS') {
+            // Получаем курсы обмена
+            const rates = await this.getExchangeRates();
+            
+            // Конвертируем в USDT
+            if (invoiceData.asset === 'USDT' || invoiceData.asset === 'USDT_TRC20' || invoiceData.asset === 'USDT_BEP20') {
+              // Если это USDT, просто добавляем на USDT баланс
+              currency = 'usdt';
+            } else if (invoiceData.asset === 'TON' || invoiceData.asset === 'BTC' || invoiceData.asset === 'ETH') {
+              // Конвертируем в USDT через курсы
+              const assetRate = rates.rates[invoiceData.asset.toLowerCase()] || 1;
+              amount = amount * assetRate;
+              currency = 'usdt';
+            }
+          }
+          
+          // Добавляем средства на баланс пользователя
+          await user.addFunds(amount, currency);
+          
+          // Создаем запись о транзакции
+          const transaction = new Transaction({
+            userId: user._id,
+            telegramId: user.telegramId,
+            amount: amount,
+            type: 'deposit',
+            game: 'none',
+            cryptoDetails: {
+              invoiceId: invoiceData.invoice_id,
+              asset: invoiceData.asset,
+              amount: invoiceData.amount,
+              status: 'paid'
+            }
+          });
+          
+          await transaction.save();
+          
+          // Отмечаем инвойс как обработанный
+          await this.markInvoiceAsProcessed(invoice.invoice_id);
+          
+          console.log(`Баланс пользователя ${user.telegramId} пополнен: ${amount} ${currency}`);
+          
+          // Отправляем уведомление пользователю
+          await this.sendNotification(user.telegramId, 
+            `✅ Ваш баланс успешно пополнен!\n\n${amount} ${getCurrencySymbol(currency)}\n\nСпасибо за использование Greenlight Casino!`
+          );
+          
+          return { 
+            status: 'success', 
+            user: user.telegramId, 
+            amount: amount, 
+            currency: currency 
+          };
+        }
+      }
+    } catch (invoiceError) {
+      console.error('Ошибка при обработке инвойса:', invoiceError);
+      return { status: 'error', reason: 'invoice_processing_error', details: invoiceError.message };
     }
     
     return { status: 'skipped', reason: 'unknown' };
   } catch (error) {
     console.error('Ошибка обработки webhook:', error);
-    throw error;
+    return { status: 'error', reason: 'general_error', details: error.message };
   }
 };
 

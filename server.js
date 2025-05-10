@@ -14,7 +14,9 @@ dotenv.config({ path: path.resolve(__dirname, '.env') });
 const CASINO_BOT_TOKEN = process.env.CASINO_BOT_TOKEN;
 const ADMIN_BOT_TOKEN  = process.env.ADMIN_BOT_TOKEN;
 
-console.log('Tokens:', { CASINO_BOT_TOKEN, ADMIN_BOT_TOKEN });
+// ИСПРАВЛЕНО: Безопасное логирование без раскрытия токенов
+console.log('Боты инициализированы с корректными токенами:', 
+           { casinoBot: !!CASINO_BOT_TOKEN, adminBot: !!ADMIN_BOT_TOKEN });
 
 // Создаём экземпляры ботов
 const casinoBot = createCasinoBot(CASINO_BOT_TOKEN);

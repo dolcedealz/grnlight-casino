@@ -63,62 +63,103 @@ module.exports = (token) => {
     }
   });
 
- // Обработчик web_app_data - улучшенная версия
+// Обработчик web_app_data - улучшенная версия с валидацией
 bot.on('web_app_data', async (ctx) => {
   try {
-      // Получаем данные от веб-приложения
-      const rawData = ctx.webAppData.data;
-      console.log('Получены данные из веб-приложения:', rawData);
+    // Получаем данные от веб-приложения
+    const rawData = ctx.webAppData.data;
+    console.log('Получены данные из веб-приложения:', rawData);
+    
+    let data;
+    try {
+      // Пробуем распарсить JSON данные
+      data = JSON.parse(rawData);
       
-      let data;
-      try {
-          // Пробуем распарсить JSON данные
-          data = JSON.parse(rawData);
-      } catch (e) {
-          // Если не JSON, то обрабатываем как строку
-          console.log('Данные не в формате JSON, обрабатываем как строку');
-          data = rawData;
+      // Добавляем валидацию данных
+      if (!data || typeof data !== 'object') {
+        throw new Error('Некорректный формат данных');
       }
       
-      // Обработка различных типов данных от веб-приложения
-      if (typeof data === 'object' && data.type) {
-          // Обработка типизированных данных (объект)
-          switch(data.type) {
-              case 'dispute_room_connect':
-                  // Обработка подключения к комнате спора
-                  await handleDisputeRoomConnect(ctx, data);
-                  break;
-                  
-              case 'player_ready':
-                  // Обработка статуса готовности игрока
-                  await handlePlayerReady(ctx, data);
-                  break;
-                  
-              case 'dispute_result':
-                  // Обработка результата спора
-                  await handleDisputeResult(ctx, data);
-                  break;
-                  
-              case 'dispute_result_final':
-                  // Обработка финального результата спора
-                  await handleDisputeResultFinal(ctx, data);
-                  break;
-                  
-              default:
-                  console.log(`Неизвестный тип данных: ${data.type}`);
-                  ctx.reply('Получены неизвестные данные.');
-          }
+      // Проверяем наличие ожидаемых полей в зависимости от типа
+      if (data.type && typeof data.type === 'string') {
+        // Валидация в зависимости от типа данных
+        switch(data.type) {
+          case 'dispute_room_connect':
+            if (!data.disputeId || !data.roomId) {
+              throw new Error('Отсутствуют обязательные поля для подключения к комнате');
+            }
+            break;
+          case 'player_ready':
+            if (!data.disputeId || typeof data.ready === 'undefined') {
+              throw new Error('Отсутствуют обязательные поля для статуса игрока');
+            }
+            break;
+          case 'dispute_result':
+            if (!data.disputeId) {
+              throw new Error('Отсутствует ID спора');
+            }
+            break;
+          case 'dispute_result_final':
+            if (!data.disputeId) {
+              throw new Error('Отсутствует ID спора');
+            }
+            break;
+          default:
+            console.log(`Неизвестный тип данных: ${data.type}`);
+            throw new Error('Неподдерживаемый тип данных');
+        }
       } else if (typeof data === 'string' && data.startsWith('dispute_result_')) {
-          // Обработка результата спора (старый формат)
-          await handleLegacyDisputeResult(ctx, data);
+        // Обработка данных в старом формате
+        const parts = data.split('_');
+        if (parts.length < 4) {
+          throw new Error('Некорректный формат данных спора');
+        }
       } else {
-          // Обработка других данных
-          console.log('Обработка неструктурированных данных');
-          ctx.reply('Данные успешно получены.');
+        throw new Error('Отсутствует тип данных');
       }
+    } catch (e) {
+      // В случае ошибки парсинга или валидации
+      console.error('Ошибка обработки данных веб-приложения:', e.message);
+      return ctx.reply('❌ Получены некорректные данные от веб-приложения');
+    }
+    
+    // Обработка различных типов данных от веб-приложения
+    if (typeof data === 'object' && data.type) {
+      // Обработка типизированных данных (объект)
+      switch(data.type) {
+        case 'dispute_room_connect':
+          // Обработка подключения к комнате спора
+          await handleDisputeRoomConnect(ctx, data);
+          break;
+          
+        case 'player_ready':
+          // Обработка статуса готовности игрока
+          await handlePlayerReady(ctx, data);
+          break;
+          
+        case 'dispute_result':
+          // Обработка результата спора
+          await handleDisputeResult(ctx, data);
+          break;
+          
+        case 'dispute_result_final':
+          // Обработка финального результата спора
+          await handleDisputeResultFinal(ctx, data);
+          break;
+          
+        default:
+          ctx.reply('Получен неподдерживаемый тип данных.');
+      }
+    } else if (typeof data === 'string' && data.startsWith('dispute_result_')) {
+      // Обработка результата спора (старый формат)
+      await handleLegacyDisputeResult(ctx, data);
+    } else {
+      // Обработка других данных
+      ctx.reply('Неподдерживаемый формат данных.');
+    }
   } catch (error) {
-      console.error('Ошибка обработки данных веб-приложения:', error);
-      ctx.reply('❌ Произошла ошибка при обработке данных');
+    console.error('Ошибка обработки данных веб-приложения:', error);
+    ctx.reply('❌ Произошла ошибка при обработке данных');
   }
 });
 
